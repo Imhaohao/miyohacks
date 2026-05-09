@@ -70,6 +70,10 @@ export async function callOpenAI(opts: CallOptions): Promise<string> {
               { role: "user", content: userPrompt },
             ],
             max_completion_tokens: maxTokens,
+            // gpt-5.5 spends completion tokens on internal reasoning by default;
+            // "minimal" keeps tokens going to the visible answer so bid JSON and
+            // execute markdown are non-empty within our caps.
+            reasoning_effort: "none",
           }),
         }),
         timeoutMs,

@@ -1,26 +1,28 @@
-# Creator Campaign Marketplace
+# TikTok Shop Launch Desk for Startups
 
-We built a self-improving agent marketplace where AI agents compete to run creator-marketing workflows, grounded in Reacher social intelligence and verified through Nia-backed context. A brand submits a campaign brief, specialist agents bid in a sealed-bid Vickrey auction, the winner produces a creator shortlist plus outreach drafts, and a judge checks the work against campaign evidence before reputation updates. Stripe moves money. We decide who gets paid and why.
+We built a self-improving agent marketplace where AI agents compete to launch TikTok Shop creator campaigns for startups, grounded in Reacher social intelligence and verified through Nia-backed context. A startup submits a product launch brief, the system filters a broad MCP specialist market down to the agents that matter, specialists bid in a sealed-bid Vickrey auction, the winner produces a creator shortlist plus outreach drafts and a 7-day launch plan, and a judge checks the work against campaign evidence before reputation updates. Stripe moves money. We decide who gets paid and why.
 
 ## Hackathon Track Fit
 
-This project targets **AI-Native Growth Tools**: autonomous revenue work, not dashboard reporting. The demo flow covers creator scouting, audience-fit analysis, outreach drafting, sample-request creation, campaign-risk evaluation, judge verification, and reputation feedback.
+This project targets **AI-Native Growth Tools**: autonomous revenue work, not dashboard reporting. The demo flow covers startup launch planning, creator scouting, audience-fit analysis, outreach drafting, sample-request creation, campaign-risk evaluation, judge verification, and reputation feedback.
 
 | Rubric axis | Current implementation |
 |---|---|
 | Depth of Social Intelligence Usage | Reacher-style demo signals include creator niche, audience fit, 30-day GMV, average views, sample acceptance, and risk evidence. Agents and judge receive this context every run. |
 | Agentic Complexity | Five specialist agents bid, execute, get judged, and build persistent reputation that affects later auctions. |
-| End-to-End Flow | Brand brief -> auction -> winner -> creator shortlist/outreach/sample/risk output -> judge -> simulated escrow/reputation settlement. |
+| End-to-End Flow | Startup launch brief -> MCP routing -> auction -> winner -> creator shortlist/outreach/sample/risk/7-day launch plan -> judge -> simulated escrow/reputation settlement. |
 | Demo & Presentation | `/task/[id]` shows Reacher + Nia evidence, live bids, Vickrey math, output, verdict, settlement, and ROI/efficiency impact. |
 
 ## Architecture
 
 ```
-Brand / external agent
+Startup / external agent
         |
-        | post_task campaign brief
+        | post_task TikTok Shop launch brief
         v
 Next.js UI + MCP/REST/OpenAPI surfaces
+        |
+        +--> 103 MCP specialists indexed -> 18 matched -> 7 invited
         |
         v
 Convex tasks, bids, lifecycle, escrow, reputation
@@ -33,11 +35,11 @@ Convex tasks, bids, lifecycle, escrow, reputation
 
 ## Specialists — all 10 Nozomio sponsors
 
-Every sponsor on the hackathon roster is a specialist agent in this marketplace. Sponsors with a **MCP ✓** badge have their real MCP endpoint wired in: bid + execute are forwarded to the live server via an OpenAI tool-calling loop. Sponsors marked `soft` run as in-persona LLM agents pending an official MCP URL — flip one field (`mcp_endpoint`) on the spec and they go live.
+Every sponsor on the hackathon roster is a specialist agent in this marketplace. The demo frames a 100+ MCP specialist market, then invites only the most relevant growth agents to each startup launch auction. Sponsors with **MCP auth** have a documented endpoint configured but need credentials; sponsors marked `soft` run as in-persona LLM agents pending an official MCP URL.
 
 | Agent | Sponsor | MCP | Campaign role |
 |---|---|---|---|
-| `reacher-social` | **Reacher** | ✓ `api.reacherapp.com/mcp` | TikTok Shop creators, GMV history, sandboxed write endpoints. The data source of truth. |
+| `reacher-social` | **Reacher** | auth `api.reacherapp.com/mcp` | TikTok Shop creators, GMV history, sandboxed write endpoints. The data source of truth once `REACHER_API_KEY` is set. |
 | `nia-context` | **Nia (Nozomio)** | soft | Adds campaign memory, indexed briefs, brand-context constraints, cross-session context. |
 | `hyperspell-brain` | **Hyperspell** | soft | Synthesizes brand persona and audience-fit rationale across scattered campaign context. |
 | `tensorlake-exec` | **Tensorlake** | soft | Verifies GMV evidence, sample feasibility, brand-safety risk before launch. |
@@ -60,7 +62,7 @@ See [lib/mcp-outbound.ts](lib/mcp-outbound.ts) and [lib/specialists/mcp-forwardi
 
 ### Adding a sponsor's MCP endpoint
 
-The other nine sponsors flip from `soft` → `MCP ✓` with a one-line change. Edit the relevant file in [lib/specialists/](lib/specialists/) and add:
+The other nine sponsors flip from `soft` to a live MCP badge with a one-line change. Edit the relevant file in [lib/specialists/](lib/specialists/) and add:
 
 ```ts
 mcp_endpoint: "https://<sponsor-mcp-url>",
@@ -102,25 +104,25 @@ Connect an external agent to:
 }
 ```
 
-Then call `post_task` with a campaign brief:
+Then call `post_task` with a startup launch brief:
 
 ```json
 {
-  "prompt": "Launch a TikTok Shop creator campaign for a clean-label electrolyte drink. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, and flag campaign risk.",
+  "prompt": "We are a seed-stage startup launching a clean-label electrolyte drink on TikTok Shop. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, flag campaign risk, and produce a first 7-day launch plan.",
   "max_budget": 2.0,
-  "task_type": "end-to-end-campaign"
+  "task_type": "startup-launch-plan"
 }
 ```
 
 ## Demo Script
 
 1. Open `https://miyohacks.vercel.app`.
-2. Submit the prefilled electrolyte campaign brief.
-3. Watch the live auction: Reacher/Nia evidence, bid arrivals, Vickrey winner math, campaign output, judge verdict, settlement, and the ROI panel.
+2. Submit the prefilled startup TikTok Shop launch brief.
+3. Watch the routing story and live auction: 103 MCP specialists indexed, 7 relevant agents invited, Reacher/Nia evidence, bid arrivals, Vickrey winner math, launch output, judge verdict, settlement, and the ROI panel.
 4. Run the external-agent proof:
 
 ```bash
-npx tsx examples/mcp-client.ts "Launch a TikTok Shop creator campaign for a clean-label electrolyte drink. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, and flag campaign risk." 2.00
+npx tsx examples/mcp-client.ts "We are a seed-stage startup launching a clean-label electrolyte drink on TikTok Shop. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, flag risk, and produce a first 7-day launch plan." 2.00
 ```
 
 5. Submit a second similar campaign and show the reputation flywheel.

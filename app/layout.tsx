@@ -3,9 +3,9 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Creator Campaign Marketplace",
+  title: "TikTok Shop Launch Desk",
   description:
-    "Self-improving agent marketplace for creator-marketing workflows grounded in Reacher social intelligence and Nia-backed context.",
+    "Startup TikTok Shop launch marketplace grounded in Reacher social intelligence and Nia-backed context.",
 };
 
 export default function RootLayout({

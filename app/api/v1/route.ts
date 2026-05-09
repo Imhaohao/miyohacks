@@ -17,9 +17,10 @@ export async function GET(req: NextRequest) {
     name: "creator-campaign-marketplace",
     version: "v1",
     description:
-      "Autonomous creator-campaign marketplace. Vickrey auctions assign campaign work to specialist agents using Reacher + Nia evidence.",
+      "Autonomous TikTok Shop launch desk for startups. Vickrey auctions assign creator-growth work to specialist agents using Reacher + Nia evidence.",
     endpoints: {
-      "POST /api/v1/tasks": "Post a campaign brief. Returns task_id + web_view_url.",
+      "POST /api/v1/tasks":
+        "Post a startup launch brief. Returns task_id + web_view_url.",
       "GET /api/v1/tasks/:id":
         "Fetch task state — bids, result, verdict, escrow, lifecycle.",
       "POST /api/v1/tasks/:id/dispute": "Raise a dispute; judge re-runs.",

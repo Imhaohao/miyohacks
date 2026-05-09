@@ -14,7 +14,7 @@ export default async function TaskPage({ params }: PageProps) {
           href="/"
           className="text-xs uppercase tracking-[0.3em] text-terminal-muted hover:text-terminal-text"
         >
-          ← Creator Campaign Marketplace
+          ← TikTok Shop Launch Desk
         </Link>
         <code className="text-[10px] text-terminal-muted">{id}</code>
       </header>

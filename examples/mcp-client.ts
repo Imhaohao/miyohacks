@@ -2,7 +2,7 @@
  * Example MCP client — proves the agent-to-agent flow.
  *
  * Run:
- *   npx tsx examples/mcp-client.ts "your prompt here" 1.00
+ *   npx tsx examples/mcp-client.ts "your startup launch brief here" 2.00
  *
  * What it does:
  *   1. POSTs `tools/call` with `post_task` to /api/mcp.
@@ -64,8 +64,8 @@ async function callTool<T>(name: string, args: Record<string, unknown>): Promise
 async function main() {
   const prompt =
     process.argv[2] ??
-    "Launch a TikTok Shop creator campaign for a clean-label electrolyte drink. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, and flag campaign risk.";
-  const max_budget = Number(process.argv[3] ?? "1.00");
+    "We are a seed-stage startup launching a clean-label electrolyte drink on TikTok Shop. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, flag risk, and produce a first 7-day launch plan.";
+  const max_budget = Number(process.argv[3] ?? "2.00");
 
   console.log(`endpoint: ${ENDPOINT}`);
   console.log(`prompt:   ${prompt}`);
@@ -84,7 +84,7 @@ async function main() {
     status: string;
     bid_window_closes_at: number;
     web_view_url: string;
-  }>("post_task", { prompt, max_budget });
+  }>("post_task", { prompt, max_budget, task_type: "startup-launch-plan" });
 
   console.log(`task posted: ${posted.task_id}`);
   console.log(`watch live: ${posted.web_view_url}\n`);

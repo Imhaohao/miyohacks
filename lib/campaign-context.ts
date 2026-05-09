@@ -10,7 +10,7 @@ export interface ReacherCreatorSignal {
 }
 
 export const DEFAULT_CAMPAIGN_BRIEF =
-  "Launch a TikTok Shop creator campaign for a clean-label electrolyte drink targeting wellness creators, college athletes, and busy professionals. Find creators with credible GMV signals, strong audience fit, and low brand-safety risk. Produce a shortlist, outreach drafts, sample-request notes, and risk rationale.";
+  "We are a seed-stage startup launching a clean-label electrolyte drink on TikTok Shop with a tiny growth team and a $2 simulated agent budget. Target wellness creators, college athletes, and busy professionals who can drive credible first-week GMV. Build a creator shortlist, outreach drafts, sample-request notes, launch risk rationale, and a first 7-day action plan.";
 
 export const REACHER_DEMO_SIGNALS: ReacherCreatorSignal[] = [
   {
@@ -72,9 +72,11 @@ export const REACHER_DEMO_SIGNALS: ReacherCreatorSignal[] = [
 ];
 
 const NIA_CONTEXT = [
+  "Nia startup context: the team has no dedicated creator manager, so the winning agent should produce assets a founder can act on immediately.",
   "Nia campaign memory: previous hydration launches won when creators had a niche fit score above 0.80 and explicit low-sugar audience language.",
   "Nia brief index: brand voice should be practical, evidence-led, and avoid medical claims.",
   "Nia risk note: outreach must include a sample request, a creator-specific hook, and a disclosure-safe ask.",
+  "Nia operating constraint: prioritize fast first-week learning over a large but unfocused creator list.",
 ];
 
 export function buildCampaignEvidence(prompt: string, taskType: string): string {
@@ -92,8 +94,10 @@ export function buildCampaignEvidence(prompt: string, taskType: string): string 
 
   return [
     "Track: AI-Native Growth Tools. Sponsors: Nia + Reacher.",
+    "Product frame: TikTok Shop launch desk for startups.",
+    "Market-depth frame: 103 MCP specialists indexed; 18 relevant to creator-commerce; 7 invited to the live auction.",
     `Campaign task type: ${taskType}`,
-    `Brand brief: ${prompt}`,
+    `Startup launch brief: ${prompt}`,
     "",
     "Reacher TikTok Shop demo evidence:",
     creatorRows,
@@ -101,6 +105,6 @@ export function buildCampaignEvidence(prompt: string, taskType: string): string 
     "Nia-backed context layer:",
     ...NIA_CONTEXT,
     "",
-    "Required campaign output: ranked creator shortlist, Reacher evidence for each creator, audience-fit rationale, outreach drafts, sample-request notes, risk evaluation, and expected campaign-quality reasoning.",
+    "Required campaign output: ranked creator shortlist, Reacher evidence for each creator, audience-fit rationale, outreach drafts, sample-request notes, risk evaluation, first 7-day launch plan, and expected campaign-quality reasoning.",
   ].join("\n");
 }

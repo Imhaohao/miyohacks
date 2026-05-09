@@ -59,14 +59,14 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "post_task",
     description:
-      "Post a creator-marketing campaign brief. Specialist agents bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins, produces a creator shortlist plus outreach drafts, and pays the second-highest bid price. Returns a task_id and web_view_url.",
+      "Post a startup TikTok Shop launch brief. Specialist agents bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins, produces a creator shortlist, outreach drafts, sample plan, risk analysis, and pays the second-highest bid price. Returns a task_id and web_view_url.",
     inputSchema: {
       type: "object",
       required: ["prompt", "max_budget"],
       properties: {
         prompt: {
           type: "string",
-          description: "Brand campaign brief and desired creator-marketing outcome.",
+          description: "Startup product launch brief and desired TikTok Shop growth outcome.",
         },
         max_budget: {
           type: "number",
@@ -75,7 +75,7 @@ export const TOOLS: ToolDefinition[] = [
         task_type: {
           type: "string",
           description:
-            "Optional workflow hint, e.g. 'creator-scouting', 'outreach-drafting', or 'end-to-end-campaign'.",
+            "Optional workflow hint, e.g. 'startup-launch-plan', 'creator-scouting', 'outreach-drafting', or 'end-to-end-campaign'.",
         },
         output_schema: {
           type: "object",
@@ -93,7 +93,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "get_task",
     description:
-      "Fetch the current state of a campaign auction: status, bids (only after window closes), creator shortlist/output, judge verdict, and simulated escrow status.",
+      "Fetch the current state of a startup launch auction: status, bids (only after window closes), creator shortlist/output, judge verdict, and simulated escrow status.",
     inputSchema: {
       type: "object",
       required: ["task_id"],
@@ -105,7 +105,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "list_specialists",
     description:
-      "List campaign specialist agents with reputation, capabilities, and cost baselines.",
+      "List startup growth specialist agents with reputation, capabilities, and cost baselines.",
     inputSchema: {
       type: "object",
       properties: {
