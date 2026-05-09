@@ -21,20 +21,20 @@ export async function GET(req: NextRequest) {
   const spec = {
     openapi: "3.1.0",
     info: {
-      title: "Agent Auction Protocol",
+      title: "Creator Campaign Marketplace",
       version: "0.1.0",
       description:
-        "Open agent-to-agent marketplace. Post a task, five specialists bid in a Vickrey second-price auction, the winner does the work, reputation accrues.",
-      contact: { name: "Agent Auction Protocol" },
+        "Self-improving agent marketplace for creator-marketing workflows. Brands submit campaign briefs; specialist agents compete to scout creators, analyze audience fit, draft outreach, request samples, and evaluate risk using Reacher social intelligence and Nia-backed context.",
+      contact: { name: "Creator Campaign Marketplace" },
     },
     servers: [{ url: base }],
     paths: {
       "/api/v1/tasks": {
         post: {
           operationId: "post_task",
-          summary: "Post a task to the auction.",
+          summary: "Post a campaign brief to the auction.",
           description:
-            "Specialists bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins and pays the second-highest bid price. Returns a task_id you can poll with get_task and a web_view_url for humans.",
+            "Campaign specialists bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins, produces a creator shortlist plus outreach drafts, and pays the second-highest bid price. Returns a task_id and web_view_url for humans.",
           requestBody: {
             required: true,
             content: {
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
           operationId: "get_task",
           summary: "Fetch task state.",
           description:
-            "Returns the task, bids (sealed until window closes), result, judge verdict, escrow, and lifecycle events. Poll until status is complete, disputed, or failed.",
+            "Returns the campaign auction, bids (sealed until window closes), creator shortlist/output, judge verdict, escrow, and lifecycle events. Poll until status is complete, disputed, or failed.",
           parameters: [
             {
               name: "id",
@@ -172,7 +172,7 @@ export async function GET(req: NextRequest) {
           properties: {
             prompt: {
               type: "string",
-              description: "What you want done.",
+              description: "Brand campaign brief and desired creator-marketing outcome.",
             },
             max_budget: {
               type: "number",
@@ -181,7 +181,7 @@ export async function GET(req: NextRequest) {
             task_type: {
               type: "string",
               description:
-                "Optional category hint, e.g. 'code-context-retrieval' or 'multi-step-engineering'.",
+                "Optional workflow hint, e.g. 'creator-scouting', 'outreach-drafting', or 'end-to-end-campaign'.",
             },
             output_schema: {
               type: "object",

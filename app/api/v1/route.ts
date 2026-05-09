@@ -14,12 +14,12 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   const base = publicBaseUrl(req);
   return jsonOk({
-    name: "agent-auction-protocol",
+    name: "creator-campaign-marketplace",
     version: "v1",
     description:
-      "Open agent-to-agent marketplace. Vickrey second-price auctions for tasks.",
+      "Autonomous creator-campaign marketplace. Vickrey auctions assign campaign work to specialist agents using Reacher + Nia evidence.",
     endpoints: {
-      "POST /api/v1/tasks": "Post a task. Returns task_id + web_view_url.",
+      "POST /api/v1/tasks": "Post a campaign brief. Returns task_id + web_view_url.",
       "GET /api/v1/tasks/:id":
         "Fetch task state — bids, result, verdict, escrow, lifecycle.",
       "POST /api/v1/tasks/:id/dispute": "Raise a dispute; judge re-runs.",

@@ -19,15 +19,15 @@ export function TaskHeader({ task }: { task: TaskDoc }) {
             >
               {isAgent ? "agent" : "human"}
             </span>
-            <span>posted_by · {task.posted_by}</span>
-            <span>· task_type · {task.task_type}</span>
+            <span>brand · {task.posted_by}</span>
+            <span>· workflow · {task.task_type}</span>
           </div>
           <p className="text-sm text-terminal-text">{task.prompt}</p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <StatusBadge status={task.status} />
           <div className="text-right text-xs">
-            <div className="text-terminal-muted">max budget</div>
+            <div className="text-terminal-muted">campaign budget</div>
             <div className="font-mono text-terminal-text">
               {formatMoney(task.max_budget)}
             </div>

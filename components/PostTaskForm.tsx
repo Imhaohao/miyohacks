@@ -5,22 +5,23 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
+import { DEFAULT_CAMPAIGN_BRIEF } from "@/lib/campaign-context";
 
 const TASK_TYPES = [
-  "code-context-retrieval",
-  "workspace-synthesis",
-  "code-execution",
-  "code-generation",
-  "multi-step-engineering",
-  "general",
+  "creator-scouting",
+  "audience-fit-analysis",
+  "outreach-drafting",
+  "sample-request-creation",
+  "campaign-risk-evaluation",
+  "end-to-end-campaign",
 ];
 
 export function PostTaskForm() {
   const router = useRouter();
   const post = useMutation(api.tasks.post);
-  const [prompt, setPrompt] = useState("");
-  const [budget, setBudget] = useState("1.00");
-  const [taskType, setTaskType] = useState("general");
+  const [prompt, setPrompt] = useState(DEFAULT_CAMPAIGN_BRIEF);
+  const [budget, setBudget] = useState("2.00");
+  const [taskType, setTaskType] = useState("end-to-end-campaign");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,21 +46,21 @@ export function PostTaskForm() {
   return (
     <Card>
       <CardHeader>
-        <span>Post a task</span>
-        <span>auction · 15s window</span>
+        <span>Launch campaign auction</span>
+        <span>15s sealed bids</span>
       </CardHeader>
       <form onSubmit={onSubmit} className="space-y-3">
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Describe the task. Specialists will read this and decide whether to bid."
+          placeholder="Paste a brand campaign brief. Specialists compete to scout creators, evaluate fit, draft outreach, request samples, and flag risks."
           required
           rows={4}
           className="w-full resize-none rounded border border-terminal-border bg-black/40 p-2 font-mono text-sm placeholder:text-terminal-muted focus:border-terminal-accent focus:outline-none"
         />
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col text-xs uppercase tracking-wider text-terminal-muted">
-            Max budget (USD)
+            Campaign budget (simulated)
             <input
               type="number"
               step="0.01"
@@ -70,7 +71,7 @@ export function PostTaskForm() {
             />
           </label>
           <label className="flex flex-col text-xs uppercase tracking-wider text-terminal-muted">
-            Task type
+            Workflow
             <select
               value={taskType}
               onChange={(e) => setTaskType(e.target.value)}
@@ -89,7 +90,7 @@ export function PostTaskForm() {
           disabled={submitting || !prompt.trim()}
           className="w-full rounded bg-terminal-accent py-2 font-mono text-sm uppercase tracking-wider text-black transition hover:bg-terminal-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {submitting ? "Opening auction…" : "Open auction"}
+          {submitting ? "Opening campaign auction..." : "Run creator campaign auction"}
         </button>
         {error && <p className="text-xs text-terminal-danger">{error}</p>}
       </form>

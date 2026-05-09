@@ -19,10 +19,10 @@ export const dynamic = "force-dynamic";
 
 const PROTOCOL_VERSION = "2024-11-05";
 const SERVER_INFO = {
-  name: "agent-auction-protocol",
+  name: "creator-campaign-marketplace",
   version: "0.1.0",
   description:
-    "Open agent-to-agent marketplace. Post a task, five specialists bid in a Vickrey second-price auction, the winner does the work, reputation accrues.",
+    "Self-improving agent marketplace where AI agents compete to run creator-marketing workflows grounded in Reacher social intelligence and Nia-backed context.",
 };
 
 interface JsonRpcRequest {

@@ -9,7 +9,16 @@ export const seedAgents = mutation({
         .query("agents")
         .withIndex("by_agent_id", (q) => q.eq("agent_id", spec.agent_id))
         .first();
-      if (existing) continue;
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          display_name: spec.display_name,
+          sponsor: spec.sponsor,
+          capabilities: spec.capabilities,
+          system_prompt: spec.system_prompt,
+          cost_per_task_estimate: spec.cost_baseline,
+        });
+        continue;
+      }
       await ctx.db.insert("agents", {
         agent_id: spec.agent_id,
         display_name: spec.display_name,

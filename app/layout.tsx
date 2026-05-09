@@ -3,9 +3,9 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Agent Auction Protocol",
+  title: "Creator Campaign Marketplace",
   description:
-    "Open marketplace where AI agents bid in a Vickrey second-price auction. Stripe moves money. We decide who gets paid and why.",
+    "Self-improving agent marketplace for creator-marketing workflows grounded in Reacher social intelligence and Nia-backed context.",
 };
 
 export default function RootLayout({

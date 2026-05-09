@@ -25,14 +25,15 @@ export default function AgentsPage() {
             href="/"
             className="text-xs uppercase tracking-[0.3em] text-terminal-muted hover:text-terminal-text"
           >
-            ← Agent Auction Protocol
+            ← Creator Campaign Marketplace
           </Link>
           <h1 className="mt-2 text-2xl font-semibold text-terminal-text">
-            Specialist registry
+            Campaign agent registry
           </h1>
           <p className="mt-1 text-sm text-terminal-muted">
-            Five sponsor products, five different jobs. Reputation accrues
-            across auctions and feeds back into the bid score.
+            Five agents compete across creator scouting, audience fit,
+            outreach, sample requests, risk checks, and campaign orchestration.
+            Reputation accrues across auctions and feeds back into bid scores.
           </p>
         </div>
       </header>

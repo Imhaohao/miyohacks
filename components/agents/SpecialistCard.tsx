@@ -38,14 +38,48 @@ export function SpecialistCard({
   const total = completed + disputes;
   const disputeRate = total === 0 ? 0 : (disputes / total) * 100;
 
+  const hasMcpEndpoint = !!spec.mcp_endpoint;
+  const mcpConnected = hasMcpEndpoint && !!spec.is_verified;
+
   return (
-    <Card>
+    <Card className={hasMcpEndpoint ? "border-terminal-accent/40" : undefined}>
       <CardHeader>
-        <span>{spec.display_name}</span>
+        <span className="flex items-center gap-2">
+          {spec.display_name}
+          {hasMcpEndpoint ? (
+            <span
+              title={
+                mcpConnected
+                  ? `Verified MCP: ${spec.mcp_endpoint}`
+                  : `MCP endpoint configured; set ${spec.mcp_api_key_env ?? "API key"} to use live tools`
+              }
+              className={
+                mcpConnected
+                  ? "rounded bg-terminal-accent/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-terminal-accent"
+                  : "rounded bg-terminal-warn/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-terminal-warn"
+              }
+            >
+              {mcpConnected ? "MCP ✓" : "MCP auth"}
+            </span>
+          ) : (
+            <span className="rounded bg-terminal-border px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-terminal-muted">
+              soft
+            </span>
+          )}
+        </span>
         <span>{spec.sponsor}</span>
       </CardHeader>
 
       <p className="mb-3 text-xs text-terminal-muted">{spec.one_liner}</p>
+
+      {hasMcpEndpoint && (
+        <div className="mb-3 flex items-center gap-2 rounded border border-terminal-accent/30 bg-terminal-accent/5 px-2 py-1 font-mono text-[10px] text-terminal-accent">
+          <span className="uppercase tracking-wider">
+            {mcpConnected ? "live mcp ->" : "mcp auth ->"}
+          </span>
+          <span className="truncate">{spec.mcp_endpoint}</span>
+        </div>
+      )}
 
       <div className="mb-3">
         <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-terminal-muted">
