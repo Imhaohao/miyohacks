@@ -84,7 +84,11 @@ async function main() {
     status: string;
     bid_window_closes_at: number;
     web_view_url: string;
-  }>("post_task", { prompt, max_budget, task_type: "startup-launch-plan" });
+  }>("post_task", {
+    prompt,
+    max_budget,
+    task_type: process.env.TASK_TYPE ?? "reacher-live-launch",
+  });
 
   console.log(`task posted: ${posted.task_id}`);
   console.log(`watch live: ${posted.web_view_url}\n`);

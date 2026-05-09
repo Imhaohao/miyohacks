@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { DEFAULT_CAMPAIGN_BRIEF } from "@/lib/campaign-context";
 
 const TASK_TYPES = [
+  { value: "reacher-live-launch", label: "Live Reacher proof" },
   { value: "startup-launch-plan", label: "Startup launch plan" },
   { value: "creator-scouting", label: "Creator scouting" },
   { value: "audience-fit-analysis", label: "Audience-fit analysis" },
