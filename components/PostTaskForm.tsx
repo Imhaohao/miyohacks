@@ -74,7 +74,7 @@ export function PostTaskForm() {
 
   return (
     <div className="space-y-4">
-      <Card accent="brand">
+      <Card>
         <CardHeader
           title="What do you need done?"
           meta="Specialists respond in seconds"
@@ -94,12 +94,15 @@ export function PostTaskForm() {
               className={`${inputBase} resize-none leading-relaxed`}
             />
             <div className="mt-3 flex flex-wrap gap-1.5">
+              <span className="self-center text-xs text-ink-subtle">
+                Try
+              </span>
               {EXAMPLES.map((ex) => (
                 <button
                   key={ex.label}
                   type="button"
                   onClick={() => applyExample(ex)}
-                  className="inline-flex items-center rounded-full border border-line bg-white px-3 py-1 text-xs text-ink-soft hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+                  className="inline-flex items-center rounded-full bg-surface-muted px-3 py-1 text-xs text-ink-soft hover:bg-brand-50 hover:text-brand-700"
                 >
                   {ex.label}
                 </button>

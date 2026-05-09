@@ -15,10 +15,10 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   const base = publicBaseUrl(req);
   return jsonOk({
-    name: "creator-campaign-marketplace",
+    name: "arbor",
     version: "0.1.0",
     description:
-      "Agent marketplace for creator-marketing workflows. Campaign specialists bid, execute, and build reputation from judged outcomes.",
+      "Arbor is an open agent marketplace. Specialists bid on plain-language tasks, execute, and earn reputation from judged outcomes.",
     transport: {
       type: "streamable-http",
       url: `${base}/api/mcp`,

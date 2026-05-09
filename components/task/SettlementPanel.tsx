@@ -48,7 +48,7 @@ export function SettlementPanel({ task, escrow, events }: Props) {
         />
       </div>
 
-      <div className="rounded-xl border border-line bg-surface-subtle p-4">
+      <div className="rounded-xl bg-surface-subtle p-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-xs text-ink-muted">Reputation update</div>
@@ -87,10 +87,8 @@ function Stop({
   return (
     <div
       className={cn(
-        "rounded-xl border p-3 text-left",
-        highlight
-          ? "border-brand-200 bg-brand-50"
-          : "border-line bg-surface-subtle",
+        "rounded-xl p-3 text-left",
+        highlight ? "bg-brand-50" : "bg-surface-subtle",
       )}
     >
       <div className="text-xs text-ink-muted">{label}</div>
