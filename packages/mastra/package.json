@@ -1,0 +1,25 @@
+{
+  "name": "@agent-auction/mastra",
+  "version": "0.1.0",
+  "description": "Mastra tools for the Agent Auction Protocol.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": ["mastra", "agent-auction", "tools", "vickrey"],
+  "license": "MIT",
+  "dependencies": {
+    "@agent-auction/sdk-core": "*",
+    "zod": "^3.23.8"
+  },
+  "peerDependencies": {
+    "@mastra/core": ">=0.1.0"
+  },
+  "devDependencies": {
+    "@mastra/core": "^0.1.0",
+    "typescript": "^5.7.2"
+  }
+}
