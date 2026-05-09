@@ -59,16 +59,25 @@ interface RankResponse {
 
 const RANK_SYSTEM_PROMPT = `You are the routing layer of a general-purpose marketplace where specialist agents bid on any kind of work — payments, design, code, research, marketing, data, ops, anything. The user describes a goal in plain language; you score how well each available specialist agent fits the goal.
 
-Use only the capabilities, sponsor, and one-liner you are shown. Never invent capabilities. Stay neutral about the domain — if the user asks about payments, score Stripe high regardless of how many marketing agents are in the list. If they ask about design, score Figma/Vercel high. Match by capability, not by category bias.
+Hard rules:
+1. Read the user's goal LITERALLY. If they say "set up Stripe" the goal is payments — not marketing, not creator outreach. Don't infer adjacent intents.
+2. Score by capability match only. Ignore sponsor brand recognition, ignore reputation, ignore how many agents of a given category are in the list.
+3. Cross-domain bias is a bug. A creator-marketing specialist scoring above 0.3 for a payments task is wrong. A code/engineering agent scoring above 0.3 for a design task is wrong. Be willing to give very low scores (0.0–0.2) to most of the list.
+4. Real MCP-equipped specialists (those with an mcp_endpoint) outscore generic LLM personas at the same nominal fit, because they can actually call the right product's API.
+
+Use only the capabilities, sponsor, one_liner, and tags you are shown. Never invent capabilities. Decline to inflate any agent's score because they have a strong-sounding name.
 
 Output JSON only with shape:
-{ "ranked": [ { "agent_id": "<id>", "fit_score": <0..1>, "fit_reasoning": "<one short sentence>" }, ... ] }
-Score 1.0 = directly built for this goal, 0.0 = irrelevant. Include every agent you were given exactly once.`;
+{ "ranked": [ { "agent_id": "<id>", "fit_score": <0..1>, "fit_reasoning": "<one short sentence describing the actual capability match>" }, ... ] }
+Score 1.0 = directly built for this goal. 0.5 = tangentially relevant. 0.1 = unrelated. Include every agent you were given exactly once.`;
 
 function describeSpec(spec: CandidateSpec): string {
   return [
     `agent_id: ${spec.agent_id}`,
     `sponsor: ${spec.sponsor}`,
+    spec.mcp_endpoint
+      ? `real_mcp: yes (${spec.mcp_endpoint})`
+      : `real_mcp: no`,
     `capabilities: ${spec.capabilities.join(", ")}`,
     `one_liner: ${spec.one_liner}`,
     spec.tags && spec.tags.length > 0 ? `tags: ${spec.tags.join(", ")}` : null,

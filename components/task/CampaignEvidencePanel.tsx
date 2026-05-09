@@ -11,47 +11,46 @@ const usd = new Intl.NumberFormat("en-US", {
 
 export function CampaignEvidencePanel() {
   return (
-    <Card>
-      <CardHeader>
-        <span>Startup launch evidence</span>
-        <span>Reacher + Nia</span>
-      </CardHeader>
-      <div className="grid gap-2 md:grid-cols-2">
+    <Card className="animate-fade-up">
+      <CardHeader title="Reacher + Nia evidence" meta="Grounding layer" />
+      <div className="grid gap-2.5 md:grid-cols-2">
         {REACHER_DEMO_SIGNALS.map((creator) => (
           <div
             key={creator.handle}
-            className="rounded border border-terminal-border bg-black/30 p-3"
+            className="rounded-xl border border-line bg-surface-subtle p-3 transition-colors hover:border-line-strong hover:bg-white"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="font-mono text-sm text-terminal-text">
+                <div className="font-mono text-sm text-ink">
                   {creator.handle}
                 </div>
-                <div className="text-xs text-terminal-muted">
-                  {creator.niche}
-                </div>
+                <div className="text-xs text-ink-muted">{creator.niche}</div>
               </div>
-              <div className="text-right font-mono text-xs">
-                <div className="text-terminal-accent">
+              <div className="text-right text-xs">
+                <div className="font-mono text-brand-700">
                   {Math.round(creator.audienceFit * 100)}% fit
                 </div>
-                <div className="text-terminal-muted">
+                <div className="font-mono text-ink-muted">
                   {usd.format(creator.gmv30d)} GMV
                 </div>
               </div>
             </div>
-            <div className="mt-2 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider text-terminal-muted">
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-muted">
               <span>{creator.avgVideoViews.toLocaleString("en-US")} views</span>
-              <span>{Math.round(creator.sampleAcceptanceRate * 100)}% sample</span>
-              <span>risk {creator.risk}</span>
+              <span>·</span>
+              <span>
+                {Math.round(creator.sampleAcceptanceRate * 100)}% sample
+              </span>
+              <span>·</span>
+              <span>Risk {creator.risk}</span>
             </div>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-terminal-muted">
+      <p className="mt-4 text-xs text-ink-muted">
         Reacher supplies TikTok Shop creator, video, GMV, sample, and risk
-        signals. Nia supplies startup constraints: small team, fast first-week
-        learning, practical founder-ready outreach, and brand-safe claims.
+        signals. Nia supplies campaign memory and brand-context constraints used
+        by the agents and judge.
       </p>
     </Card>
   );
