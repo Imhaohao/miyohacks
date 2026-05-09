@@ -7,7 +7,12 @@
 
 import { callRemoteTool, flattenToolResult } from "../mcp-outbound";
 import { isCampaignTask } from "../campaign-context";
-import type { SpecialistConfig, SpecialistRunner } from "../types";
+import type {
+  CampaignLaunchArtifact,
+  CampaignLaunchCreator,
+  SpecialistConfig,
+  SpecialistRunner,
+} from "../types";
 
 /**
  * Reacher's domain is TikTok Shop creator-commerce. The bid is hardcoded
@@ -98,40 +103,124 @@ function num(row: Record<string, unknown>, key: string): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function money(value: number, currency = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
 function handle(row: Record<string, unknown>): string {
   const raw = str(row, "creator_handle", str(row, "handle", "unknown"));
   return raw.startsWith("@") ? raw : `@${raw}`;
 }
 
-function creatorTable(rows: Record<string, unknown>[], currency: string): string {
-  return [
-    "| Rank | Creator | GMV | Units | Orders | Followers | Est. commission |",
-    "|---:|---|---:|---:|---:|---:|---:|",
-    ...rows.map((row, index) =>
-      [
-        `| ${index + 1}`,
-        `**${handle(row)}**`,
-        money(num(row, "gmv") || num(row, "shop_gmv"), currency),
-        String(num(row, "units_sold") || num(row, "shop_units_sold")),
-        String(num(row, "order_count")),
-        num(row, "follower_count").toLocaleString("en-US"),
-        `${money(num(row, "est_commission"), currency)} |`,
-      ].join(" | "),
-    ),
-  ].join("\n");
+function creatorFromRow(
+  row: Record<string, unknown>,
+  index: number,
+): CampaignLaunchCreator {
+  const creatorHandle = handle(row);
+  const gmv = num(row, "gmv") || num(row, "shop_gmv");
+  const followers = num(row, "follower_count");
+  return {
+    rank: index + 1,
+    handle: creatorHandle,
+    gmv,
+    units_sold: num(row, "units_sold") || num(row, "shop_units_sold"),
+    orders: num(row, "order_count"),
+    followers,
+    estimated_commission: num(row, "est_commission"),
+    fit_reason:
+      gmv > 0
+        ? `${creatorHandle} has live Reacher GMV traction and enough audience scale for a fast founder-led TikTok Shop test.`
+        : `${creatorHandle} appears in the Reacher creator roster and should be reviewed before sample spend.`,
+  };
 }
 
-function outreachDraft(row: Record<string, unknown>): string {
-  const creator = handle(row);
-  return `**${creator}**\n\nHi ${creator.replace("@", "")} — I am launching a clean-label electrolyte drink on TikTok Shop and your audience looks like a strong fit for practical wellness content. Reacher shows recent creator-commerce traction from your account, so I would love to send a sample kit and set you up with an affiliate link if the product fits your routine. No pressure to post if it is not a fit. If you do create, please disclose the sample/affiliate relationship and keep claims to taste, ingredients, routine fit, and hydration support.`;
+function outreachDraft(creator: CampaignLaunchCreator): string {
+  return `Hi ${creator.handle.replace("@", "")} — I am launching a clean-label electrolyte drink on TikTok Shop and your audience looks like a strong fit for practical wellness content. Reacher shows recent creator-commerce traction from your account, so I would love to send a sample kit and set you up with an affiliate link if the product fits your routine. No pressure to post if it is not a fit. If you do create, please disclose the sample/affiliate relationship and keep claims to taste, ingredients, routine fit, and hydration support.`;
+}
+
+function buildArtifact(args: {
+  prompt: string;
+  creators: CampaignLaunchCreator[];
+  currency: string;
+  shops: string[];
+  dateRange: string;
+}): CampaignLaunchArtifact {
+  const top = args.creators.slice(0, 3);
+  return {
+    kind: "campaign_launch",
+    title: "TikTok Shop Creator Launch Kit",
+    summary: `Reacher selected ${top.map((c) => c.handle).join(", ")} for the first sample wave using live creator performance data. The product is a founder-ready launch kit: shortlist, outreach, sample tasks, risk controls, and a 7-day operating board.`,
+    evidence: {
+      tools_used: [
+        "list_shops_shops_get",
+        "creators_performance_creators_performance_post",
+        "creators_list_creators_list_post",
+      ],
+      shops_queried: args.shops,
+      performance_window: args.dateRange,
+      currency: args.currency,
+    },
+    creators: args.creators,
+    outreach_drafts: top.map((creator) => ({
+      handle: creator.handle,
+      message: outreachDraft(creator),
+    })),
+    sample_plan: [
+      {
+        task: "Ship variety sample kits to the top 3 creators",
+        owner: "Founder",
+        status: "todo",
+      },
+      {
+        task: "Generate TikTok Shop affiliate links and creator discount codes",
+        owner: "Growth ops",
+        status: "ready",
+      },
+      {
+        task: "Attach claim-safe talking points and disclosure language",
+        owner: "Compliance",
+        status: "ready",
+      },
+    ],
+    risk_flags: [
+      "Do not allow creators to make medical, endurance, recovery, or disease-related claims.",
+      "Live Reacher GMV proves creator-commerce traction; category fit still needs quick recent-content review.",
+      "Do not expand sample spend until at least two creators confirm receipt and posting window.",
+    ],
+    launch_plan: [
+      {
+        day: 1,
+        action: "Approve top creators, generate affiliate links, and send outreach.",
+        metric: "3 creator replies",
+      },
+      {
+        day: 2,
+        action: "Ship sample kits and confirm tracking.",
+        metric: "100% sample tracking captured",
+      },
+      {
+        day: 3,
+        action: "Send claim-safe content brief and hook options.",
+        metric: "2 draft concepts received",
+      },
+      {
+        day: 4,
+        action: "Confirm posting windows and review any risky claims.",
+        metric: "0 unresolved compliance flags",
+      },
+      {
+        day: 5,
+        action: "Approve drafts and prepare TikTok Shop links.",
+        metric: "3 posts ready",
+      },
+      {
+        day: 6,
+        action: "Launch first posts and monitor GMV/orders/comments.",
+        metric: "First attributed orders",
+      },
+      {
+        day: 7,
+        action: "Double down on highest GMV-per-view creator.",
+        metric: "Winner picked for wave 2",
+      },
+    ],
+  };
 }
 
 export const reacherSocial: SpecialistRunner = {
@@ -188,51 +277,14 @@ export const reacherSocial: SpecialistRunner = {
         )}`
       : "recent Reacher performance window";
 
-    return [
-      "# Live Reacher TikTok Shop Launch Plan",
-      "",
-      `**Startup brief:** ${prompt}`,
-      "",
-      "## Live Reacher MCP Evidence Used",
-      "",
-      "- `list_shops_shops_get`: confirmed accessible shops for this API key.",
-      "- `creators_performance_creators_performance_post`: ranked creators by period GMV.",
-      "- `creators_list_creators_list_post`: cross-checked creator roster and lifetime shop data.",
-      `- Shops queried: ${(performance.shops_queried ?? shops.data.map((s) => str(s, "shop_name")).filter(Boolean)).join(", ") || "all accessible shops"}.`,
-      `- Performance window: ${dateRange}.`,
-      "",
-      "## Ranked Creator Shortlist",
-      "",
-      creatorTable(rows, currency),
-      "",
-      "## Recommendation",
-      "",
-      `Start with **${top.map(handle).join(", ")}**. They have the strongest live Reacher GMV signal for a founder-led TikTok Shop test, so they should receive the first sample kits before the startup expands to a broader creator pool.`,
-      "",
-      "## Creator-Specific Outreach Drafts",
-      "",
-      ...top.flatMap((row) => [outreachDraft(row), ""]),
-      "## Sample Request Plan",
-      "",
-      "- Send a small variety kit, ingredient card, founder note, TikTok Shop affiliate instructions, and claim-safe talking points.",
-      "- Ask for one short-form TikTok Shop video per accepted sample: taste test, daily routine placement, and clear affiliate/sample disclosure.",
-      "- Prioritize creators in GMV rank order; pause expansion until at least two creators confirm sample receipt.",
-      "",
-      "## Risk Flags",
-      "",
-      "- Do not let creators make medical, endurance, recovery, or disease-related claims.",
-      "- GMV is real Reacher performance evidence, but category fit still needs manual review against each creator's recent content.",
-      "- Use the first week to validate conversion quality before shipping samples to lower-fit high-reach creators.",
-      "",
-      "## First 7-Day Launch Plan",
-      "",
-      "1. Day 1: approve the top 3 creators, generate affiliate links, and send sample request messages.",
-      "2. Day 2: ship sample kits and confirm tracking in the campaign sheet.",
-      "3. Day 3: send each creator a claim-safe content brief and three hook options.",
-      "4. Day 4: follow up on sample receipt and collect posting windows.",
-      "5. Day 5: approve drafts/comments for compliance and disclosure.",
-      "6. Day 6: launch first posts and monitor GMV, orders, and comments.",
-      "7. Day 7: double down on the top creator by GMV per view; pause creators with weak conversion or risky claims.",
-    ].join("\n");
+    return buildArtifact({
+      prompt,
+      creators: rows.map(creatorFromRow),
+      currency,
+      shops:
+        performance.shops_queried ??
+        shops.data.map((s) => str(s, "shop_name")).filter(Boolean),
+      dateRange,
+    });
   },
 };

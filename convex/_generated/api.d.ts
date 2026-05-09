@@ -17,6 +17,7 @@ import type * as escrow from "../escrow.js";
 import type * as lifecycle from "../lifecycle.js";
 import type * as reputation from "../reputation.js";
 import type * as seed from "../seed.js";
+import type * as taskContexts from "../taskContexts.js";
 import type * as tasks from "../tasks.js";
 
 import type {
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   lifecycle: typeof lifecycle;
   reputation: typeof reputation;
   seed: typeof seed;
+  taskContexts: typeof taskContexts;
   tasks: typeof tasks;
 }>;
 

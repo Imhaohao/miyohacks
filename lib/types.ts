@@ -30,6 +30,7 @@ export type EscrowStatus = "locked" | "released" | "refunded";
 
 export type LifecycleEventType =
   | "task_posted"
+  | "context_enriched"
   | "bid_received"
   | "bid_declined"
   | "auction_resolved"
@@ -58,6 +59,49 @@ export interface JudgeVerdict {
   reasoning: string;
   quality_score: number;
 }
+
+export interface CampaignLaunchCreator {
+  rank: number;
+  handle: string;
+  gmv: number;
+  units_sold: number;
+  orders: number;
+  followers: number;
+  estimated_commission: number;
+  fit_reason: string;
+}
+
+export interface CampaignLaunchArtifact {
+  kind: "campaign_launch";
+  title: string;
+  summary: string;
+  evidence: {
+    tools_used: string[];
+    shops_queried: string[];
+    performance_window: string;
+    currency: string;
+  };
+  creators: CampaignLaunchCreator[];
+  outreach_drafts: Array<{
+    handle: string;
+    message: string;
+  }>;
+  sample_plan: Array<{
+    task: string;
+    owner: string;
+    status: "todo" | "ready" | "blocked";
+  }>;
+  risk_flags: string[];
+  launch_plan: Array<{
+    day: number;
+    action: string;
+    metric: string;
+  }>;
+}
+
+export type ExecutionArtifact = CampaignLaunchArtifact;
+
+export type SpecialistOutput = string | ExecutionArtifact;
 
 export interface SpecialistConfig {
   agent_id: AgentId;
@@ -103,5 +147,5 @@ export interface SpecialistRunner {
   /** Decide whether to bid on a task. */
   bid(prompt: string, taskType: string): Promise<SpecialistDecision>;
   /** Execute the task once awarded. */
-  execute(prompt: string, taskType: string): Promise<string>;
+  execute(prompt: string, taskType: string): Promise<SpecialistOutput>;
 }
