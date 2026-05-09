@@ -22,10 +22,12 @@ export default defineSchema({
     max_budget: v.number(),
     status: v.union(
       v.literal("open"),
+      v.literal("planning"),
       v.literal("bidding"),
       v.literal("awarded"),
       v.literal("executing"),
       v.literal("judging"),
+      v.literal("synthesizing"),
       v.literal("complete"),
       v.literal("disputed"),
       v.literal("failed"),
@@ -36,7 +38,27 @@ export default defineSchema({
     price_paid: v.optional(v.number()),
     result: v.optional(v.any()),
     judge_verdict: v.optional(v.any()),
-  }),
+    /**
+     * If set, this task is a sub-step in a larger plan. The auction lifecycle
+     * runs identically; on settle, control returns to the parent task to
+     * advance to the next step or synthesize.
+     */
+    parent_task_id: v.optional(v.id("tasks")),
+    step_index: v.optional(v.number()),
+    /**
+     * Decomposition produced by the planner. Set on parent tasks only.
+     * Each step describes a sub-prompt and an optional preferred specialist.
+     */
+    task_plan: v.optional(
+      v.array(
+        v.object({
+          prompt: v.string(),
+          rationale: v.string(),
+          specialist_hint: v.optional(v.string()),
+        }),
+      ),
+    ),
+  }).index("by_parent", ["parent_task_id"]),
 
   task_contexts: defineTable({
     task_id: v.id("tasks"),

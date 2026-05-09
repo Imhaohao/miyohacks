@@ -15,6 +15,7 @@ import type * as discoveredSpecialists from "../discoveredSpecialists.js";
 import type * as disputes from "../disputes.js";
 import type * as escrow from "../escrow.js";
 import type * as lifecycle from "../lifecycle.js";
+import type * as planning from "../planning.js";
 import type * as reputation from "../reputation.js";
 import type * as reputationDimensions from "../reputationDimensions.js";
 import type * as seed from "../seed.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   disputes: typeof disputes;
   escrow: typeof escrow;
   lifecycle: typeof lifecycle;
+  planning: typeof planning;
   reputation: typeof reputation;
   reputationDimensions: typeof reputationDimensions;
   seed: typeof seed;

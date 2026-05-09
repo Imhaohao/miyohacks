@@ -168,24 +168,37 @@ async function rankWithLLM(
     .filter(Boolean)
     .join("\n\n");
 
-  const data = await callOpenAIJSON<RankResponse>({
-    systemPrompt: RANK_SYSTEM_PROMPT,
-    userPrompt,
-    maxTokens: 900,
-    timeoutMs: 12_000,
-    retries: 0,
-  });
-  if (!Array.isArray(data.ranked)) return [];
-  return data.ranked
-    .map((r) => ({
-      agent_id: String(r.agent_id),
-      fit_score: clamp01(Number(r.fit_score)),
-      fit_reasoning:
-        typeof r.fit_reasoning === "string" && r.fit_reasoning.trim()
-          ? r.fit_reasoning.trim()
-          : "no rationale provided",
-    }))
-    .filter((r) => pool.some((s) => s.agent_id === r.agent_id));
+  try {
+    const data = await callOpenAIJSON<RankResponse>({
+      systemPrompt: RANK_SYSTEM_PROMPT,
+      userPrompt,
+      maxTokens: 1200,
+      timeoutMs: 18_000,
+      retries: 0,
+    });
+    if (!Array.isArray(data.ranked)) {
+      console.warn(
+        "[suggest] LLM ranker returned non-array; falling back to keyword rank.",
+      );
+      return [];
+    }
+    return data.ranked
+      .map((r) => ({
+        agent_id: String(r.agent_id),
+        fit_score: clamp01(Number(r.fit_score)),
+        fit_reasoning:
+          typeof r.fit_reasoning === "string" && r.fit_reasoning.trim()
+            ? r.fit_reasoning.trim()
+            : "no rationale provided",
+      }))
+      .filter((r) => pool.some((s) => s.agent_id === r.agent_id));
+  } catch (err) {
+    console.warn(
+      "[suggest] LLM ranker failed; falling back to keyword rank:",
+      err instanceof Error ? err.message : String(err),
+    );
+    throw err;
+  }
 }
 
 function clamp01(n: number): number {
@@ -193,34 +206,63 @@ function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
+/**
+ * Keyword fallback used when the LLM ranker fails. Cheap heuristic, but
+ * meaningful: a direct sponsor-name or capability-tag match in the prompt
+ * is treated as a strong signal, so "set up stripe" pulls stripe-payments
+ * to the top even when the LLM call dies.
+ */
 function fallbackKeywordRank(
   query: string,
   pool: CandidateSpec[],
 ): RankedItem[] {
+  const lowerQuery = query.toLowerCase();
   const tokens = new Set(
-    query
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((t) => t.length > 2),
+    lowerQuery.split(/[^a-z0-9]+/).filter((t) => t.length > 2),
   );
   return pool.map((s) => {
-    const haystack = [
-      s.sponsor,
-      s.one_liner,
-      ...s.capabilities,
-      ...(s.tags ?? []),
-    ]
-      .join(" ")
-      .toLowerCase();
-    let hits = 0;
-    for (const t of tokens) if (haystack.includes(t)) hits += 1;
-    const fit =
-      tokens.size === 0 ? 0.3 : Math.min(1, hits / Math.max(3, tokens.size));
+    const sponsor = s.sponsor.toLowerCase();
+    const sponsorRoot = sponsor.split(/[\s(]/)[0];
+    const tagSet = new Set([
+      ...s.capabilities.map((c) => c.toLowerCase()),
+      ...(s.tags ?? []).map((t) => t.toLowerCase()),
+    ]);
+
+    let score = 0;
+    const reasons: string[] = [];
+
+    // Direct sponsor-name match — by far the strongest signal.
+    if (sponsorRoot.length > 2 && lowerQuery.includes(sponsorRoot)) {
+      score += 0.85;
+      reasons.push(`mentions ${s.sponsor}`);
+    }
+
+    // Domain-tag matches (e.g. "payments", "design") count strongly.
+    let tagHits = 0;
+    for (const tag of tagSet) {
+      if (tag.length > 2 && lowerQuery.includes(tag)) tagHits += 1;
+    }
+    if (tagHits > 0) {
+      score += Math.min(0.4, 0.18 * tagHits);
+      reasons.push(`${tagHits} capability/tag match`);
+    }
+
+    // Generic token overlap with the one-liner — weakest signal.
+    const oneLiner = s.one_liner.toLowerCase();
+    let oneLinerHits = 0;
+    for (const t of tokens) if (oneLiner.includes(t)) oneLinerHits += 1;
+    if (oneLinerHits > 0) {
+      score += Math.min(0.15, 0.04 * oneLinerHits);
+    }
+
+    if (score === 0) {
+      reasons.push("no keyword overlap");
+    }
+
     return {
       agent_id: s.agent_id,
-      fit_score: fit,
-      fit_reasoning:
-        hits > 0 ? `Matched ${hits} keyword(s)` : "No keyword overlap",
+      fit_score: clamp01(score),
+      fit_reasoning: reasons.join(" · "),
     };
   });
 }
