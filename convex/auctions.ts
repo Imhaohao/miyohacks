@@ -18,9 +18,13 @@ export const solicitBids = internalAction({
     const task = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
     });
+    const invitedSpecialists =
+      task.task_type === "reacher-live-launch"
+        ? SPECIALISTS.filter((spec) => spec.agent_id === "reacher-social")
+        : SPECIALISTS;
 
     await Promise.allSettled(
-      SPECIALISTS.map(async (spec) => {
+      invitedSpecialists.map(async (spec) => {
         const runner = getRunner(spec.agent_id as AgentId);
         const agent = await ctx.runQuery(internal.agents._getByAgentId, {
           agent_id: spec.agent_id,
@@ -188,10 +192,14 @@ export const execute = internalAction({
 
     try {
       const runner = getRunner(winner.agent_id as AgentId);
+      // 180s cap on execute. MCP-forwarding specialists run multi-round
+      // tool-calling loops (6 rounds × ~30s each worst case for Reacher /
+      // Nia), so 60s would force a timeout before they finish. Plain
+      // (mock) specialists return well under this.
       const result = await Promise.race([
         runner.execute(task.prompt, task.task_type),
         new Promise<string>((_, reject) =>
-          setTimeout(() => reject(new Error("execution timeout (60s)")), 60_000),
+          setTimeout(() => reject(new Error("execution timeout (180s)")), 180_000),
         ),
       ]);
 
@@ -254,6 +262,9 @@ export const judge = internalAction({
     });
 
     const userPrompt = [
+      task.task_type === "reacher-live-launch"
+        ? "This is the live Reacher proof workflow. The seeded demo creators in the generic campaign evidence are illustrative only. Do not reject merely because the agent used different creators. For this workflow, prefer live Reacher MCP evidence from tools such as list_shops_shops_get, creators_performance_creators_performance_post, and creators_list_creators_list_post. Accept if the output cites those live tool results and includes a creator shortlist, outreach drafts, sample notes, risk flags, and a 7-day launch plan."
+        : null,
       buildCampaignEvidence(task.prompt, task.task_type),
       task.output_schema
         ? `Required output schema:\n${JSON.stringify(task.output_schema, null, 2)}`

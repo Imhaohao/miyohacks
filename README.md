@@ -10,7 +10,7 @@ This project targets **AI-Native Growth Tools**: autonomous revenue work, not da
 |---|---|
 | Depth of Social Intelligence Usage | Reacher-style demo signals include creator niche, audience fit, 30-day GMV, average views, sample acceptance, and risk evidence. Agents and judge receive this context every run. |
 | Agentic Complexity | Five specialist agents bid, execute, get judged, and build persistent reputation that affects later auctions. |
-| End-to-End Flow | Startup launch brief -> MCP routing -> auction -> winner -> creator shortlist/outreach/sample/risk/7-day launch plan -> judge -> simulated escrow/reputation settlement. |
+| End-to-End Flow | Startup launch brief -> MCP routing -> auction -> winner -> creator shortlist/outreach/sample/risk/7-day launch plan -> judge -> simulated escrow/reputation settlement. A demo-only `reacher-live-launch` workflow routes directly to Reacher when judges need proof of live sponsor data. |
 | Demo & Presentation | `/task/[id]` shows Reacher + Nia evidence, live bids, Vickrey math, output, verdict, settlement, and ROI/efficiency impact. |
 
 ## Architecture
@@ -35,11 +35,11 @@ Convex tasks, bids, lifecycle, escrow, reputation
 
 ## Specialists — all 10 Nozomio sponsors
 
-Every sponsor on the hackathon roster is a specialist agent in this marketplace. The demo frames a 100+ MCP specialist market, then invites only the most relevant growth agents to each startup launch auction. Sponsors with **MCP auth** have a documented endpoint configured but need credentials; sponsors marked `soft` run as in-persona LLM agents pending an official MCP URL.
+Every sponsor on the hackathon roster is a specialist agent in this marketplace. The demo frames a 100+ MCP specialist market, then invites only the most relevant growth agents to each startup launch auction. Sponsors with **MCP ✓** have a verified endpoint configured; sponsors marked `soft` run as in-persona LLM agents pending an official MCP URL.
 
 | Agent | Sponsor | MCP | Campaign role |
 |---|---|---|---|
-| `reacher-social` | **Reacher** | auth `api.reacherapp.com/mcp` | TikTok Shop creators, GMV history, sandboxed write endpoints. The data source of truth once `REACHER_API_KEY` is set. |
+| `reacher-social` | **Reacher** | ✓ `api.reacherapp.com/mcp` | TikTok Shop creators, GMV history, sandboxed write endpoints. The data source of truth. |
 | `nia-context` | **Nia (Nozomio)** | soft | Adds campaign memory, indexed briefs, brand-context constraints, cross-session context. |
 | `hyperspell-brain` | **Hyperspell** | soft | Synthesizes brand persona and audience-fit rationale across scattered campaign context. |
 | `tensorlake-exec` | **Tensorlake** | soft | Verifies GMV evidence, sample feasibility, brand-safety risk before launch. |
@@ -125,7 +125,7 @@ Then call `post_task` with a startup launch brief:
 npx tsx examples/mcp-client.ts "We are a seed-stage startup launching a clean-label electrolyte drink on TikTok Shop. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, flag risk, and produce a first 7-day launch plan." 2.00
 ```
 
-5. Submit a second similar campaign and show the reputation flywheel.
+5. For the normal multi-agent auction/flywheel, run the same command with `TASK_TYPE=startup-launch-plan`.
 
 ## Payment Reality
 

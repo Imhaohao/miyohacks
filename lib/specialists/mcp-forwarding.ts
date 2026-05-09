@@ -90,6 +90,13 @@ function sanitizeName(n: string): string {
 }
 
 async function chatCompletion(body: Record<string, unknown>, timeoutMs: number): Promise<ChatResponse> {
+  // gpt-5.5 rejects `reasoning_effort` together with `tools` on /v1/chat/completions
+  // ("Function tools with reasoning_effort are not supported"). Strip it when
+  // tools are present; keep it on plain calls where it prevents empty output.
+  const sanitized: Record<string, unknown> = { ...body };
+  if (sanitized.tools && "reasoning_effort" in sanitized) {
+    delete sanitized.reasoning_effort;
+  }
   const res = await withTimeout(
     fetch(CHAT_URL, {
       method: "POST",
@@ -97,7 +104,7 @@ async function chatCompletion(body: Record<string, unknown>, timeoutMs: number):
         authorization: `Bearer ${apiKey()}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(sanitized),
     }),
     timeoutMs,
   );
@@ -209,10 +216,12 @@ export function makeMcpForwardingSpecialist(
             messages,
             tools: openaiTools,
             tool_choice: "auto",
-            max_completion_tokens: 1500,
-            reasoning_effort: "none",
+            // Tool-call rounds can't use reasoning_effort with gpt-5.5
+            // (chatCompletion strips it), so leave room for reasoning + the
+            // actual tool call / final answer.
+            max_completion_tokens: 4000,
           },
-          30_000,
+          45_000,
         );
         const msg = res.choices[0]?.message;
         if (!msg) throw new Error("OpenAI returned no message");
