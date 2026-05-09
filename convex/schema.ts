@@ -45,6 +45,7 @@ export default defineSchema({
      */
     parent_task_id: v.optional(v.id("tasks")),
     step_index: v.optional(v.number()),
+    product_context_profile_id: v.optional(v.id("product_context_profiles")),
     /**
      * Decomposition produced by the planner. Set on parent tasks only.
      * Each step describes a sub-prompt and an optional preferred specialist.
@@ -59,6 +60,25 @@ export default defineSchema({
       ),
     ),
   }).index("by_parent", ["parent_task_id"]),
+
+  product_context_profiles: defineTable({
+    owner_id: v.string(),
+    company_name: v.string(),
+    product_url: v.optional(v.string()),
+    github_repo_url: v.optional(v.string()),
+    business_context: v.string(),
+    repo_context: v.optional(v.string()),
+    source_hints: v.array(v.string()),
+    hyperspell_status: v.union(
+      v.literal("not_configured"),
+      v.literal("pending"),
+      v.literal("seeded"),
+      v.literal("failed"),
+    ),
+    hyperspell_error: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  }).index("by_owner", ["owner_id"]),
 
   task_contexts: defineTable({
     task_id: v.id("tasks"),

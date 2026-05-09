@@ -1,3 +1,5 @@
+import { isCreatorCommerceTask, isImplementationTask } from "./campaign-context";
+
 export interface ContextInput {
   prompt: string;
   taskType: string;
@@ -54,22 +56,26 @@ export function buildOrchestrationContext(input: ContextInput): OrchestrationCon
   const prompt = input.prompt.trim();
   const lower = prompt.toLowerCase();
   const isStartup = includesAny(lower, ["startup", "seed", "founder", "tiny growth team"]);
-  const isTikTok = includesAny(lower, ["tiktok", "creator", "shop", "gmv", "sample"]);
-  const isRepo = includesAny(lower, ["repo", "code", "github", "implementation", "api", "backend", "frontend"]);
+  const isTikTok = isCreatorCommerceTask(prompt, input.taskType);
+  const isRepo = isImplementationTask(prompt, input.taskType);
 
   const business: BusinessContext = {
     owner: "hyperspell",
     summary: input.businessContext?.trim() ||
       (isStartup
         ? "Seed-stage business with limited operator bandwidth that needs founder-ready growth execution, not generic advice."
-        : "Business context should be inferred from the campaign brief and treated as the buyer's current operating reality."),
+        : "Business context should be inferred from the buyer's brief and treated as the current operating reality."),
     known_facts: cleanList([
       isStartup ? "Small team; output must be immediately usable by a founder or growth lead." : undefined,
       isTikTok ? "Revenue motion depends on TikTok Shop creators, samples, outreach, and measurable GMV." : undefined,
       input.businessContext?.trim(),
     ]),
     goals: cleanList([
-      isTikTok ? "Launch a creator-commerce workflow that can produce first-week learning and GMV." : "Complete the requested business workflow with evidence-backed execution.",
+      isTikTok
+        ? "Launch a creator-commerce workflow that can produce first-week learning and GMV."
+        : isRepo
+          ? "Plan the requested software/product change before execution, preserving existing repo behavior."
+          : "Complete the requested business workflow with evidence-backed execution.",
       "Minimize coordination loss when handing work to a specialized execution agent.",
     ]),
     constraints: cleanList([
@@ -87,7 +93,7 @@ export function buildOrchestrationContext(input: ContextInput): OrchestrationCon
     owner: "nia",
     summary: input.repoContext?.trim() ||
       (isRepo
-        ? "Nia should retrieve the relevant repo files, docs, APIs, and source references before execution."
+        ? "Nia should retrieve the relevant repo files, docs, APIs, state contracts, and source references before execution."
         : "Nia should treat the source layer as the authoritative map of docs, repo behavior, and reusable code patterns."),
     source_map: [
       ...sourceHints.map((hint, index) => ({
@@ -96,9 +102,11 @@ export function buildOrchestrationContext(input: ContextInput): OrchestrationCon
         why: "Caller-provided source hint for Nia retrieval.",
       })),
       {
-        label: "campaign-context",
+        label: isTikTok ? "campaign-context" : "task-classification",
         path: "lib/campaign-context.ts",
-        why: "Defines the demo's Reacher-style campaign evidence and Nia-backed constraints.",
+        why: isTikTok
+          ? "Defines the demo's Reacher-style campaign evidence and Nia-backed constraints."
+          : "Defines task classification so creator-commerce context is not injected into unrelated tasks.",
       },
       {
         label: "auction-lifecycle",
@@ -125,9 +133,20 @@ export function buildOrchestrationContext(input: ContextInput): OrchestrationCon
 
   const recommended = input.taskType === "reacher-live-launch"
     ? ["reacher-social"]
-    : isRepo
-      ? ["nia-context", "devin-engineer", "codex-writer"]
-      : ["reacher-social", "hyperspell-brain", "nia-context", "codex-writer"];
+    : isTikTok
+      ? ["reacher-social", "hyperspell-brain", "nia-context", "codex-writer", "devin-engineer"]
+      : isRepo
+        ? [
+            "nia-context",
+            "devin-engineer",
+            "codex-writer",
+            "convex-realtime",
+            "vercel-v0",
+            "github-engineering",
+            "vercel-deploy",
+            "stripe-payments",
+          ]
+        : ["hyperspell-brain", "nia-context", "codex-writer", "devin-engineer"];
 
   const routing: RoutingContext = {
     owner: "auction-house",

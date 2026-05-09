@@ -1,5 +1,5 @@
 /**
- * MCP tool definitions for the creator-campaign marketplace.
+ * MCP tool definitions for the agent marketplace.
  *
  * Tools live here (instead of inline in the route) so the same definitions can
  * back both the HTTP transport and a future stdio transport without drift.
@@ -59,6 +59,13 @@ export interface RaiseDisputeArgs {
   reason: string;
 }
 
+export interface OverrideJudgeArgs {
+  task_id: string;
+  verdict: "accept" | "reject";
+  reason: string;
+  actor?: string;
+}
+
 export interface SuggestSpecialistsArgs {
   prompt: string;
   task_type?: string;
@@ -79,6 +86,16 @@ export interface DiscoverSpecialistArgs {
   preferred_sources?: Array<"catalog" | "registry" | "synthesized">;
 }
 
+export interface UpsertProductContextArgs {
+  agent_id?: string;
+  company_name: string;
+  product_url?: string;
+  github_repo_url?: string;
+  business_context: string;
+  repo_context?: string;
+  source_hints?: string[];
+}
+
 // ─── tool definitions ─────────────────────────────────────────────────────
 
 export interface ToolDefinition {
@@ -89,16 +106,59 @@ export interface ToolDefinition {
 
 export const TOOLS: ToolDefinition[] = [
   {
+    name: "upsert_product_context",
+    description:
+      "Save reusable product/business/repo context for a buyer. Future post_task calls from the same agent_id automatically attach this Hyperspell/Nia context before specialists bid.",
+    inputSchema: {
+      type: "object",
+      required: ["company_name", "business_context"],
+      properties: {
+        agent_id: {
+          type: "string",
+          description:
+            "Caller identifier whose future tasks should use this context. Defaults to 'agent:mcp'.",
+        },
+        company_name: {
+          type: "string",
+          description: "Product or company name.",
+        },
+        product_url: {
+          type: "string",
+          description: "Optional public product/app URL.",
+        },
+        github_repo_url: {
+          type: "string",
+          description: "Optional GitHub repository URL for Nia context.",
+        },
+        business_context: {
+          type: "string",
+          description:
+            "Hyperspell-owned context: customers, positioning, goals, constraints, prior knowledge, and preferences.",
+        },
+        repo_context: {
+          type: "string",
+          description:
+            "Nia-owned context: important files, docs, architecture notes, and implementation guardrails.",
+        },
+        source_hints: {
+          type: "array",
+          items: { type: "string" },
+          description: "Repo paths, docs, URLs, or source IDs Nia should prioritize.",
+        },
+      },
+    },
+  },
+  {
     name: "post_task",
     description:
-      "Post a startup TikTok Shop launch brief. Specialist agents bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins, produces a creator shortlist, outreach drafts, sample plan, risk analysis, and pays the second-highest bid price. Returns a task_id and web_view_url.",
+      "Post work for specialist agents. Agents bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring fit wins and returns either a product artifact, an implementation plan for approval, or a domain-specific deliverable. Returns a task_id and web_view_url.",
     inputSchema: {
       type: "object",
       required: ["prompt", "max_budget"],
       properties: {
         prompt: {
           type: "string",
-          description: "Startup product launch brief and desired TikTok Shop growth outcome.",
+          description: "The user's goal, brief, or build request.",
         },
         max_budget: {
           type: "number",
@@ -107,7 +167,7 @@ export const TOOLS: ToolDefinition[] = [
         task_type: {
           type: "string",
           description:
-            "Optional workflow hint, e.g. 'startup-launch-plan', 'creator-scouting', 'outreach-drafting', or 'end-to-end-campaign'.",
+            "Optional workflow hint, e.g. 'implementation-plan', 'pricing-experiment', 'creator-campaign', or 'reacher-live-launch'.",
         },
         output_schema: {
           type: "object",
@@ -141,7 +201,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "get_task",
     description:
-      "Fetch the current state of a startup launch auction: status, bids (only after window closes), creator shortlist/output, judge verdict, and simulated escrow status.",
+      "Fetch current task state: status, bids (only after window closes), output artifact, judge verdict, context packet, and simulated escrow status.",
     inputSchema: {
       type: "object",
       required: ["task_id"],
@@ -153,7 +213,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "list_specialists",
     description:
-      "List startup growth specialist agents with reputation, capabilities, and cost baselines.",
+      "List specialist agents with reputation, capabilities, MCP connection status, and cost baselines.",
     inputSchema: {
       type: "object",
       properties: {
@@ -167,7 +227,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "suggest_specialists",
     description:
-      "Given a free-form goal (e.g. 'launch a TikTok shop'), return the top specialist agents in the marketplace ranked by fit, with reasoning. Flags low-confidence matches so the caller knows when to use discover_specialist.",
+      "Given a free-form goal, return the top specialist agents ranked by literal fit, with reasoning. Flags low-confidence matches so the caller knows when to use discover_specialist.",
     inputSchema: {
       type: "object",
       required: ["prompt"],
@@ -217,6 +277,31 @@ export const TOOLS: ToolDefinition[] = [
         reason: {
           type: "string",
           description: "One-paragraph explanation of why you dispute the result.",
+        },
+      },
+    },
+  },
+  {
+    name: "override_judge",
+    description:
+      "Human override for a judge verdict. Records an auditable override and updates settlement without re-running the model judge.",
+    inputSchema: {
+      type: "object",
+      required: ["task_id", "verdict", "reason"],
+      properties: {
+        task_id: { type: "string" },
+        verdict: {
+          type: "string",
+          enum: ["accept", "reject"],
+          description: "Final human decision to force for this task.",
+        },
+        reason: {
+          type: "string",
+          description: "One-paragraph explanation for the override.",
+        },
+        actor: {
+          type: "string",
+          description: "Optional operator/buyer id. Defaults to agent:mcp.",
         },
       },
     },
@@ -424,6 +509,29 @@ export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
   };
 }
 
+export async function handleUpsertProductContext(args: UpsertProductContextArgs) {
+  if (!args.company_name?.trim()) throw new Error("company_name is required");
+  if (!args.business_context?.trim()) {
+    throw new Error("business_context is required");
+  }
+
+  const result = await convex().mutation(api.productContext.save, {
+    owner_id: args.agent_id ?? "agent:mcp",
+    company_name: args.company_name,
+    product_url: args.product_url,
+    github_repo_url: args.github_repo_url,
+    business_context: args.business_context,
+    repo_context: args.repo_context,
+    source_hints: args.source_hints,
+  });
+
+  return {
+    ...result,
+    attached_to_agent_id: args.agent_id ?? "agent:mcp",
+    note: "Future post_task calls from this agent_id will automatically attach this product context.",
+  };
+}
+
 export async function handleRaiseDispute(args: RaiseDisputeArgs) {
   if (!args.task_id || !args.reason)
     throw new Error("task_id and reason are required");
@@ -434,6 +542,21 @@ export async function handleRaiseDispute(args: RaiseDisputeArgs) {
   return { ok: true };
 }
 
+export async function handleOverrideJudge(args: OverrideJudgeArgs) {
+  if (!args.task_id || !args.reason || !args.verdict) {
+    throw new Error("task_id, verdict, and reason are required");
+  }
+  if (args.verdict !== "accept" && args.verdict !== "reject") {
+    throw new Error("verdict must be accept or reject");
+  }
+  return await convex().action(api.disputes.override, {
+    task_id: args.task_id as Id<"tasks">,
+    verdict: args.verdict,
+    reason: args.reason,
+    actor: args.actor ?? "agent:mcp",
+  });
+}
+
 // ─── unified dispatch ─────────────────────────────────────────────────────
 
 export async function dispatchTool(
@@ -441,6 +564,10 @@ export async function dispatchTool(
   args: Record<string, unknown>,
 ): Promise<unknown> {
   switch (name) {
+    case "upsert_product_context":
+      return await handleUpsertProductContext(
+        args as unknown as UpsertProductContextArgs,
+      );
     case "post_task":
       return await handlePostTask(args as unknown as PostTaskArgs);
     case "get_task":
@@ -457,6 +584,8 @@ export async function dispatchTool(
       );
     case "raise_dispute":
       return await handleRaiseDispute(args as unknown as RaiseDisputeArgs);
+    case "override_judge":
+      return await handleOverrideJudge(args as unknown as OverrideJudgeArgs);
     default:
       throw new Error(`unknown tool: ${name}`);
   }

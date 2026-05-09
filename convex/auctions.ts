@@ -20,7 +20,8 @@ import type {
 import { callOpenAIJSON } from "../lib/openai";
 import {
   buildTaskContext,
-  isCampaignTask,
+  isCreatorCommerceTask,
+  isImplementationTask,
 } from "../lib/campaign-context";
 
 const BUYER_ID = "buyer:default";
@@ -34,6 +35,14 @@ function normalizeSpecialistOutput(output: SpecialistOutput): {
     text: output.summary,
     artifact: output,
   };
+}
+
+function formatResultForJudge(result: unknown): string {
+  if (typeof result === "string") return result;
+  if (result && typeof result === "object") {
+    return JSON.stringify(result, null, 2);
+  }
+  return JSON.stringify(result);
 }
 
 // ─── Phase 2: bid solicitation ───────────────────────────────────────────
@@ -119,13 +128,18 @@ export const solicitBids = internalAction({
     );
 
     // The reacher-live-launch demo bypasses the open auction and routes
-    // straight to reacher-social. All other tasks go through the full
-    // roster — sponsors plus runtime-discovered specialists plus the
-    // auto-enrolled MCP catalog (Stripe, Linear, Vercel, etc.).
+    // straight to reacher-social. Other tasks invite only the specialists from
+    // the Hyperspell/Nia routing packet. This prevents a creator-commerce
+    // specialist from winning a SaaS engineering task just because it can
+    // produce a polished but unrelated artifact.
+    const recommended = new Set(taskContext?.routing.recommended_specialists ?? []);
+    const roster = [...SPECIALISTS, ...discoveredConfigs, ...catalogConfigs];
     const invitedSpecialists: SpecialistConfig[] =
       task.task_type === "reacher-live-launch"
         ? SPECIALISTS.filter((spec) => spec.agent_id === "reacher-social")
-        : [...SPECIALISTS, ...discoveredConfigs, ...catalogConfigs];
+        : recommended.size > 0
+          ? roster.filter((spec) => recommended.has(spec.agent_id))
+          : roster;
 
     await Promise.allSettled(
       invitedSpecialists.map(async (spec) => {
@@ -392,6 +406,11 @@ const JUDGE_CAMPAIGN_PROMPT = `You are an impartial judge for a creator-campaign
 
 Be strict but fair. Reject if the output lacks a creator shortlist, outreach drafts, sample-request notes, risk evaluation, or evidence tied to Reacher/Nia context. Accept if it satisfies the campaign workflow even if imperfect.`;
 
+const JUDGE_IMPLEMENTATION_PLAN_PROMPT = `You are an impartial judge for the planning phase of a software/product execution marketplace. The winning agent is expected to return an implementation_plan artifact for user approval before payment/execution, not finished code. Output JSON only:
+{ "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
+
+Be strict but fair. Accept if the plan directly addresses the requested product/software change, identifies relevant context relay needs (Hyperspell business context and Nia repo/source context), names concrete implementation surfaces, preserves critical constraints such as Stripe checkout or existing UI, asks useful refinement questions, and defines acceptance criteria. Reject if it drifts into an unrelated domain, ignores the user's actual request, or pretends work is complete without a plan.`;
+
 export const judge = internalAction({
   args: {
     task_id: v.id("tasks"),
@@ -424,14 +443,16 @@ export const judge = internalAction({
       args.dispute_reason
         ? `Buyer dispute reason (re-evaluate with this in mind):\n${args.dispute_reason}`
         : null,
-      `Agent output:\n${typeof task.result === "object" && task.result && "text" in task.result ? (task.result as { text: string }).text : JSON.stringify(task.result)}`,
+      `Agent output:\n${formatResultForJudge(task.result)}`,
     ]
       .filter(Boolean)
       .join("\n\n---\n\n");
 
-    const judgeSystemPrompt = isCampaignTask(task.task_type)
+    const judgeSystemPrompt = isCreatorCommerceTask(task.prompt, task.task_type)
       ? JUDGE_CAMPAIGN_PROMPT
-      : JUDGE_GENERAL_PROMPT;
+      : isImplementationTask(task.prompt, task.task_type)
+        ? JUDGE_IMPLEMENTATION_PLAN_PROMPT
+        : JUDGE_GENERAL_PROMPT;
 
     let verdict: JudgeVerdict;
     try {

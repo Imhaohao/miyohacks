@@ -87,9 +87,10 @@ const NIA_CONTEXT = [
 export function isCampaignTask(taskType: string | undefined | null): boolean {
   if (!taskType) return false;
   const t = taskType.toLowerCase();
-  if (t.includes("campaign")) return true;
-  if (t.includes("creator")) return true;
   return [
+    "reacher-live-launch",
+    "creator-campaign",
+    "tiktok-shop-launch",
     "end-to-end-campaign",
     "creator-scouting",
     "audience-fit-analysis",
@@ -99,13 +100,61 @@ export function isCampaignTask(taskType: string | undefined | null): boolean {
   ].includes(t);
 }
 
+export function isCreatorCommerceTask(
+  prompt: string,
+  taskType: string | undefined | null,
+): boolean {
+  if (isCampaignTask(taskType)) return true;
+  const lower = prompt.toLowerCase();
+  const hasCreatorChannel = [
+    "tiktok shop",
+    "tiktok creator",
+    "creator campaign",
+    "creator-commerce",
+    "creator commerce",
+    "reacher",
+    "gmv",
+    "sample request",
+    "influencer",
+  ].some((signal) => lower.includes(signal));
+  const hasGenericCampaign = lower.includes("campaign");
+  const hasCreator = lower.includes("creator") || lower.includes("influencer");
+  return hasCreatorChannel || (hasGenericCampaign && hasCreator);
+}
+
+export function isImplementationTask(prompt: string, taskType: string): boolean {
+  const lower = `${taskType} ${prompt}`.toLowerCase();
+  return [
+    "repo",
+    "code",
+    "github",
+    "implementation",
+    "api",
+    "backend",
+    "frontend",
+    "convex",
+    "next.js",
+    "nextjs",
+    "react",
+    "stripe",
+    "checkout",
+    "pricing page",
+    "dashboard",
+    "experiment",
+    "conversion tracking",
+    "build",
+  ].some((signal) => lower.includes(signal));
+}
+
 /**
  * Wraps the user prompt with the right context for the task type. Campaign
  * tasks get the Reacher/Nia demo evidence; everything else gets a clean
  * pass-through with just the task type label.
  */
 export function buildTaskContext(prompt: string, taskType: string): string {
-  if (isCampaignTask(taskType)) return buildCampaignEvidence(prompt, taskType);
+  if (isCreatorCommerceTask(prompt, taskType)) {
+    return buildCampaignEvidence(prompt, taskType);
+  }
   return [`Task type: ${taskType || "general"}`, "", `User goal:`, prompt].join(
     "\n",
   );
