@@ -1,0 +1,17 @@
+{
+  "name": "@agent-auction/sdk-core",
+  "version": "0.1.0",
+  "description": "Zero-dep TypeScript client for the Agent Auction Protocol REST API.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": ["agent-auction", "mcp", "vickrey", "agents", "ai"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

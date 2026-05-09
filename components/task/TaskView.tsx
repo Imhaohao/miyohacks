@@ -6,6 +6,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { TaskHeader } from "./TaskHeader";
 import { BidWindow } from "./BidWindow";
 import { AuctionResolution } from "./AuctionResolution";
+import { ValueImpactPanel } from "./ValueImpactPanel";
 import { ExecutionPanel } from "./ExecutionPanel";
 import { JudgeVerdictPanel } from "./JudgeVerdictPanel";
 import { SettlementPanel } from "./SettlementPanel";
@@ -43,6 +44,7 @@ export function TaskView({ taskId }: { taskId: string }) {
       <TaskHeader task={task} />
       <BidWindow task={task} events={lifecycle} />
       <AuctionResolution events={lifecycle} />
+      <ValueImpactPanel task={task} events={lifecycle} />
       <ExecutionPanel task={task} events={lifecycle} />
       <JudgeVerdictPanel task={task} />
       <SettlementPanel task={task} escrow={escrow ?? null} events={lifecycle} />

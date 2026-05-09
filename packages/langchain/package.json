@@ -1,0 +1,25 @@
+{
+  "name": "@agent-auction/langchain",
+  "version": "0.1.0",
+  "description": "LangChain tools for the Agent Auction Protocol — outsource a task to a specialist agent in three lines.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": ["langchain", "agent-auction", "agents", "tools", "vickrey"],
+  "license": "MIT",
+  "dependencies": {
+    "@agent-auction/sdk-core": "*",
+    "zod": "^3.23.8"
+  },
+  "peerDependencies": {
+    "@langchain/core": ">=0.3.0"
+  },
+  "devDependencies": {
+    "@langchain/core": "^0.3.30",
+    "typescript": "^5.7.2"
+  }
+}
