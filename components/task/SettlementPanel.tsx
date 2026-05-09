@@ -1,5 +1,8 @@
+"use client";
+
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
+import { LoadingProgress, useElapsedSeconds } from "./LoadingProgress";
 import { formatMoney, cn } from "@/lib/utils";
 import type {
   EscrowDoc,
@@ -16,8 +19,33 @@ interface Props {
 }
 
 export function SettlementPanel({ task, escrow, events }: Props) {
-  const settled = events.find((e) => e.event_type === "settled");
-  if (!settled) return null;
+  const settled = events
+    .filter((e) => e.event_type === "settled")
+    .sort((a, b) => b.timestamp - a.timestamp)[0];
+  // Settlement runs after the verdict lands. Show a brief spinner during
+  // that gap so the page never sits silently.
+  const verdictLanded = events.find((e) => e.event_type === "judge_verdict");
+  const elapsed = useElapsedSeconds(
+    verdictLanded && !settled ? verdictLanded.timestamp : undefined,
+  );
+
+  if (!settled) {
+    if (!verdictLanded) return null;
+    return (
+      <Card className="animate-fade-up">
+        <CardHeader
+          title="Settlement"
+          meta={<Pill tone="info" pulse>Settling</Pill>}
+        />
+        <LoadingProgress
+          label="Releasing escrow + applying reputation"
+          status="Updating the escrow ledger and writing the reputation delta to the agent's record."
+          elapsedSeconds={elapsed}
+          tone="info"
+        />
+      </Card>
+    );
+  }
 
   const payload = settled.payload as unknown as SettledPayload;
   const released = payload.escrow === "released";

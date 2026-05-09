@@ -1,8 +1,12 @@
+"use client";
+
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Pill } from "@/components/ui/Pill";
+import { LoadingProgress, useElapsedSeconds } from "./LoadingProgress";
 import type { TaskDoc, LifecycleEventDoc } from "@/lib/task-view";
 import { MarkdownLite } from "./MarkdownLite";
-import { CircleNotch } from "@phosphor-icons/react/dist/ssr";
 import { LaunchProduct } from "./LaunchProduct";
+import { ImplementationPlanProduct } from "./ImplementationPlanProduct";
 import type { ExecutionArtifact } from "@/lib/types";
 
 interface Props {
@@ -29,6 +33,9 @@ export function ExecutionPanel({ task, events }: Props) {
   const started = events.find((e) => e.event_type === "execution_started");
   const completed = events.find((e) => e.event_type === "execution_complete");
   const failed = events.find((e) => e.event_type === "execution_failed");
+  const elapsed = useElapsedSeconds(
+    started && !completed && !failed ? started.timestamp : undefined,
+  );
 
   if (!started) return null;
 
@@ -42,7 +49,7 @@ export function ExecutionPanel({ task, events }: Props) {
       <Card className="animate-fade-up">
         <CardHeader
           title="Execution"
-          meta={<span className="text-rose-700">Failed</span>}
+          meta={<Pill tone="danger">Failed</Pill>}
         />
         <p className="text-sm text-ink-muted">
           <span className="font-mono text-ink">{agentId}</span> failed: {reason}.
@@ -53,23 +60,37 @@ export function ExecutionPanel({ task, events }: Props) {
   }
 
   if (!completed) {
+    // Real-MCP specialists (Reacher, Nia) take longer than soft ones because
+    // they make external HTTP calls. Surface that expectation in the status.
+    const isMcpForwarder =
+      agentId === "reacher-social" || agentId === "nia-context";
     return (
       <Card className="animate-fade-up">
         <CardHeader
           title="Execution"
-          meta={<span className="text-brand-700">Running</span>}
+          meta={<Pill tone="brand" pulse>Running</Pill>}
         />
-        <div className="flex items-center gap-3 text-sm text-ink-muted">
-          <CircleNotch
-            size={14}
-            weight="bold"
-            className="animate-spin text-brand-600"
-          />
-          <span>
-            <span className="font-mono text-ink">{agentId}</span> is working
-            <span className="streaming-caret" />
-          </span>
-        </div>
+        <LoadingProgress
+          label={`${agentId} is working`}
+          status={
+            isMcpForwarder
+              ? "Forwarding to the live MCP server. Each tool call adds a few seconds."
+              : "Generating the work product against the enriched context."
+          }
+          details={
+            isMcpForwarder
+              ? [
+                  "Calling remote MCP tools and synthesizing the result.",
+                  "Will surface the final answer when the agent stops calling tools.",
+                ]
+              : [
+                  "Reads the Hyperspell + Nia context packet from the prompt.",
+                  "Output streams in once execution_complete fires.",
+                ]
+          }
+          elapsedSeconds={elapsed}
+          tone="brand"
+        />
         <div className="mt-4 space-y-2">
           <div className="shimmer h-3 w-full rounded" />
           <div className="shimmer h-3 w-5/6 rounded" />
@@ -98,6 +119,8 @@ export function ExecutionPanel({ task, events }: Props) {
       />
       {artifact?.kind === "campaign_launch" ? (
         <LaunchProduct artifact={artifact} />
+      ) : artifact?.kind === "implementation_plan" ? (
+        <ImplementationPlanProduct artifact={artifact} />
       ) : text ? (
         <MarkdownLite text={text} />
       ) : (

@@ -23,6 +23,17 @@ const taskStatusValidator = v.union(
   v.literal("failed"),
 );
 
+function cleanOptional(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function cleanList(values: Array<string | undefined>): string[] {
+  return Array.from(
+    new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))),
+  );
+}
+
 /**
  * Post a new task. Creates the row in `bidding`, schedules bid solicitation
  * immediately and the auction resolution at window close.
@@ -41,6 +52,38 @@ export const post = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     const closesAt = now + BID_WINDOW_SECONDS * 1000;
+    const profile = await ctx.db
+      .query("product_context_profiles")
+      .withIndex("by_owner", (q) => q.eq("owner_id", args.posted_by))
+      .order("desc")
+      .first();
+
+    const profileBusiness = profile
+      ? [
+          `Company/product: ${profile.company_name}`,
+          profile.product_url ? `Product URL: ${profile.product_url}` : undefined,
+          profile.business_context,
+        ]
+          .filter((line): line is string => Boolean(line))
+          .join("\n")
+      : undefined;
+    const profileRepo = profile
+      ? [
+          profile.github_repo_url ? `GitHub repo: ${profile.github_repo_url}` : undefined,
+          profile.repo_context,
+        ]
+          .filter((line): line is string => Boolean(line))
+          .join("\n")
+      : undefined;
+    const sourceHints = cleanList([
+      profile?.github_repo_url,
+      profile?.product_url,
+      ...(profile?.source_hints ?? []),
+      ...(args.source_hints ?? []),
+    ]);
+    const businessContext = cleanOptional(args.business_context) ?? profileBusiness;
+    const repoContext = cleanOptional(args.repo_context) ?? profileRepo;
+
     const task_id = await ctx.db.insert("tasks", {
       posted_by: args.posted_by,
       task_type: args.task_type ?? "general",
@@ -50,14 +93,15 @@ export const post = mutation({
       status: "planning",
       bid_window_seconds: BID_WINDOW_SECONDS,
       bid_window_closes_at: closesAt,
+      product_context_profile_id: profile?._id,
     });
 
     const orchestrationContext = buildOrchestrationContext({
       prompt: args.prompt,
       taskType: args.task_type ?? "general",
-      businessContext: args.business_context,
-      repoContext: args.repo_context,
-      sourceHints: args.source_hints,
+      businessContext,
+      repoContext,
+      sourceHints,
     });
 
     await ctx.db.insert("task_contexts", {
@@ -86,8 +130,24 @@ export const post = mutation({
       payload: orchestrationContext,
     });
 
-    // Planner first: atomic task → single auction; compound → sub-task chain.
-    // Decompose schedules solicitBids/resolve (or runStep for multi-step).
+    if (profile) {
+      await ctx.runMutation(internal.lifecycle.log, {
+        task_id,
+        event_type: "product_context_attached",
+        payload: {
+          profile_id: profile._id,
+          company_name: profile.company_name,
+          has_product_url: Boolean(profile.product_url),
+          has_github_repo: Boolean(profile.github_repo_url),
+          source_hint_count: sourceHints.length,
+          hyperspell_status: profile.hyperspell_status,
+        },
+      });
+    }
+
+    // Planner: atomic → enrichment + auction on this task; compound → multi-
+    // step children (each routed through enrichment; children without a stub
+    // skip quickly to solicitBids inside enrichAndStartAuction).
     await ctx.scheduler.runAfter(0, internal.planning.decompose, { task_id });
 
     return {
@@ -126,7 +186,24 @@ export const _createChild = internalMutation({
       bid_window_closes_at: closesAt,
       parent_task_id: args.parent_task_id,
       step_index: args.step_index,
+      product_context_profile_id: parent.product_context_profile_id,
     });
+    const parentContext = await ctx.db
+      .query("task_contexts")
+      .withIndex("by_task", (q) => q.eq("task_id", args.parent_task_id))
+      .order("desc")
+      .first();
+    if (parentContext) {
+      await ctx.db.insert("task_contexts", {
+        task_id: child_task_id,
+        version: parentContext.version,
+        business: parentContext.business,
+        repo: parentContext.repo,
+        routing: parentContext.routing,
+        prompt_addendum: `${parentContext.prompt_addendum}\n\nChild task focus:\n${args.prompt}`,
+        created_at: now,
+      });
+    }
     await ctx.runMutation(internal.lifecycle.log, {
       task_id: child_task_id,
       event_type: "task_posted",
@@ -138,6 +215,16 @@ export const _createChild = internalMutation({
         step_index: args.step_index,
       },
     });
+    if (parentContext) {
+      await ctx.runMutation(internal.lifecycle.log, {
+        task_id: child_task_id,
+        event_type: "context_inherited",
+        payload: {
+          parent_task_id: args.parent_task_id,
+          product_context_profile_id: parent.product_context_profile_id,
+        },
+      });
+    }
     return { child_task_id, bid_window_closes_at: closesAt };
   },
 });
@@ -244,5 +331,19 @@ export const _setVerdict = internalMutation({
   args: { task_id: v.id("tasks"), verdict: v.any() },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.task_id, { judge_verdict: args.verdict });
+  },
+});
+
+/**
+ * Reset the bid window. Called by the enrichment phase after Hyperspell/Nia
+ * context is attached so the visible 15s countdown starts cleanly *after*
+ * enrichment, not from the moment the task was posted.
+ */
+export const _setBidWindow = internalMutation({
+  args: { task_id: v.id("tasks"), bid_window_closes_at: v.number() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.task_id, {
+      bid_window_closes_at: args.bid_window_closes_at,
+    });
   },
 });

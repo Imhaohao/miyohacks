@@ -1,7 +1,7 @@
 import { Pill, type PillTone } from "@/components/ui/Pill";
 import type { TaskStatus } from "@/lib/types";
 
-const META: Record<TaskStatus, { label: string; tone: PillTone; pulse?: boolean }> = {
+const META: Record<string, { label: string; tone: PillTone; pulse?: boolean }> = {
   open: { label: "Open", tone: "neutral" },
   planning: { label: "Planning", tone: "info", pulse: true },
   bidding: { label: "Bidding", tone: "warning", pulse: true },
@@ -14,10 +14,16 @@ const META: Record<TaskStatus, { label: string; tone: PillTone; pulse?: boolean 
   failed: { label: "Failed", tone: "danger" },
 };
 
-const FALLBACK = { label: "Unknown", tone: "neutral" as PillTone };
+const FALLBACK = { label: "Unknown", tone: "neutral" as PillTone, pulse: false };
 
-export function StatusBadge({ status }: { status: TaskStatus }) {
-  const m = META[status] ?? FALLBACK;
+export function StatusBadge({ status }: { status: TaskStatus | string | undefined }) {
+  // Defensive: status can be undefined briefly during reactive load, or hold
+  // a legacy value from a row written before the current union. Render a
+  // muted "Unknown" pill instead of crashing the page.
+  const m = (status && META[status as TaskStatus]) || {
+    ...FALLBACK,
+    label: status ? String(status) : FALLBACK.label,
+  };
   return (
     <Pill tone={m.tone} pulse={m.pulse}>
       <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />

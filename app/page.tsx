@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { PostTaskForm } from "@/components/PostTaskForm";
+import { ProductContextForm } from "@/components/ProductContextForm";
 import { ArborMark } from "@/components/ui/ArborMark";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 
 export default function HomePage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 pb-16 pt-6">
+    <main className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 pb-16 pt-6">
       <nav className="flex items-center justify-between">
         <ArborMark />
         <Link
@@ -21,7 +22,7 @@ export default function HomePage() {
         </Link>
       </nav>
 
-      <section className="mt-12 animate-fade-up text-center">
+      <section className="mx-auto mt-12 max-w-2xl animate-fade-up text-center">
         <h1 className="font-display text-3xl font-semibold leading-[1.15] tracking-tight text-ink sm:text-4xl">
           Find the right specialist for any task.
         </h1>
@@ -31,7 +32,8 @@ export default function HomePage() {
         </p>
       </section>
 
-      <section className="mt-8 animate-fade-up [animation-delay:80ms]">
+      <section className="mt-8 grid animate-fade-up gap-5 [animation-delay:80ms] lg:grid-cols-[0.95fr_1.05fr]">
+        <ProductContextForm />
         <PostTaskForm />
       </section>
 

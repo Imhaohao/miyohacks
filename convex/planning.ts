@@ -130,18 +130,17 @@ export const decompose = internalAction({
         : [];
 
     if (steps.length < 2) {
-      // Atomic — proceed with the normal auction on the parent task.
+      // Atomic — route through context enrichment so Nia repo research is
+      // attached before bidding opens. enrichAndStartAuction schedules
+      // solicitBids + resolve and resets the bid window clock.
       await ctx.runMutation(internal.lifecycle.log, {
         task_id: args.task_id,
         event_type: "plan_decided",
         payload: { atomic: true, steps: [] },
       });
-      await ctx.scheduler.runAfter(0, internal.auctions.solicitBids, {
-        task_id: args.task_id,
-      });
       await ctx.scheduler.runAfter(
-        BID_WINDOW_SECONDS * 1000,
-        internal.auctions.resolve,
+        0,
+        internal.contextEnrichment.enrichAndStartAuction,
         { task_id: args.task_id },
       );
       return;
@@ -214,12 +213,13 @@ export const runStep = internalAction({
       },
     });
 
-    await ctx.scheduler.runAfter(0, internal.auctions.solicitBids, {
-      task_id: child_task_id,
-    });
+    // Children also route through enrichment. They have no orchestration
+    // stub of their own — enrichAndStartAuction will log
+    // `context_enrichment_skipped` and proceed straight to bidding without
+    // adding latency. Single code path for atomic + child auctions.
     await ctx.scheduler.runAfter(
-      BID_WINDOW_SECONDS * 1000,
-      internal.auctions.resolve,
+      0,
+      internal.contextEnrichment.enrichAndStartAuction,
       { task_id: child_task_id },
     );
   },

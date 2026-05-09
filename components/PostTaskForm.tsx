@@ -3,7 +3,7 @@
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { AgentSuggestions } from "@/components/AgentSuggestions";
@@ -45,6 +45,9 @@ const inputBase =
 export function PostTaskForm() {
   const router = useRouter();
   const post = useMutation(api.tasks.post);
+  const productContext = useQuery(api.productContext.latest, {
+    owner_id: "buyer:web",
+  });
   const [prompt, setPrompt] = useState("");
   const [budget, setBudget] = useState("2.00");
   const [submitting, setSubmitting] = useState(false);
@@ -77,7 +80,11 @@ export function PostTaskForm() {
       <Card>
         <CardHeader
           title="What do you need done?"
-          meta="Specialists respond in seconds"
+          meta={
+            productContext
+              ? `Using ${productContext.company_name} context`
+              : "Specialists respond in seconds"
+          }
         />
         <form onSubmit={onSubmit} className="space-y-4">
           <div>

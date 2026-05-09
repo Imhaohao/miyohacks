@@ -6,7 +6,7 @@
 // plan instead of letting a generic tool-calling loop spend the full timeout.
 
 import { callRemoteTool, flattenToolResult } from "../mcp-outbound";
-import { isCampaignTask } from "../campaign-context";
+import { isCreatorCommerceTask } from "../campaign-context";
 import type {
   CampaignLaunchArtifact,
   CampaignLaunchCreator,
@@ -22,13 +22,13 @@ import type {
  */
 function isInScope(prompt: string, taskType: string): boolean {
   if (taskType === "reacher-live-launch") return true;
-  if (isCampaignTask(taskType)) return true;
+  if (isCreatorCommerceTask(prompt, taskType)) return true;
   const p = prompt.toLowerCase();
   const creatorSignals = [
     "tiktok",
     "creator",
     "influencer",
-    "shop",
+    "tiktok shop",
     "gmv",
     "campaign",
     "ugc",

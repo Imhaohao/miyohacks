@@ -5,11 +5,12 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Card } from "@/components/ui/Card";
 import { TaskHeader } from "./TaskHeader";
+import { ContextEnrichmentPanel } from "./ContextEnrichmentPanel";
 import { BidWindow } from "./BidWindow";
 import { AuctionResolution } from "./AuctionResolution";
 import { ValueImpactPanel } from "./ValueImpactPanel";
 import { CampaignEvidencePanel } from "./CampaignEvidencePanel";
-import { isCampaignTask } from "@/lib/campaign-context";
+import { isCreatorCommerceTask } from "@/lib/campaign-context";
 import { ExecutionPanel } from "./ExecutionPanel";
 import { JudgeVerdictPanel } from "./JudgeVerdictPanel";
 import { SettlementPanel } from "./SettlementPanel";
@@ -53,12 +54,15 @@ export function TaskView({ taskId }: { taskId: string }) {
   return (
     <div className="space-y-4">
       <TaskHeader task={task} />
-      {isCampaignTask(task.task_type) && <CampaignEvidencePanel />}
+      <ContextEnrichmentPanel events={lifecycle} />
+      {isCreatorCommerceTask(task.prompt, task.task_type) && (
+        <CampaignEvidencePanel />
+      )}
       {isMultiStepParent ? (
         <>
           <PlanPanel task={task} />
           <ExecutionPanel task={task} events={lifecycle} />
-          <JudgeVerdictPanel task={task} />
+          <JudgeVerdictPanel task={task} events={lifecycle} />
         </>
       ) : (
         <>
@@ -66,7 +70,7 @@ export function TaskView({ taskId }: { taskId: string }) {
           <AuctionResolution events={lifecycle} />
           <ValueImpactPanel task={task} events={lifecycle} />
           <ExecutionPanel task={task} events={lifecycle} />
-          <JudgeVerdictPanel task={task} />
+          <JudgeVerdictPanel task={task} events={lifecycle} />
           <SettlementPanel
             task={task}
             escrow={escrow ?? null}

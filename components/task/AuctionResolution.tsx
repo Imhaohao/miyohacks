@@ -3,6 +3,8 @@
 import { Card, CardHeader } from "@/components/ui/Card";
 import { formatMoney, formatScore, cn } from "@/lib/utils";
 import { Trophy, ArrowRight } from "@phosphor-icons/react";
+import { Pill } from "@/components/ui/Pill";
+import { LoadingProgress, useElapsedSeconds } from "./LoadingProgress";
 import type {
   AuctionResolvedPayload,
   LifecycleEventDoc,
@@ -15,13 +17,23 @@ interface Props {
 export function AuctionResolution({ events }: Props) {
   const resolved = events.find((e) => e.event_type === "auction_resolved");
   const failed = events.find((e) => e.event_type === "auction_failed");
+  const bidCount = events.filter((e) => e.event_type === "bid_received").length;
+  const declineCount = events.filter((e) => e.event_type === "bid_declined").length;
+  // Anchor the elapsed counter on the first signal that the auction has work
+  // to do — context_enriched (or task_posted as a fallback).
+  const startEvent =
+    events.find((e) => e.event_type === "context_enriched") ??
+    events.find((e) => e.event_type === "task_posted");
+  const elapsed = useElapsedSeconds(
+    !resolved && !failed ? startEvent?.timestamp : undefined,
+  );
 
   if (failed) {
     return (
       <Card className="animate-fade-up">
         <CardHeader
           title="No specialist matched"
-          meta={<span className="text-rose-700">Failed</span>}
+          meta={<Pill tone="danger">Failed</Pill>}
         />
         <p className="text-sm text-ink-muted">
           No specialist bid under your budget. Nothing was charged.
@@ -31,13 +43,27 @@ export function AuctionResolution({ events }: Props) {
   }
 
   if (!resolved) {
+    const responded = bidCount + declineCount;
+    const status =
+      bidCount === 0 && declineCount === 0
+        ? "Waiting for the first specialist to respond..."
+        : `${bidCount} ${bidCount === 1 ? "specialist has" : "specialists have"} privately quoted${declineCount > 0 ? ` (${declineCount} declined)` : ""}.`;
     return (
       <Card className="animate-fade-up">
-        <CardHeader title="Selecting your specialist" meta="In progress" />
-        <p className="text-sm text-ink-muted">
-          Specialists are responding privately. Their offers and the picking
-          rationale appear here once the window closes.
-        </p>
+        <CardHeader
+          title="Selecting your specialist"
+          meta={<Pill tone="warning" pulse>Resolving</Pill>}
+        />
+        <LoadingProgress
+          label="Sealed bids in flight"
+          status={status}
+          details={[
+            "Quotes stay hidden — even from this view — until the window closes.",
+            "When the window closes, the highest score wins and pays the runner-up's price (Vickrey).",
+          ]}
+          elapsedSeconds={elapsed}
+          tone="warning"
+        />
       </Card>
     );
   }

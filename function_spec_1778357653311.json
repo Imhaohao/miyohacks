@@ -1,0 +1,743 @@
+{
+  "url": "https://disciplined-eel-23.convex.cloud",
+  "functions": [
+    {
+      "args": {
+        "type": "object",
+        "value": {}
+      },
+      "functionType": "Query",
+      "identifier": "agents.js:list",
+      "returns": null,
+      "visibility": {
+        "kind": "public"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "agent_id": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Query",
+      "identifier": "agents.js:_getByAgentId",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "agent_id": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "delta": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": false
+          },
+          "event_type": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "increment_completed": {
+            "fieldType": {
+              "type": "boolean"
+            },
+            "optional": false
+          },
+          "increment_disputes_lost": {
+            "fieldType": {
+              "type": "boolean"
+            },
+            "optional": false
+          },
+          "reasoning": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Mutation",
+      "identifier": "agents.js:_applyReputationDelta",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Action",
+      "identifier": "auctions.js:execute",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "dispute_reason": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": true
+          },
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Action",
+      "identifier": "auctions.js:judge",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Action",
+      "identifier": "auctions.js:resolve",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Action",
+      "identifier": "auctions.js:settle",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Action",
+      "identifier": "auctions.js:solicitBids",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Query",
+      "identifier": "bids.js:forTask",
+      "returns": null,
+      "visibility": {
+        "kind": "public"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "agent_id": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "bid_price": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": false
+          },
+          "capability_claim": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "estimated_seconds": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": false
+          },
+          "score": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": false
+          },
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Mutation",
+      "identifier": "bids.js:_insert",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Query",
+      "identifier": "bids.js:_allForTask",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "bid_id": {
+            "fieldType": {
+              "tableName": "bids",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Query",
+      "identifier": "bids.js:_get",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "reason": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Action",
+      "identifier": "disputes.js:raise",
+      "returns": null,
+      "visibility": {
+        "kind": "public"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Query",
+      "identifier": "escrow.js:forTask",
+      "returns": null,
+      "visibility": {
+        "kind": "public"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "buyer_id": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "locked_amount": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": false
+          },
+          "seller_id": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Mutation",
+      "identifier": "escrow.js:_lock",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "status": {
+            "fieldType": {
+              "type": "union",
+              "value": [
+                {
+                  "type": "literal",
+                  "value": "locked"
+                },
+                {
+                  "type": "literal",
+                  "value": "released"
+                },
+                {
+                  "type": "literal",
+                  "value": "refunded"
+                }
+              ]
+            },
+            "optional": false
+          },
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Mutation",
+      "identifier": "escrow.js:_settle",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "event_type": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "payload": {
+            "fieldType": {
+              "type": "any"
+            },
+            "optional": false
+          },
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Mutation",
+      "identifier": "lifecycle.js:log",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Query",
+      "identifier": "lifecycle.js:forTask",
+      "returns": null,
+      "visibility": {
+        "kind": "public"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {}
+      },
+      "functionType": "Mutation",
+      "identifier": "seed.js:seedAgents",
+      "returns": null,
+      "visibility": {
+        "kind": "public"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "max_budget": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": false
+          },
+          "output_schema": {
+            "fieldType": {
+              "type": "any"
+            },
+            "optional": true
+          },
+          "posted_by": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "prompt": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "task_type": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": true
+          }
+        }
+      },
+      "functionType": "Mutation",
+      "identifier": "tasks.js:post",
+      "returns": null,
+      "visibility": {
+        "kind": "public"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Query",
+      "identifier": "tasks.js:get",
+      "returns": null,
+      "visibility": {
+        "kind": "public"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Query",
+      "identifier": "tasks.js:_get",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "status": {
+            "fieldType": {
+              "type": "union",
+              "value": [
+                {
+                  "type": "literal",
+                  "value": "open"
+                },
+                {
+                  "type": "literal",
+                  "value": "bidding"
+                },
+                {
+                  "type": "literal",
+                  "value": "awarded"
+                },
+                {
+                  "type": "literal",
+                  "value": "executing"
+                },
+                {
+                  "type": "literal",
+                  "value": "judging"
+                },
+                {
+                  "type": "literal",
+                  "value": "complete"
+                },
+                {
+                  "type": "literal",
+                  "value": "disputed"
+                },
+                {
+                  "type": "literal",
+                  "value": "failed"
+                }
+              ]
+            },
+            "optional": false
+          },
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Mutation",
+      "identifier": "tasks.js:_setStatus",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "price_paid": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": false
+          },
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          },
+          "winning_bid_id": {
+            "fieldType": {
+              "tableName": "bids",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Mutation",
+      "identifier": "tasks.js:_setWinner",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "result": {
+            "fieldType": {
+              "type": "any"
+            },
+            "optional": false
+          },
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Mutation",
+      "identifier": "tasks.js:_setResult",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "task_id": {
+            "fieldType": {
+              "tableName": "tasks",
+              "type": "id"
+            },
+            "optional": false
+          },
+          "verdict": {
+            "fieldType": {
+              "type": "any"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Mutation",
+      "identifier": "tasks.js:_setVerdict",
+      "returns": null,
+      "visibility": {
+        "kind": "internal"
+      }
+    },
+    {
+      "args": {
+        "type": "object",
+        "value": {
+          "agent_id": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          }
+        }
+      },
+      "functionType": "Query",
+      "identifier": "reputation.js:history",
+      "returns": null,
+      "visibility": {
+        "kind": "public"
+      }
+    }
+  ]
+}

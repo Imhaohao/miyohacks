@@ -33,6 +33,13 @@ export type EscrowStatus = "locked" | "released" | "refunded";
 export type LifecycleEventType =
   | "task_posted"
   | "context_enriched"
+  | "hyperspell_business_context_started"
+  | "hyperspell_business_context_added"
+  | "hyperspell_business_context_skipped"
+  | "nia_repo_context_started"
+  | "nia_repo_context_added"
+  | "nia_repo_context_skipped"
+  | "context_enrichment_skipped"
   | "bid_received"
   | "bid_declined"
   | "auction_resolved"
@@ -101,7 +108,33 @@ export interface CampaignLaunchArtifact {
   }>;
 }
 
-export type ExecutionArtifact = CampaignLaunchArtifact;
+export interface ImplementationPlanArtifact {
+  kind: "implementation_plan";
+  title: string;
+  summary: string;
+  agent_id: string;
+  mode: "plan_for_approval";
+  user_goal: string;
+  context_required: Array<{
+    owner: "hyperspell" | "nia" | "user" | "auction-house";
+    item: string;
+    why: string;
+  }>;
+  proposed_build: Array<{
+    step: number;
+    title: string;
+    deliverable: string;
+    files_or_surfaces: string[];
+  }>;
+  acceptance_criteria: string[];
+  user_questions: string[];
+  payment_checkpoint: {
+    required_before_execution: boolean;
+    reason: string;
+  };
+}
+
+export type ExecutionArtifact = CampaignLaunchArtifact | ImplementationPlanArtifact;
 
 export type SpecialistOutput = string | ExecutionArtifact;
 

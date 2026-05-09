@@ -21,12 +21,14 @@ import {
   type RemoteMcpTool,
 } from "../mcp-outbound";
 import { parseJSONLoose } from "../openai";
-import { buildTaskContext } from "../campaign-context";
+import { buildTaskContext, isImplementationTask } from "../campaign-context";
+import { implementationPlanFromText } from "../implementation-plan";
 import type {
   SpecialistConfig,
   SpecialistDecision,
   SpecialistRunner,
   BidPayload,
+  SpecialistOutput,
 } from "../types";
 
 const MODEL = "gpt-5.5";
@@ -153,6 +155,13 @@ export function makeMcpForwardingSpecialist(
     config,
     async bid(prompt, taskType): Promise<SpecialistDecision> {
       const tools = await getTools();
+      if (tools.length === 0) {
+        return {
+          decline: true,
+          reason:
+            "Remote MCP tool discovery is unavailable, so this specialist cannot safely execute this task right now.",
+        };
+      }
       const toolList = tools
         .slice(0, 20)
         .map((t) => `- ${t.name}: ${t.description?.slice(0, 200) ?? ""}`)
@@ -185,19 +194,22 @@ export function makeMcpForwardingSpecialist(
       return bid;
     },
 
-    async execute(prompt, taskType): Promise<string> {
+    async execute(prompt, taskType): Promise<SpecialistOutput> {
       const tools = await getTools();
 
       // No tools discovered → fall back to a plain completion in persona, with
       // a note that the MCP server was unreachable. Degrades gracefully.
       if (tools.length === 0) {
         const sys = `${config.system_prompt}\n\nYou are normally connected to ${endpoint} but tool discovery is unavailable right now. Produce your best persona-driven answer to the user's actual goal and clearly note in the output that live MCP tool calls were not made.`;
-        return await callPlain(
+        const fallback = await callPlain(
           sys,
           buildTaskContext(prompt, taskType),
           4000,
           60_000,
         );
+        return isImplementationTask(prompt, taskType)
+          ? implementationPlanFromText({ config, prompt, text: fallback })
+          : fallback;
       }
 
       const openaiTools = toOpenAITools(tools);
@@ -228,7 +240,10 @@ export function makeMcpForwardingSpecialist(
         messages.push(msg);
 
         if (!msg.tool_calls || msg.tool_calls.length === 0) {
-          return (msg.content ?? "").trim();
+          const content = (msg.content ?? "").trim();
+          return isImplementationTask(prompt, taskType)
+            ? implementationPlanFromText({ config, prompt, text: content })
+            : content;
         }
 
         for (const call of msg.tool_calls) {
@@ -279,7 +294,10 @@ export function makeMcpForwardingSpecialist(
         },
         45_000,
       );
-      return (final.choices[0]?.message?.content ?? "").trim();
+      const content = (final.choices[0]?.message?.content ?? "").trim();
+      return isImplementationTask(prompt, taskType)
+        ? implementationPlanFromText({ config, prompt, text: content })
+        : content;
     },
   };
 }
