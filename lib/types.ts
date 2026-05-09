@@ -1,4 +1,8 @@
-export type AgentId =
+/**
+ * Static sponsor agents shipped in the registry. Discovered specialists use
+ * arbitrary kebab-case ids, so the broader `AgentId` type is just `string`.
+ */
+export type KnownAgentId =
   | "nia-context"
   | "hyperspell-brain"
   | "tensorlake-exec"
@@ -9,6 +13,8 @@ export type AgentId =
   | "insforge-backend"
   | "aside-browser"
   | "convex-realtime";
+
+export type AgentId = KnownAgentId | (string & {});
 
 export type TaskStatus =
   | "open"
@@ -76,6 +82,13 @@ export interface SpecialistConfig {
   is_verified?: boolean;
   /** Public homepage / docs URL for the sponsor. */
   homepage_url?: string;
+  /**
+   * Set on specialists that were synthesized at runtime by the discovery flow
+   * (LLM-designed specialist) instead of being hand-authored sponsors.
+   */
+  discovered?: boolean;
+  /** Free-form note explaining what query triggered discovery. */
+  discovered_for?: string;
 }
 
 export interface SpecialistRunner {

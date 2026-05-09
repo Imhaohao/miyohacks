@@ -6,6 +6,7 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { DEFAULT_CAMPAIGN_BRIEF } from "@/lib/campaign-context";
+import { AgentSuggestions } from "@/components/AgentSuggestions";
 
 const TASK_TYPES = [
   { value: "reacher-live-launch", label: "Live Reacher proof" },
@@ -46,6 +47,7 @@ export function PostTaskForm() {
   }
 
   return (
+    <div className="space-y-4">
     <Card>
       <CardHeader>
         <span>Launch TikTok Shop</span>
@@ -111,5 +113,7 @@ export function PostTaskForm() {
         {error && <p className="text-xs text-terminal-danger">{error}</p>}
       </form>
     </Card>
+    <AgentSuggestions prompt={prompt} taskType={taskType} />
+    </div>
   );
 }

@@ -74,4 +74,17 @@ export default defineSchema({
     payload: v.any(),
     timestamp: v.number(),
   }).index("by_task", ["task_id"]),
+
+  discovered_specialists: defineTable({
+    agent_id: v.string(),
+    display_name: v.string(),
+    sponsor: v.string(),
+    capabilities: v.array(v.string()),
+    system_prompt: v.string(),
+    cost_baseline: v.number(),
+    starting_reputation: v.number(),
+    one_liner: v.string(),
+    discovered_for: v.string(),
+    created_at: v.number(),
+  }).index("by_agent_id", ["agent_id"]),
 });

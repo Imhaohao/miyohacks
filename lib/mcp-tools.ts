@@ -12,7 +12,16 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { SPECIALISTS } from "@/lib/specialists/registry";
+import {
+  SPECIALISTS,
+  registerDiscoveredSpecialist,
+} from "@/lib/specialists/registry";
+import {
+  suggestSpecialists,
+  type SuggestResult,
+} from "@/lib/specialists/suggest";
+import { discoverSpecialist } from "@/lib/specialists/discover";
+import type { SpecialistConfig } from "@/lib/types";
 
 function convex() {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
@@ -45,6 +54,19 @@ export interface ListSpecialistsArgs {
 export interface RaiseDisputeArgs {
   task_id: string;
   reason: string;
+}
+
+export interface SuggestSpecialistsArgs {
+  prompt: string;
+  task_type?: string;
+  top_n?: number;
+}
+
+export interface DiscoverSpecialistArgs {
+  prompt: string;
+  task_type?: string;
+  /** When false, the discovered config is returned but not persisted. */
+  persist?: boolean;
 }
 
 // ─── tool definitions ─────────────────────────────────────────────────────
@@ -117,6 +139,47 @@ export const TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "suggest_specialists",
+    description:
+      "Given a free-form goal (e.g. 'launch a TikTok shop'), return the top specialist agents in the marketplace ranked by fit, with reasoning. Flags low-confidence matches so the caller knows when to use discover_specialist.",
+    inputSchema: {
+      type: "object",
+      required: ["prompt"],
+      properties: {
+        prompt: {
+          type: "string",
+          description: "What the user wants to accomplish.",
+        },
+        task_type: { type: "string", description: "Optional workflow hint." },
+        top_n: {
+          type: "integer",
+          description: "How many specialists to return. Default 3, max 10.",
+        },
+      },
+    },
+  },
+  {
+    name: "discover_specialist",
+    description:
+      "Synthesize a brand-new specialist agent tailored to a goal that the existing roster cannot cover well. Persists the new specialist so it can compete in future auctions. Use this when suggest_specialists returns low_confidence: true.",
+    inputSchema: {
+      type: "object",
+      required: ["prompt"],
+      properties: {
+        prompt: {
+          type: "string",
+          description: "Goal that requires a new specialist.",
+        },
+        task_type: { type: "string", description: "Optional workflow hint." },
+        persist: {
+          type: "boolean",
+          description:
+            "If false, the discovered config is returned without persisting. Defaults to true.",
+        },
+      },
+    },
+  },
+  {
     name: "raise_dispute",
     description:
       "Raise a dispute on a completed task. The judge re-evaluates with the dispute reason injected; reputation and escrow flow accordingly.",
@@ -174,13 +237,17 @@ export async function handleGetTask(args: GetTaskArgs) {
 
 export async function handleListSpecialists(_args: ListSpecialistsArgs) {
   // Combine the static registry (capabilities, sponsor) with live reputation.
-  const live = await convex().query(api.agents.list, {});
+  const c = convex();
+  const [live, all] = await Promise.all([
+    c.query(api.agents.list, {}),
+    loadAllSpecialists(),
+  ]);
   const liveById = new Map(
     (live as Array<{ agent_id: string; reputation_score: number; total_tasks_completed: number }>).map(
       (a) => [a.agent_id, a],
     ),
   );
-  return SPECIALISTS.map((s) => {
+  return all.map((s) => {
     const l = liveById.get(s.agent_id);
     return {
       agent_id: s.agent_id,
@@ -198,12 +265,110 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
           : s.mcp_api_key_env
             ? "auth_required"
             : "configured"
-        : "mocked",
+        : s.discovered
+          ? "discovered"
+          : "mocked",
       mcp_api_key_env: s.mcp_api_key_env,
       is_verified: s.is_verified ?? false,
       homepage_url: s.homepage_url,
+      discovered: !!s.discovered,
+      discovered_for: s.discovered_for,
     };
   });
+}
+
+async function loadAllSpecialists(): Promise<SpecialistConfig[]> {
+  const c = convex();
+  const discovered = (await c.query(api.discoveredSpecialists.list, {})) as Array<{
+    agent_id: string;
+    display_name: string;
+    sponsor: string;
+    capabilities: string[];
+    system_prompt: string;
+    cost_baseline: number;
+    starting_reputation: number;
+    one_liner: string;
+    discovered_for: string;
+  }>;
+  const discoveredConfigs: SpecialistConfig[] = discovered.map((d) => ({
+    agent_id: d.agent_id,
+    display_name: d.display_name,
+    sponsor: d.sponsor,
+    capabilities: d.capabilities,
+    system_prompt: d.system_prompt,
+    cost_baseline: d.cost_baseline,
+    starting_reputation: d.starting_reputation,
+    one_liner: d.one_liner,
+    discovered: true,
+    discovered_for: d.discovered_for,
+  }));
+  for (const cfg of discoveredConfigs) registerDiscoveredSpecialist(cfg);
+  return [...SPECIALISTS, ...discoveredConfigs];
+}
+
+export async function handleSuggestSpecialists(
+  args: SuggestSpecialistsArgs,
+): Promise<SuggestResult> {
+  if (typeof args.prompt !== "string" || !args.prompt.trim()) {
+    throw new Error("prompt is required");
+  }
+  const topN =
+    typeof args.top_n === "number" && args.top_n > 0
+      ? Math.min(10, Math.floor(args.top_n))
+      : 3;
+  const all = await loadAllSpecialists();
+  return await suggestSpecialists(args.prompt, args.task_type, all, topN);
+}
+
+export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
+  if (typeof args.prompt !== "string" || !args.prompt.trim()) {
+    throw new Error("prompt is required");
+  }
+  const persist = args.persist !== false;
+  const existing = await loadAllSpecialists();
+  const cfg = await discoverSpecialist({
+    query: args.prompt,
+    taskType: args.task_type,
+    existing,
+  });
+
+  let persisted = false;
+  if (persist) {
+    try {
+      await convex().mutation(api.discoveredSpecialists.create, {
+        agent_id: cfg.agent_id,
+        display_name: cfg.display_name,
+        sponsor: cfg.sponsor,
+        capabilities: cfg.capabilities,
+        system_prompt: cfg.system_prompt,
+        cost_baseline: cfg.cost_baseline,
+        starting_reputation: cfg.starting_reputation,
+        one_liner: cfg.one_liner,
+        discovered_for: cfg.discovered_for ?? args.prompt,
+      });
+      registerDiscoveredSpecialist(cfg);
+      persisted = true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`failed to persist discovered specialist: ${msg}`);
+    }
+  }
+
+  return {
+    specialist: {
+      agent_id: cfg.agent_id,
+      display_name: cfg.display_name,
+      sponsor: cfg.sponsor,
+      capabilities: cfg.capabilities,
+      cost_baseline: cfg.cost_baseline,
+      starting_reputation: cfg.starting_reputation,
+      one_liner: cfg.one_liner,
+      system_prompt: cfg.system_prompt,
+      discovered: true,
+      discovered_for: cfg.discovered_for,
+    },
+    persisted,
+  };
 }
 
 export async function handleRaiseDispute(args: RaiseDisputeArgs) {
@@ -229,6 +394,14 @@ export async function dispatchTool(
       return await handleGetTask(args as unknown as GetTaskArgs);
     case "list_specialists":
       return await handleListSpecialists(args as ListSpecialistsArgs);
+    case "suggest_specialists":
+      return await handleSuggestSpecialists(
+        args as unknown as SuggestSpecialistsArgs,
+      );
+    case "discover_specialist":
+      return await handleDiscoverSpecialist(
+        args as unknown as DiscoverSpecialistArgs,
+      );
     case "raise_dispute":
       return await handleRaiseDispute(args as unknown as RaiseDisputeArgs);
     default:
