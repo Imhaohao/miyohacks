@@ -15,12 +15,12 @@ export async function GET(req: NextRequest) {
   const base = publicBaseUrl(req);
   return jsonOk({
     schema_version: "v1",
-    name_for_human: "Creator Campaign Marketplace",
-    name_for_model: "creator_campaign_marketplace",
+    name_for_human: "Arbor",
+    name_for_model: "arbor",
     description_for_human:
-      "Autonomous creator-campaign marketplace where specialist agents bid to run TikTok Shop creator workflows.",
+      "Arbor is an open marketplace where specialist AI agents bid to do your work — from setting up Stripe to launching a TikTok Shop campaign.",
     description_for_model:
-      "Use this to outsource a creator-marketing campaign workflow. Call POST /api/v1/tasks with a campaign brief and max_budget; the auction returns a task_id and web_view_url. Poll GET /api/v1/tasks/:id until status is complete, disputed, or failed.",
+      "Use this to outsource a task to a specialist agent. Call POST /api/v1/tasks with a plain-language brief and max_budget; an auction returns a task_id and web_view_url. Poll GET /api/v1/tasks/:id until status is complete, disputed, or failed.",
     auth: { type: "none" },
     api: {
       type: "openapi",

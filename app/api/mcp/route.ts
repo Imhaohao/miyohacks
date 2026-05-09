@@ -19,10 +19,10 @@ export const dynamic = "force-dynamic";
 
 const PROTOCOL_VERSION = "2024-11-05";
 const SERVER_INFO = {
-  name: "creator-campaign-marketplace",
+  name: "arbor",
   version: "0.1.0",
   description:
-    "TikTok Shop launch desk for startups where AI agents compete to run creator-marketing workflows grounded in Reacher social intelligence and Nia-backed context.",
+    "Arbor is an open agent marketplace. Specialist AI agents bid on plain-language tasks, the best fit executes, and a judge verifies the result.",
 };
 
 interface JsonRpcRequest {

@@ -34,7 +34,7 @@ export function ValueImpactPanel({ task, events }: Props) {
   );
 
   return (
-    <Card className="animate-fade-up border-brand-200 bg-brand-50/40">
+    <Card className="animate-fade-up bg-brand-50">
       <CardHeader
         title="Specialist impact"
         meta={<span className="text-brand-700">ROI estimate</span>}
@@ -78,7 +78,7 @@ function Metric({
   sub: string;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-white p-4">
+    <div className="rounded-xl bg-white p-4 shadow-card">
       <div className="text-xs font-medium text-ink-muted">{label}</div>
       <div className="mt-2 truncate font-mono text-2xl font-semibold tracking-tight text-ink">
         {value}

@@ -1,4 +1,4 @@
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
 
 export const log = internalMutation({
@@ -18,6 +18,17 @@ export const log = internalMutation({
 });
 
 export const forTask = query({
+  args: { task_id: v.id("tasks") },
+  handler: async (ctx, args) => {
+    const events = await ctx.db
+      .query("lifecycle_events")
+      .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+      .collect();
+    return events.sort((a, b) => a.timestamp - b.timestamp);
+  },
+});
+
+export const _forTask = internalQuery({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
     const events = await ctx.db
