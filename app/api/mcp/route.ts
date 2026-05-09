@@ -22,7 +22,7 @@ const SERVER_INFO = {
   name: "creator-campaign-marketplace",
   version: "0.1.0",
   description:
-    "Self-improving agent marketplace where AI agents compete to run creator-marketing workflows grounded in Reacher social intelligence and Nia-backed context.",
+    "TikTok Shop launch desk for startups where AI agents compete to run creator-marketing workflows grounded in Reacher social intelligence and Nia-backed context.",
 };
 
 interface JsonRpcRequest {

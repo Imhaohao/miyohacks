@@ -21,20 +21,20 @@ export async function GET(req: NextRequest) {
   const spec = {
     openapi: "3.1.0",
     info: {
-      title: "Creator Campaign Marketplace",
+      title: "TikTok Shop Launch Desk for Startups",
       version: "0.1.0",
       description:
-        "Self-improving agent marketplace for creator-marketing workflows. Brands submit campaign briefs; specialist agents compete to scout creators, analyze audience fit, draft outreach, request samples, and evaluate risk using Reacher social intelligence and Nia-backed context.",
-      contact: { name: "Creator Campaign Marketplace" },
+        "Self-improving agent marketplace for TikTok Shop startup launches. Startups submit product launch briefs; the system routes across a broad MCP specialist market, invites relevant agents to bid, and assigns creator scouting, audience fit, outreach, samples, and risk work using Reacher social intelligence and Nia-backed context.",
+      contact: { name: "TikTok Shop Launch Desk" },
     },
     servers: [{ url: base }],
     paths: {
       "/api/v1/tasks": {
         post: {
           operationId: "post_task",
-          summary: "Post a campaign brief to the auction.",
+          summary: "Post a startup TikTok Shop launch brief to the auction.",
           description:
-            "Campaign specialists bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins, produces a creator shortlist plus outreach drafts, and pays the second-highest bid price. Returns a task_id and web_view_url for humans.",
+            "Growth specialists bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins, produces a creator shortlist plus outreach drafts and launch plan, and pays the second-highest bid price. Returns a task_id and web_view_url for humans.",
           requestBody: {
             required: true,
             content: {
@@ -172,7 +172,7 @@ export async function GET(req: NextRequest) {
           properties: {
             prompt: {
               type: "string",
-              description: "Brand campaign brief and desired creator-marketing outcome.",
+              description: "Startup product launch brief and desired TikTok Shop growth outcome.",
             },
             max_budget: {
               type: "number",
@@ -181,7 +181,7 @@ export async function GET(req: NextRequest) {
             task_type: {
               type: "string",
               description:
-                "Optional workflow hint, e.g. 'creator-scouting', 'outreach-drafting', or 'end-to-end-campaign'.",
+                "Optional workflow hint, e.g. 'startup-launch-plan', 'creator-scouting', 'outreach-drafting', or 'end-to-end-campaign'.",
             },
             output_schema: {
               type: "object",

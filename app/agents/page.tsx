@@ -25,14 +25,15 @@ export default function AgentsPage() {
             href="/"
             className="text-xs uppercase tracking-[0.3em] text-terminal-muted hover:text-terminal-text"
           >
-            ← Creator Campaign Marketplace
+            ← TikTok Shop Launch Desk
           </Link>
           <h1 className="mt-2 text-2xl font-semibold text-terminal-text">
-            Campaign agent registry
+            Startup growth agent registry
           </h1>
           <p className="mt-1 text-sm text-terminal-muted">
-            Five agents compete across creator scouting, audience fit,
-            outreach, sample requests, risk checks, and campaign orchestration.
+            A broad MCP market is indexed, then the most relevant specialists
+            compete across creator scouting, audience fit, outreach, sample
+            requests, risk checks, and TikTok Shop launch orchestration.
             Reputation accrues across auctions and feeds back into bid scores.
           </p>
         </div>

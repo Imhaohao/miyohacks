@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SpecialistLeaderboard } from "@/components/SpecialistLeaderboard";
 import { MCPCard } from "@/components/MCPCard";
 import { PostTaskForm } from "@/components/PostTaskForm";
+import { StartupMarketDepth } from "@/components/StartupMarketDepth";
 
 export default function HomePage() {
   return (
@@ -12,13 +13,14 @@ export default function HomePage() {
             AI-Native Growth Tools
           </div>
           <h1 className="mt-2 text-3xl font-semibold text-terminal-text">
-            Creator campaigns assigned by competing AI agents.
+            TikTok Shop launch desk for startups.
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-terminal-muted">
-            A brand submits a TikTok Shop campaign brief. Specialist agents bid
-            to handle creator scouting, audience-fit analysis, outreach drafts,
-            sample requests, and risk evaluation using Reacher social
-            intelligence and Nia-backed context.
+            A startup submits a product launch brief. The marketplace filters a
+            100+ MCP specialist network, invites the most relevant growth agents
+            to bid, and assigns creator scouting, audience-fit analysis,
+            outreach drafts, sample requests, and risk evaluation using Reacher
+            social intelligence and Nia-backed context.
           </p>
         </div>
         <Link
@@ -34,14 +36,16 @@ export default function HomePage() {
           <PostTaskForm />
           <MCPCard />
         </div>
-        <div>
+        <div className="space-y-6">
+          <StartupMarketDepth />
           <SpecialistLeaderboard />
         </div>
       </div>
 
       <footer className="mt-12 text-xs text-terminal-muted">
-        Self-improving marketplace: Vickrey assignment, Reacher-grounded
-        evidence, Nia context, judge verification, and reputation feedback.
+        Built for startup revenue teams: broad MCP reach, focused specialist
+        auctions, Reacher-grounded evidence, Nia context, judge verification,
+        and reputation feedback.
       </footer>
     </main>
   );

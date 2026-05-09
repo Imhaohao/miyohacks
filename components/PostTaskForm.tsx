@@ -8,12 +8,13 @@ import { useRouter } from "next/navigation";
 import { DEFAULT_CAMPAIGN_BRIEF } from "@/lib/campaign-context";
 
 const TASK_TYPES = [
-  "creator-scouting",
-  "audience-fit-analysis",
-  "outreach-drafting",
-  "sample-request-creation",
-  "campaign-risk-evaluation",
-  "end-to-end-campaign",
+  { value: "startup-launch-plan", label: "Startup launch plan" },
+  { value: "creator-scouting", label: "Creator scouting" },
+  { value: "audience-fit-analysis", label: "Audience-fit analysis" },
+  { value: "outreach-drafting", label: "Outreach drafting" },
+  { value: "sample-request-creation", label: "Sample requests" },
+  { value: "campaign-risk-evaluation", label: "Risk evaluation" },
+  { value: "end-to-end-campaign", label: "End-to-end campaign" },
 ];
 
 export function PostTaskForm() {
@@ -21,7 +22,7 @@ export function PostTaskForm() {
   const post = useMutation(api.tasks.post);
   const [prompt, setPrompt] = useState(DEFAULT_CAMPAIGN_BRIEF);
   const [budget, setBudget] = useState("2.00");
-  const [taskType, setTaskType] = useState("end-to-end-campaign");
+  const [taskType, setTaskType] = useState("startup-launch-plan");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,14 +47,28 @@ export function PostTaskForm() {
   return (
     <Card>
       <CardHeader>
-        <span>Launch campaign auction</span>
-        <span>15s sealed bids</span>
+        <span>Launch TikTok Shop</span>
+        <span>15s agent auction</span>
       </CardHeader>
       <form onSubmit={onSubmit} className="space-y-3">
+        <div className="grid gap-2 rounded border border-terminal-border bg-black/30 p-3 text-xs text-terminal-muted sm:grid-cols-3">
+          <div>
+            <div className="font-mono text-terminal-text">Seed-stage brand</div>
+            <div>limited team, needs revenue this week</div>
+          </div>
+          <div>
+            <div className="font-mono text-terminal-text">TikTok Shop</div>
+            <div>creator GMV, samples, outreach</div>
+          </div>
+          <div>
+            <div className="font-mono text-terminal-text">Auction routing</div>
+            <div>100+ indexed, top agents invited</div>
+          </div>
+        </div>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Paste a brand campaign brief. Specialists compete to scout creators, evaluate fit, draft outreach, request samples, and flag risks."
+          placeholder="Paste a startup product launch brief. Specialists compete to scout TikTok Shop creators, evaluate fit, draft outreach, request samples, and flag risks."
           required
           rows={4}
           className="w-full resize-none rounded border border-terminal-border bg-black/40 p-2 font-mono text-sm placeholder:text-terminal-muted focus:border-terminal-accent focus:outline-none"
@@ -78,8 +93,8 @@ export function PostTaskForm() {
               className="mt-1 rounded border border-terminal-border bg-black/40 px-2 py-1.5 font-mono text-sm text-terminal-text focus:border-terminal-accent focus:outline-none"
             >
               {TASK_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+                <option key={t.value} value={t.value}>
+                  {t.label}
                 </option>
               ))}
             </select>
@@ -90,7 +105,7 @@ export function PostTaskForm() {
           disabled={submitting || !prompt.trim()}
           className="w-full rounded bg-terminal-accent py-2 font-mono text-sm uppercase tracking-wider text-black transition hover:bg-terminal-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {submitting ? "Opening campaign auction..." : "Run creator campaign auction"}
+          {submitting ? "Opening startup launch auction..." : "Build TikTok Shop launch plan"}
         </button>
         {error && <p className="text-xs text-terminal-danger">{error}</p>}
       </form>

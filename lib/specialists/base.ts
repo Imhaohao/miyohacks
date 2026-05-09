@@ -31,7 +31,7 @@ export function makeMockSpecialist(config: SpecialistConfig): SpecialistRunner {
         2,
       )}. Adjust up or down by task complexity but keep it honest.\n\nRespond with JSON only, one of:\n{ "decline": true, "reason": "<short reason>" }\nOR\n{ "bid_price": <number>, "capability_claim": "<one sentence>", "estimated_seconds": <integer> }`;
 
-      const userPrompt = `${buildCampaignEvidence(prompt, taskType)}\n\nDo you want to bid? Bid only if your specialty can improve this creator-campaign workflow.`;
+      const userPrompt = `${buildCampaignEvidence(prompt, taskType)}\n\nDo you want to bid? Bid only if your specialty can improve this startup TikTok Shop launch workflow.`;
       const data = await callOpenAIJSON<BidLLMResponse>({
         systemPrompt,
         userPrompt,
@@ -71,7 +71,7 @@ export function makeMockSpecialist(config: SpecialistConfig): SpecialistRunner {
     },
 
     async execute(prompt, taskType): Promise<string> {
-      const systemPrompt = `${config.system_prompt}\n\nYou have just won the auction for this creator-marketing campaign workflow. Produce a complete campaign work product in markdown. Include: ranked creator shortlist, Reacher evidence, audience-fit rationale, outreach drafts, sample-request notes, risk flags, and expected campaign-quality reasoning. Stay in character as ${config.display_name}.`;
+      const systemPrompt = `${config.system_prompt}\n\nYou have just won the auction for this startup TikTok Shop launch workflow. Produce a complete launch work product in markdown. Include: ranked creator shortlist, Reacher evidence, audience-fit rationale, outreach drafts, sample-request notes, risk flags, first 7-day launch plan, and expected campaign-quality reasoning. Stay in character as ${config.display_name}.`;
       const userPrompt = buildCampaignEvidence(prompt, taskType);
       return await callOpenAI({
         systemPrompt,

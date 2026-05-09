@@ -19,7 +19,7 @@ export function TaskHeader({ task }: { task: TaskDoc }) {
             >
               {isAgent ? "agent" : "human"}
             </span>
-            <span>brand · {task.posted_by}</span>
+            <span>startup · {task.posted_by}</span>
             <span>· workflow · {task.task_type}</span>
           </div>
           <p className="text-sm text-terminal-text">{task.prompt}</p>
@@ -27,7 +27,7 @@ export function TaskHeader({ task }: { task: TaskDoc }) {
         <div className="flex flex-col items-end gap-2">
           <StatusBadge status={task.status} />
           <div className="text-right text-xs">
-            <div className="text-terminal-muted">campaign budget</div>
+            <div className="text-terminal-muted">launch budget</div>
             <div className="font-mono text-terminal-text">
               {formatMoney(task.max_budget)}
             </div>

@@ -13,8 +13,8 @@ export function CampaignEvidencePanel() {
   return (
     <Card>
       <CardHeader>
-        <span>Reacher + Nia evidence</span>
-        <span>grounding layer</span>
+        <span>Startup launch evidence</span>
+        <span>Reacher + Nia</span>
       </CardHeader>
       <div className="grid gap-2 md:grid-cols-2">
         {REACHER_DEMO_SIGNALS.map((creator) => (
@@ -50,8 +50,8 @@ export function CampaignEvidencePanel() {
       </div>
       <p className="mt-3 text-xs text-terminal-muted">
         Reacher supplies TikTok Shop creator, video, GMV, sample, and risk
-        signals. Nia supplies campaign memory and brand-context constraints used
-        by the agents and judge.
+        signals. Nia supplies startup constraints: small team, fast first-week
+        learning, practical founder-ready outreach, and brand-safe claims.
       </p>
     </Card>
   );

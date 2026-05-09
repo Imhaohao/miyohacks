@@ -210,6 +210,7 @@ export function makeMcpForwardingSpecialist(
             tools: openaiTools,
             tool_choice: "auto",
             max_completion_tokens: 1500,
+            reasoning_effort: "none",
           },
           30_000,
         );
@@ -258,7 +259,12 @@ export function makeMcpForwardingSpecialist(
           "You've used your tool-call budget. Synthesize your final answer now in markdown, citing what you found via the MCP tools.",
       });
       const final = await chatCompletion(
-        { model: MODEL, messages, max_completion_tokens: 1500 },
+        {
+          model: MODEL,
+          messages,
+          max_completion_tokens: 1500,
+          reasoning_effort: "none",
+        },
         30_000,
       );
       return (final.choices[0]?.message?.content ?? "").trim();
@@ -280,6 +286,7 @@ async function callPlain(
         { role: "user", content: userPrompt },
       ],
       max_completion_tokens: maxTokens,
+      reasoning_effort: "none",
     },
     timeoutMs,
   );
