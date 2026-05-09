@@ -19,6 +19,7 @@ import type * as planning from "../planning.js";
 import type * as reputation from "../reputation.js";
 import type * as reputationDimensions from "../reputationDimensions.js";
 import type * as seed from "../seed.js";
+import type * as taskContexts from "../taskContexts.js";
 import type * as tasks from "../tasks.js";
 
 import type {
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   reputation: typeof reputation;
   reputationDimensions: typeof reputationDimensions;
   seed: typeof seed;
+  taskContexts: typeof taskContexts;
   tasks: typeof tasks;
 }>;
 
