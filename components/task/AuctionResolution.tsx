@@ -2,6 +2,7 @@
 
 import { Card, CardHeader } from "@/components/ui/Card";
 import { formatMoney, formatScore, cn } from "@/lib/utils";
+import { Trophy, ArrowRight } from "@phosphor-icons/react";
 import type {
   AuctionResolvedPayload,
   LifecycleEventDoc,
@@ -17,13 +18,13 @@ export function AuctionResolution({ events }: Props) {
 
   if (failed) {
     return (
-      <Card>
-        <CardHeader>
-          <span>Auction</span>
-          <span className="text-terminal-danger">failed</span>
-        </CardHeader>
-        <p className="text-sm text-terminal-muted">
-          No valid bids under budget. Nothing was charged.
+      <Card className="animate-fade-up">
+        <CardHeader
+          title="No specialist matched"
+          meta={<span className="text-rose-700">Failed</span>}
+        />
+        <p className="text-sm text-ink-muted">
+          No specialist bid under your budget. Nothing was charged.
         </p>
       </Card>
     );
@@ -31,13 +32,11 @@ export function AuctionResolution({ events }: Props) {
 
   if (!resolved) {
     return (
-      <Card>
-        <CardHeader>
-          <span>Auction resolution</span>
-          <span>pending</span>
-        </CardHeader>
-        <p className="text-xs text-terminal-muted">
-          Bids unsealed and Vickrey math shown here once the window closes.
+      <Card className="animate-fade-up">
+        <CardHeader title="Selecting your specialist" meta="In progress" />
+        <p className="text-sm text-ink-muted">
+          Specialists are responding privately. Their offers and the picking
+          rationale appear here once the window closes.
         </p>
       </Card>
     );
@@ -46,72 +45,119 @@ export function AuctionResolution({ events }: Props) {
   const payload = resolved.payload as unknown as AuctionResolvedPayload;
   const { bids, winner, vickrey } = payload;
   const isDegenerate = vickrey.rule === "degenerate_single_bid";
+  const maxScore = Math.max(...bids.map((b) => b.score), 0.01);
 
   return (
-    <Card className="border-terminal-accent/40">
-      <CardHeader>
-        <span>Auction resolved</span>
-        <span className="text-terminal-accent">winner: {winner.agent_id}</span>
-      </CardHeader>
+    <Card accent="brand" className="animate-fade-up border-brand-100">
+      <CardHeader
+        title="Specialist selected"
+        meta={
+          <span className="inline-flex items-center gap-1.5 text-brand-700">
+            <Trophy size={12} weight="fill" />
+            <span className="font-mono">{winner.agent_id}</span>
+          </span>
+        }
+      />
 
-      {/* Vickrey strike-through — the most important pedagogical visual */}
-      <div className="mb-4 rounded-md border border-terminal-accent/40 bg-terminal-accent/5 p-4">
-        <div className="text-[10px] uppercase tracking-[0.2em] text-terminal-muted">
-          Vickrey second-price rule
-        </div>
-        <div className="mt-2 flex flex-wrap items-baseline gap-3 font-mono">
-          <span className="text-terminal-text">{winner.agent_id} bid</span>
-          <span className="text-2xl text-terminal-muted line-through decoration-terminal-danger decoration-2">
-            {formatMoney(vickrey.winner_bid_price)}
-          </span>
-          <span className="text-terminal-muted">→</span>
-          <span className="text-3xl font-semibold text-terminal-accent animate-pulse-once">
-            pays {formatMoney(vickrey.price_paid)}
-          </span>
-          <span className="text-xs text-terminal-muted">
+      {/* Pricing callout — gradient-tinted, animated value pop */}
+      <div className="relative mb-6 overflow-hidden rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-fuchsia-50 p-5">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-12 -top-10 h-40 w-40 rounded-full bg-brand-200/40 blur-3xl"
+        />
+        <div className="relative">
+          <div className="text-xs font-medium uppercase-[none] text-brand-700">
+            Honest pricing · Vickrey second-price
+          </div>
+          <div className="mt-3 flex flex-wrap items-baseline gap-3">
+            <span className="text-sm text-ink-muted">
+              <span className="font-mono">{winner.agent_id}</span> bid
+            </span>
+            <span className="text-2xl text-ink-subtle line-through decoration-rose-400 decoration-2">
+              {formatMoney(vickrey.winner_bid_price)}
+            </span>
+            <ArrowRight
+              size={18}
+              weight="bold"
+              className="text-ink-subtle"
+            />
+            <span className="animate-value-pop font-display text-3xl font-bold tracking-tight text-brand-700 sm:text-4xl">
+              pays {formatMoney(vickrey.price_paid)}
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-ink-muted">
             {isDegenerate
-              ? "(only one valid bid — degenerate, pays own bid)"
-              : "(second-highest bid price)"}
-          </span>
+              ? "Only one valid offer — they pay their own price."
+              : "They pay the runner-up's price, so the honest move is to quote your true cost."}
+          </p>
         </div>
-        <p className="mt-3 text-xs text-terminal-muted">
-          Truth-telling is the dominant strategy: a specialist who shaded their
-          bid below true cost would risk winning at a loss; one who shaded
-          above would only lose win probability without raising profit.
-        </p>
       </div>
 
-      {/* All bids ranked */}
-      <div className="space-y-1">
-        {bids.map((b, i) => (
-          <div
-            key={b.bid_id}
-            className={cn(
-              "flex items-center justify-between rounded px-2 py-1.5 text-xs",
-              i === 0
-                ? "bg-terminal-accent/10 text-terminal-text"
-                : "text-terminal-muted",
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <span className="w-4 font-mono text-terminal-muted">
-                #{i + 1}
-              </span>
-              <span className="font-mono">{b.agent_id}</span>
-              <span className="hidden md:inline">{b.capability_claim}</span>
+      {/* Bid ladder — winner is emphasized; everyone else gets a score bar viz */}
+      <div className="space-y-2">
+        {bids.map((b, i) => {
+          const isWinner = i === 0;
+          const widthPct = Math.max(8, Math.round((b.score / maxScore) * 100));
+          return (
+            <div
+              key={b.bid_id}
+              className={cn(
+                "group relative overflow-hidden rounded-xl border p-3 text-sm transition-shadow",
+                isWinner
+                  ? "border-brand-200 bg-gradient-to-r from-brand-50 to-white shadow-sm"
+                  : "border-line bg-white hover:border-line-strong",
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className={cn(
+                    "mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold tracking-tight",
+                    isWinner
+                      ? "bg-brand-600 text-white"
+                      : "bg-surface-muted text-ink-muted",
+                  )}
+                >
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-sm text-ink">
+                      {b.agent_id}
+                    </span>
+                    {isWinner && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-semibold tracking-tight text-white">
+                        <Trophy size={9} weight="fill" />
+                        Winner
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    className={cn(
+                      "mt-1 text-xs leading-relaxed",
+                      isWinner ? "text-ink-soft" : "text-ink-muted",
+                    )}
+                  >
+                    {b.capability_claim}
+                  </p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="score-bar flex-1">
+                      <span style={{ width: `${widthPct}%` }} />
+                    </div>
+                    <span className="shrink-0 font-mono text-[11px] text-ink-muted">
+                      score {formatScore(b.score)}
+                    </span>
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="text-[10px] text-ink-subtle">Bid</div>
+                  <div className="font-mono text-sm text-ink">
+                    {formatMoney(b.bid_price)}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-6 font-mono">
-              <span>
-                <span className="text-terminal-muted">bid </span>
-                {formatMoney(b.bid_price)}
-              </span>
-              <span>
-                <span className="text-terminal-muted">score </span>
-                {formatScore(b.score)}
-              </span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Card>
   );

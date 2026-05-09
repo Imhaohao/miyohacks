@@ -1,4 +1,5 @@
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Pill } from "@/components/ui/Pill";
 import type { TaskDoc } from "@/lib/task-view";
 import { cn } from "@/lib/utils";
 
@@ -10,31 +11,28 @@ export function JudgeVerdictPanel({ task }: { task: TaskDoc }) {
   const pct = Math.round(verdict.quality_score * 100);
 
   return (
-    <Card>
-      <CardHeader>
-        <span>Judge verdict</span>
-        <span
-          className={cn(
-            "rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
-            accepted
-              ? "bg-terminal-accent/20 text-terminal-accent"
-              : "bg-terminal-danger/20 text-terminal-danger",
-          )}
-        >
-          {verdict.verdict}
-        </span>
-      </CardHeader>
-      <p className="mb-4 text-sm text-terminal-text">{verdict.reasoning}</p>
+    <Card className="animate-fade-up">
+      <CardHeader
+        title="Judge verdict"
+        meta={
+          <Pill tone={accepted ? "success" : "danger"}>
+            {accepted ? "Accepted" : "Rejected"}
+          </Pill>
+        }
+      />
+      <p className="mb-5 text-sm leading-relaxed text-ink-soft">
+        {verdict.reasoning}
+      </p>
       <div>
-        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-terminal-muted">
-          <span>quality score</span>
-          <span className="font-mono text-terminal-text">{pct}%</span>
+        <div className="mb-1.5 flex items-center justify-between text-xs">
+          <span className="text-ink-muted">Quality score</span>
+          <span className="font-mono text-ink">{pct}%</span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded bg-terminal-border">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
           <div
             className={cn(
-              "h-full transition-[width] duration-700 ease-out",
-              accepted ? "bg-terminal-accent" : "bg-terminal-danger",
+              "h-full rounded-full transition-[width] duration-700 ease-out",
+              accepted ? "bg-emerald-500" : "bg-rose-500",
             )}
             style={{ width: `${pct}%` }}
           />

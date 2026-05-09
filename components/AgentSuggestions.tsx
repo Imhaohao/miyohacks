@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Pill, type PillTone } from "@/components/ui/Pill";
 import { formatMoney, formatScore } from "@/lib/utils";
+import { Sparkle, CircleNotch, Lightning } from "@phosphor-icons/react";
 
 type DiscoverySource = "catalog" | "registry" | "synthesized";
 
@@ -105,7 +107,6 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error?.message ?? "discover failed");
       setDiscovered(json as DiscoverResponse);
-      // Re-run suggestions so the new specialist appears in the list.
       reqIdRef.current += 1;
       const reReq = reqIdRef.current;
       const refresh = await fetch("/api/v1/suggest", {
@@ -126,59 +127,69 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
 
   if (prompt.trim().length < MIN_PROMPT_LEN) return null;
 
-  return (
-    <Card>
-      <CardHeader>
-        <span>Recommended specialists</span>
-        <span>
-          {loading
-            ? "scoring..."
-            : data
-              ? data.low_confidence
-                ? "weak match"
-                : `top fit ${formatScore(data.best_fit_score)}`
-              : ""}
-        </span>
-      </CardHeader>
+  const meta = loading ? (
+    <span className="inline-flex items-center gap-1.5">
+      <CircleNotch size={12} className="animate-spin" />
+      Scoring
+    </span>
+  ) : data ? (
+    data.low_confidence ? (
+      <span className="text-amber-700">Weak match</span>
+    ) : (
+      <span>Top fit · {formatScore(data.best_fit_score)}</span>
+    )
+  ) : null;
 
-      {error && <p className="mb-2 text-xs text-terminal-danger">{error}</p>}
+  return (
+    <Card className="animate-fade-up">
+      <CardHeader title="Recommended specialists" meta={meta} />
+
+      {error && (
+        <p className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {error}
+        </p>
+      )}
+
+      {loading && !data && <SuggestionSkeleton />}
 
       {!loading && !error && data && data.suggestions.length === 0 && (
-        <p className="text-xs text-terminal-muted">
+        <p className="text-sm text-ink-muted">
           No specialist matched yet. Try discovery to spawn one.
         </p>
       )}
 
       {data && data.suggestions.length > 0 && (
-        <div className="divide-y divide-terminal-border">
+        <div className="divide-y divide-line">
           {data.suggestions.map((s) => (
             <div
               key={s.agent_id}
-              className="flex items-start justify-between gap-3 py-2 text-sm"
+              className="flex animate-fade-up items-start justify-between gap-3 py-3 text-sm"
             >
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 font-mono text-terminal-text">
-                  <span>{s.display_name}</span>
+                <div className="flex items-center gap-2 text-ink">
+                  <span className="font-medium tracking-tight">
+                    {s.display_name}
+                  </span>
                   <SourceBadge
                     discovered={s.discovered}
                     source={s.discovery_source}
                     hasEndpoint={!!s.mcp_endpoint}
                   />
                 </div>
-                <p className="text-xs text-terminal-muted">
+                <p className="text-xs text-ink-muted">
                   {s.sponsor} · {s.one_liner}
                 </p>
-                <p className="mt-1 text-xs text-terminal-text/80">
+                <p className="mt-1.5 text-xs text-ink-soft">
                   {s.fit_reasoning}
                 </p>
               </div>
-              <div className="shrink-0 text-right text-xs font-mono">
-                <div className="text-terminal-muted">fit</div>
-                <div className="text-terminal-text">
+              <div className="shrink-0 text-right text-xs">
+                <div className="text-ink-subtle">Fit</div>
+                <div className="font-mono text-ink">
                   {formatScore(s.fit_score)}
                 </div>
-                <div className="mt-1 text-terminal-muted">cost</div>
-                <div className="text-terminal-text">
+                <div className="mt-1 text-ink-subtle">Cost</div>
+                <div className="font-mono text-ink">
                   {formatMoney(s.cost_baseline)}
                 </div>
               </div>
@@ -188,28 +199,39 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
       )}
 
       {data && data.recommend_discovery && (
-        <div className="mt-3 rounded border border-dashed border-terminal-warn/60 bg-terminal-warn/5 p-3 text-xs text-terminal-warn">
+        <div className="mt-4 animate-fade-up rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
           <p className="font-medium">No strong match in the current roster.</p>
-          <p className="mt-1 text-terminal-muted">
-            Spawn a tailor-made specialist for this campaign. It joins the
-            registry and competes in the auction alongside the sponsors.
+          <p className="mt-1 text-xs text-amber-800">
+            Spawn a tailor-made specialist for this task. It joins the registry
+            and competes alongside the existing specialists.
           </p>
           <button
             type="button"
             onClick={onDiscover}
             disabled={discovering}
-            className="mt-2 rounded border border-terminal-warn/60 px-2 py-1 font-mono uppercase tracking-wider text-terminal-warn hover:bg-terminal-warn/10 disabled:opacity-40"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:border-amber-400 hover:bg-amber-100 disabled:opacity-50"
           >
-            {discovering ? "synthesizing..." : "Discover a new specialist"}
+            {discovering ? (
+              <>
+                <CircleNotch size={12} className="animate-spin" />
+                Synthesizing…
+              </>
+            ) : (
+              <>
+                <Sparkle size={12} weight="fill" />
+                Discover a new specialist
+              </>
+            )}
           </button>
         </div>
       )}
 
       {discovered && (
-        <div className="mt-3 rounded border border-terminal-accent/40 bg-terminal-accent/5 p-3 text-xs">
+        <div className="mt-4 animate-fade-up rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-mono text-terminal-accent">
-              new specialist · {discovered.specialist.display_name}
+            <p className="inline-flex items-center gap-1.5 font-medium text-brand-700">
+              <Lightning size={14} weight="fill" />
+              New specialist · {discovered.specialist.display_name}
             </p>
             <SourceBadge
               discovered
@@ -217,32 +239,54 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
               hasEndpoint={!!discovered.specialist.mcp_endpoint}
             />
           </div>
-          <p className="mt-1 text-terminal-muted">
-            {discovered.specialist.sponsor} · {discovered.specialist.one_liner}
+          <p className="mt-1 text-xs text-ink-muted">
+            {discovered.specialist.sponsor} ·{" "}
+            {discovered.specialist.one_liner}
           </p>
           {discovered.specialist.mcp_endpoint && (
-            <p className="mt-1 font-mono text-[11px] text-terminal-text/80">
+            <p className="mt-1 font-mono text-[11px] text-ink-soft">
               MCP: {discovered.specialist.mcp_endpoint}
             </p>
           )}
-          <p className="mt-1 text-terminal-text/80">
+          <p className="mt-1 text-xs text-ink-soft">
             Capabilities: {discovered.specialist.capabilities.join(", ")}
           </p>
-          <p className="mt-1 text-terminal-muted">{discovered.rationale}</p>
+          <p className="mt-1 text-xs text-ink-muted">
+            {discovered.rationale}
+          </p>
           {discovered.verified_tools.length > 0 && (
-            <p className="mt-1 text-terminal-accent/80">
+            <p className="mt-1 text-xs text-emerald-700">
               tools/list ✓ {discovered.verified_tools.slice(0, 6).join(", ")}
-              {discovered.verified_tools.length > 6 ? "..." : ""}
+              {discovered.verified_tools.length > 6 ? "…" : ""}
             </p>
           )}
           {discovered.source === "synthesized" && (
-            <p className="mt-1 text-terminal-warn">
+            <p className="mt-1 text-xs text-amber-700">
               No real MCP backend matched — this is an LLM-only fallback.
             </p>
           )}
         </div>
       )}
     </Card>
+  );
+}
+
+function SuggestionSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="flex items-center justify-between gap-3 py-1"
+        >
+          <div className="flex-1 space-y-1.5">
+            <div className="shimmer h-3.5 w-1/3 rounded" />
+            <div className="shimmer h-3 w-3/4 rounded" />
+          </div>
+          <div className="shimmer h-8 w-16 rounded" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -256,29 +300,14 @@ function SourceBadge({
   hasEndpoint: boolean;
 }) {
   if (!discovered) return null;
-  const map: Record<DiscoverySource, { label: string; cls: string }> = {
-    catalog: {
-      label: "MCP · catalog",
-      cls: "bg-terminal-accent/20 text-terminal-accent",
-    },
-    registry: {
-      label: "MCP · registry",
-      cls: "bg-terminal-accent/20 text-terminal-accent",
-    },
-    synthesized: {
-      label: "synthesized",
-      cls: "bg-terminal-warn/20 text-terminal-warn",
-    },
+  const map: Record<DiscoverySource, { label: string; tone: PillTone }> = {
+    catalog: { label: "MCP · catalog", tone: "success" },
+    registry: { label: "MCP · registry", tone: "success" },
+    synthesized: { label: "Synthesized", tone: "warning" },
   };
-  const fallback: { label: string; cls: string } = hasEndpoint
-    ? { label: "MCP", cls: "bg-terminal-accent/20 text-terminal-accent" }
-    : { label: "synthesized", cls: "bg-terminal-warn/20 text-terminal-warn" };
+  const fallback: { label: string; tone: PillTone } = hasEndpoint
+    ? { label: "MCP", tone: "success" }
+    : { label: "Synthesized", tone: "warning" };
   const meta = source ? map[source] : fallback;
-  return (
-    <span
-      className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${meta.cls}`}
-    >
-      {meta.label}
-    </span>
-  );
+  return <Pill tone={meta.tone}>{meta.label}</Pill>;
 }

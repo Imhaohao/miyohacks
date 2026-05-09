@@ -1,11 +1,13 @@
 "use client";
 
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Pill } from "@/components/ui/Pill";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ReputationChart } from "./ReputationChart";
 import { formatMoney, formatScore, cn } from "@/lib/utils";
 import type { SpecialistConfig } from "@/lib/types";
+import { CheckCircle, Plug, ShieldWarning } from "@phosphor-icons/react";
 
 interface LiveAgent {
   agent_id: string;
@@ -42,85 +44,94 @@ export function SpecialistCard({
   const mcpConnected = hasMcpEndpoint && !!spec.is_verified;
 
   return (
-    <Card className={hasMcpEndpoint ? "border-terminal-accent/40" : undefined}>
-      <CardHeader>
-        <span className="flex items-center gap-2">
-          {spec.display_name}
-          {hasMcpEndpoint ? (
-            <span
-              title={
-                mcpConnected
-                  ? `Verified MCP: ${spec.mcp_endpoint}`
-                  : `MCP endpoint configured; set ${spec.mcp_api_key_env ?? "API key"} to use live tools`
-              }
-              className={
-                mcpConnected
-                  ? "rounded bg-terminal-accent/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-terminal-accent"
-                  : "rounded bg-terminal-warn/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-terminal-warn"
-              }
-            >
-              {mcpConnected ? "MCP ✓" : "MCP auth"}
-            </span>
-          ) : (
-            <span className="rounded bg-terminal-border px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-terminal-muted">
-              soft
-            </span>
-          )}
-        </span>
-        <span>{spec.sponsor}</span>
-      </CardHeader>
+    <Card
+      className={cn(
+        "animate-fade-up",
+        hasMcpEndpoint && "border-brand-200",
+      )}
+    >
+      <CardHeader
+        title={
+          <span className="flex items-center gap-2">
+            <span>{spec.display_name}</span>
+            {mcpConnected && (
+              <Pill tone="success" title={`Verified MCP: ${spec.mcp_endpoint}`}>
+                <CheckCircle size={11} weight="fill" />
+                MCP
+              </Pill>
+            )}
+            {hasMcpEndpoint && !mcpConnected && (
+              <Pill
+                tone="warning"
+                title={`MCP endpoint configured; set ${spec.mcp_api_key_env ?? "API key"} to use live tools`}
+              >
+                <ShieldWarning size={11} weight="fill" />
+                Auth needed
+              </Pill>
+            )}
+            {!hasMcpEndpoint && (
+              <Pill tone="neutral">
+                <Plug size={11} />
+                Soft
+              </Pill>
+            )}
+          </span>
+        }
+        meta={spec.sponsor}
+      />
 
-      <p className="mb-3 text-xs text-terminal-muted">{spec.one_liner}</p>
+      <p className="mb-4 text-sm text-ink-muted">{spec.one_liner}</p>
 
       {hasMcpEndpoint && (
-        <div className="mb-3 flex items-center gap-2 rounded border border-terminal-accent/30 bg-terminal-accent/5 px-2 py-1 font-mono text-[10px] text-terminal-accent">
-          <span className="uppercase tracking-wider">
-            {mcpConnected ? "live mcp ->" : "mcp auth ->"}
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 font-mono text-[11px] text-brand-700">
+          <span className="font-sans font-medium">
+            {mcpConnected ? "Live MCP" : "MCP auth"}
           </span>
           <span className="truncate">{spec.mcp_endpoint}</span>
         </div>
       )}
 
-      <div className="mb-3">
-        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-terminal-muted">
-          <span>reputation</span>
-          <span className="font-mono text-terminal-text">
-            {formatScore(score)}
-          </span>
+      <div className="mb-4">
+        <div className="mb-1.5 flex items-center justify-between text-xs">
+          <span className="text-ink-muted">Reputation</span>
+          <span className="font-mono text-ink">{formatScore(score)}</span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded bg-terminal-border">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
           <div
-            className="h-full bg-terminal-accent transition-[width] duration-700 ease-out"
+            className="h-full rounded-full bg-brand-600 transition-[width] duration-700 ease-out"
             style={{ width: `${score * 100}%` }}
           />
         </div>
       </div>
 
-      <ReputationChart startingScore={spec.starting_reputation} events={events} />
+      <ReputationChart
+        startingScore={spec.starting_reputation}
+        events={events}
+      />
 
-      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-terminal-border pt-3 text-xs">
-        <Stat label="completed" value={String(completed)} />
-        <Stat label="disputes" value={String(disputes)} />
+      <div className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4 text-xs">
+        <Stat label="Completed" value={String(completed)} />
+        <Stat label="Disputes" value={String(disputes)} />
         <Stat
-          label="dispute %"
+          label="Dispute rate"
           value={total === 0 ? "—" : `${disputeRate.toFixed(0)}%`}
           danger={disputeRate >= 25}
         />
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1">
+      <div className="mt-4 flex flex-wrap gap-1.5">
         {spec.capabilities.map((c) => (
           <span
             key={c}
-            className="rounded border border-terminal-border bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-terminal-muted"
+            className="rounded-md border border-line bg-surface-subtle px-2 py-0.5 font-mono text-[10px] text-ink-muted"
           >
             {c}
           </span>
         ))}
       </div>
 
-      <div className="mt-3 text-[10px] text-terminal-muted">
-        cost baseline · {formatMoney(spec.cost_baseline)}
+      <div className="mt-3 text-xs text-ink-subtle">
+        Cost baseline · {formatMoney(spec.cost_baseline)}
       </div>
     </Card>
   );
@@ -137,13 +148,11 @@ function Stat({
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-terminal-muted">
-        {label}
-      </div>
+      <div className="text-[11px] text-ink-muted">{label}</div>
       <div
         className={cn(
-          "font-mono",
-          danger ? "text-terminal-danger" : "text-terminal-text",
+          "mt-0.5 font-mono",
+          danger ? "text-rose-600" : "text-ink",
         )}
       >
         {value}

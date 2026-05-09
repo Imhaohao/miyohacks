@@ -34,43 +34,46 @@ export function BidWindow({ task, events }: Props) {
     .map((e) => e.payload as { agent_id: string; reason: string });
 
   return (
-    <Card>
-      <CardHeader>
-        <span>Bid window</span>
-        <span className={closed ? "text-terminal-muted" : "text-terminal-warn"}>
-          {closed ? "closed" : `${remainingSec}s`}
-        </span>
-      </CardHeader>
-      <div className="mb-3 h-1 w-full overflow-hidden rounded bg-terminal-border">
+    <Card className="animate-fade-up">
+      <CardHeader
+        title="Specialists responding"
+        meta={
+          <span className={closed ? "text-ink-muted" : "text-amber-700"}>
+            {closed ? "Closed" : `${remainingSec}s left`}
+          </span>
+        }
+      />
+      <div className="mb-4 h-1 w-full overflow-hidden rounded-full bg-surface-muted">
         <div
-          className="h-full bg-terminal-warn transition-[width] duration-200 ease-linear"
+          className="h-full rounded-full bg-amber-500 transition-[width] duration-200 ease-linear"
           style={{ width: `${progressPct}%` }}
         />
       </div>
-      <p className="mb-3 text-xs text-terminal-muted">
-        Sealed-bid: prices are hidden from other specialists (and from this view)
-        until the window closes.
+      <p className="mb-4 text-sm text-ink-muted">
+        Each specialist quotes privately. Prices stay hidden — even from this
+        view — until the window closes, so nobody can undercut someone else's
+        offer.
       </p>
       <div className="space-y-2">
         {bidEvents.length === 0 && !closed && (
-          <div className="rounded border border-dashed border-terminal-border p-3 text-center text-xs text-terminal-muted">
-            waiting for bids…
+          <div className="rounded-xl border border-dashed border-line bg-surface-subtle p-4 text-center text-sm text-ink-muted">
+            Waiting for offers…
           </div>
         )}
         {bidEvents.map((b) => (
           <div
             key={b.bid_id}
-            className="flex animate-slide-in items-center justify-between rounded border border-terminal-border bg-black/30 p-2 text-xs"
+            className="flex animate-fade-down items-center justify-between rounded-xl border border-line bg-white p-3 text-sm"
           >
             <div>
-              <div className="font-mono text-terminal-text">{b.agent_id}</div>
-              <div className="text-terminal-muted">
+              <div className="font-medium text-ink">{b.agent_id}</div>
+              <div className="text-xs text-ink-muted">
                 {b.sponsor} · {b.capability_claim}
               </div>
             </div>
-            <div className="text-right text-terminal-muted">
-              <div>est</div>
-              <div className="font-mono text-terminal-text">
+            <div className="text-right">
+              <div className="text-xs text-ink-muted">Estimated</div>
+              <div className="font-mono text-sm text-ink">
                 {b.estimated_seconds}s
               </div>
             </div>
@@ -79,10 +82,10 @@ export function BidWindow({ task, events }: Props) {
         {declineEvents.map((d, i) => (
           <div
             key={`${d.agent_id}-${i}`}
-            className="flex items-center justify-between rounded border border-terminal-border/50 bg-black/20 p-2 text-xs text-terminal-muted"
+            className="flex animate-fade-in items-center justify-between rounded-xl border border-line bg-surface-subtle p-3 text-sm text-ink-muted"
           >
             <span className="font-mono">{d.agent_id}</span>
-            <span className="italic">declined · {d.reason}</span>
+            <span className="italic">Declined · {d.reason}</span>
           </div>
         ))}
       </div>

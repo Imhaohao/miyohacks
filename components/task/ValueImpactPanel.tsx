@@ -34,11 +34,11 @@ export function ValueImpactPanel({ task, events }: Props) {
   );
 
   return (
-    <Card className="border-terminal-accent/50 bg-terminal-accent/5">
-      <CardHeader>
-        <span>Specialist impact</span>
-        <span className="text-terminal-accent">ROI estimate</span>
-      </CardHeader>
+    <Card className="animate-fade-up border-brand-200 bg-brand-50/40">
+      <CardHeader
+        title="Specialist impact"
+        meta={<span className="text-brand-700">ROI estimate</span>}
+      />
 
       <div className="grid gap-3 md:grid-cols-3">
         <Metric
@@ -54,12 +54,12 @@ export function ValueImpactPanel({ task, events }: Props) {
         <Metric
           label="Specialized agent"
           value={payload.winner.agent_id}
-          sub={`estimated ${estimatedSeconds}s to first output`}
+          sub={`Estimated ${estimatedSeconds}s to first output`}
         />
       </div>
 
-      <p className="mt-4 text-xs text-terminal-muted">
-        You saved {formatMoney(saved)} and improved your efficiency by{" "}
+      <p className="mt-4 text-xs text-ink-muted">
+        You saved {formatMoney(saved)} and improved efficiency by{" "}
         {efficiencyLift}% by using this specialized agent. Savings are computed
         from budget minus second-price payment; efficiency is an estimate from
         the winning specialist&apos;s quoted time.
@@ -78,14 +78,12 @@ function Metric({
   sub: string;
 }) {
   return (
-    <div className="rounded border border-terminal-border bg-black/30 p-3">
-      <div className="text-[10px] uppercase tracking-[0.2em] text-terminal-muted">
-        {label}
-      </div>
-      <div className="mt-2 truncate font-mono text-2xl font-semibold text-terminal-text">
+    <div className="rounded-xl border border-line bg-white p-4">
+      <div className="text-xs font-medium text-ink-muted">{label}</div>
+      <div className="mt-2 truncate font-mono text-2xl font-semibold tracking-tight text-ink">
         {value}
       </div>
-      <div className="mt-1 text-xs text-terminal-muted">{sub}</div>
+      <div className="mt-1 text-xs text-ink-muted">{sub}</div>
     </div>
   );
 }

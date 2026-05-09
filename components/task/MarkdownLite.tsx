@@ -1,20 +1,20 @@
 /**
  * Tiny markdown-ish renderer: splits text on ``` fenced code blocks and
- * renders alternating prose / code segments. Avoids a full markdown dep —
- * sufficient for showing specialist outputs in the demo.
+ * renders alternating prose / code segments. Sufficient for showing
+ * specialist outputs without pulling in a markdown dep.
  */
 export function MarkdownLite({ text }: { text: string }) {
   const segments = splitFences(text);
   return (
-    <div className="space-y-3 text-sm">
+    <div className="space-y-3 text-sm leading-relaxed">
       {segments.map((seg, i) =>
         seg.kind === "code" ? (
           <pre
             key={i}
-            className="overflow-x-auto rounded border border-terminal-border bg-black/60 p-3 font-mono text-xs text-terminal-text"
+            className="overflow-x-auto rounded-xl border border-line bg-surface-subtle p-3 font-mono text-xs text-ink-soft"
           >
             {seg.lang && (
-              <div className="mb-1 text-[10px] uppercase tracking-wider text-terminal-muted">
+              <div className="mb-1 text-[10px] font-medium text-ink-muted">
                 {seg.lang}
               </div>
             )}
@@ -23,7 +23,7 @@ export function MarkdownLite({ text }: { text: string }) {
         ) : (
           <div
             key={i}
-            className="whitespace-pre-wrap font-sans text-terminal-text"
+            className="whitespace-pre-wrap font-sans text-ink-soft"
           >
             {seg.body}
           </div>

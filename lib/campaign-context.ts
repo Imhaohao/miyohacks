@@ -79,6 +79,38 @@ const NIA_CONTEXT = [
   "Nia operating constraint: prioritize fast first-week learning over a large but unfocused creator list.",
 ];
 
+/**
+ * True when a task is part of the creator-marketing demo flow and should get
+ * the Reacher TikTok Shop signals + Nia campaign context injected. Anything
+ * else is a generic agent-marketplace task — no campaign baking.
+ */
+export function isCampaignTask(taskType: string | undefined | null): boolean {
+  if (!taskType) return false;
+  const t = taskType.toLowerCase();
+  if (t.includes("campaign")) return true;
+  if (t.includes("creator")) return true;
+  return [
+    "end-to-end-campaign",
+    "creator-scouting",
+    "audience-fit-analysis",
+    "outreach-drafting",
+    "sample-request-creation",
+    "campaign-risk-evaluation",
+  ].includes(t);
+}
+
+/**
+ * Wraps the user prompt with the right context for the task type. Campaign
+ * tasks get the Reacher/Nia demo evidence; everything else gets a clean
+ * pass-through with just the task type label.
+ */
+export function buildTaskContext(prompt: string, taskType: string): string {
+  if (isCampaignTask(taskType)) return buildCampaignEvidence(prompt, taskType);
+  return [`Task type: ${taskType || "general"}`, "", `User goal:`, prompt].join(
+    "\n",
+  );
+}
+
 export function buildCampaignEvidence(prompt: string, taskType: string): string {
   const creatorRows = REACHER_DEMO_SIGNALS.map((c) =>
     [

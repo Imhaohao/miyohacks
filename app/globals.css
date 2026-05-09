@@ -3,15 +3,157 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  --font-encode-sans: "Encode Sans Semi Expanded", system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Encode Sans Semi Expanded", system-ui,
+    sans-serif;
 }
 
 html,
 body {
-  background: #0a0a0a;
-  color: #e5e5e5;
+  background: #ffffff;
+  color: #0f172a;
 }
 
 body {
+  font-family: var(--font-encode-sans);
   font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth defaults across interactive surfaces — the 0.4s rule. */
+a,
+button,
+input,
+select,
+textarea,
+[role="button"] {
+  transition-property: color, background-color, border-color, box-shadow,
+    transform, opacity;
+  transition-duration: 400ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Tailwind's `transition-*` utilities respect the same default. */
+
+/* Loading shimmer — used for skeleton bars while data streams in. */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(241, 245, 249, 1) 0%,
+    rgba(226, 232, 240, 1) 50%,
+    rgba(241, 245, 249, 1) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* Streaming caret used while text is being generated. */
+.streaming-caret::after {
+  content: "▍";
+  display: inline-block;
+  margin-left: 2px;
+  color: #1877f2;
+  animation: caret-blink 1s step-end infinite;
+}
+
+/* Recharts tooltip override to match brand. */
+.recharts-default-tooltip {
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 6px 24px -8px rgba(15, 23, 42, 0.12) !important;
+}
+
+@keyframes caret-blink {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  61%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Reserve vertical space so streaming output doesn't shift the layout. */
+.reserve-min {
+  min-height: 1.25rem;
+}
+
+/* Selection color */
+::selection {
+  background: #dbe7fe;
+  color: #143f8a;
+}
+
+/* Aurora — soft, layered radial gradients used behind hero blocks. */
+.bg-aurora {
+  background:
+    radial-gradient(
+      60% 60% at 12% 0%,
+      rgba(59, 113, 240, 0.18) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      45% 60% at 95% 8%,
+      rgba(244, 114, 182, 0.16) 0%,
+      transparent 65%
+    ),
+    radial-gradient(
+      55% 55% at 80% 100%,
+      rgba(251, 191, 36, 0.12) 0%,
+      transparent 60%
+    ),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+/* Subtle dotted grid that hints at structure without becoming noise. */
+.bg-dot-grid {
+  background-image: radial-gradient(
+    rgba(15, 23, 42, 0.06) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
+}
+
+/* Mini horizontal score bar used in lists. */
+.score-bar {
+  position: relative;
+  height: 4px;
+  width: 100%;
+  border-radius: 9999px;
+  background-color: #e2e8f0;
+  overflow: hidden;
+}
+.score-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  border-radius: 9999px;
+  background-image: linear-gradient(90deg, #5a8ef7, #1877f2);
+  transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) scale(1.02);
+  }
+}
+
+.animate-float {
+  animation: float-slow 6s ease-in-out infinite;
 }

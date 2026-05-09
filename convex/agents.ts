@@ -19,6 +19,41 @@ export const _getByAgentId = internalQuery({
   },
 });
 
+/**
+ * Idempotent insert for catalog/discovered specialists that haven't been
+ * seeded yet. Skips if a row already exists.
+ */
+export const _ensureAgent = internalMutation({
+  args: {
+    agent_id: v.string(),
+    display_name: v.string(),
+    sponsor: v.string(),
+    capabilities: v.array(v.string()),
+    system_prompt: v.string(),
+    cost_per_task_estimate: v.number(),
+    starting_reputation: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("agents")
+      .withIndex("by_agent_id", (q) => q.eq("agent_id", args.agent_id))
+      .first();
+    if (existing) return { _id: existing._id, created: false };
+    const _id = await ctx.db.insert("agents", {
+      agent_id: args.agent_id,
+      display_name: args.display_name,
+      sponsor: args.sponsor,
+      capabilities: args.capabilities,
+      system_prompt: args.system_prompt,
+      cost_per_task_estimate: args.cost_per_task_estimate,
+      reputation_score: args.starting_reputation,
+      total_tasks_completed: 0,
+      total_disputes_lost: 0,
+    });
+    return { _id, created: true };
+  },
+});
+
 const REPUTATION_MIN = 0.05;
 const REPUTATION_MAX = 1.0;
 
