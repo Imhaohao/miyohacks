@@ -14,16 +14,15 @@ This commit lands the foundation for the v2 hackathon spec: Next.js shell, Tailw
 - `convex/schema.ts` matches the v2 spec exactly (agents, tasks, bids, escrow, reputation_events, lifecycle_events).
 - `lib/types.ts` and `lib/claude.ts` (timeout + JSON-loose parser, Sonnet `claude-sonnet-4-20250514`).
 - `lib/specialists/` — one file per sponsor. Each currently uses a Claude-mocked imitation via `makeMockSpecialist`. Real sponsor APIs swap in by replacing the runner export in a single file.
-- `convex/seed.ts` — `seedAgents` mutation populates the registry from the in-process specialist list.
-- Home page (`/`) renders the leaderboard, a copy-to-clipboard MCP endpoint card, and a post-task form (form is stubbed until the Convex mutations land).
+- **Auction lifecycle in `convex/auctions.ts`** — `solicitBids` → `resolve` (Vickrey second-price) → `execute` → `judge` → `settle`, all with timeouts and graceful escrow refunds on failure. Bid sealing enforced in `bids.forTask` and in lifecycle event payloads.
+- **MCP endpoint at `/api/mcp`** — JSON-RPC 2.0 streamable-HTTP transport. Tools: `post_task`, `get_task`, `list_specialists`, `raise_dispute`. See [MCP integration](#mcp-integration).
+- **`examples/mcp-client.ts`** — runnable agent-side proof. Posts a task, prints `web_view_url`, polls until settled.
+- Home page (`/`) renders the leaderboard, a copy-to-clipboard MCP endpoint card, and a post-task form wired to `api.tasks.post`.
 
 ### What's still TODO (next pass)
 
-- `convex/tasks.ts` mutation `post` + `convex/auctions.ts` actions: `solicit_bids`, `resolve` (scheduled), `execute`, `judge`, `settle`.
-- `app/api/mcp/route.ts` MCP server (HTTP) using `@modelcontextprotocol/sdk` — tools: `post_task`, `get_task`, `list_specialists`, `raise_dispute`.
 - `app/task/[id]/page.tsx` live visualizer with the **Vickrey strike-through** as the centerpiece visual.
 - `app/agents/page.tsx` per-specialist reputation history (recharts line chart).
-- `examples/mcp-client.ts` — runnable agent-side example used in the demo flow.
 - Replace `lib/specialists/nia-context.ts` mock with the real Nia API (highest-impact stretch).
 
 ## Stack
@@ -98,10 +97,14 @@ npx convex run seed:seedAgents
 
 Open <http://localhost:3000>.
 
-## MCP integration (target — endpoint not yet implemented)
+## MCP integration
+
+The auction is a real MCP server at `/api/mcp`. Any MCP-compatible agent can connect to it.
+
+### Add the server to your agent
 
 ```jsonc
-// In your agent's MCP config:
+// In your agent's MCP config (e.g. claude_desktop_config.json):
 {
   "mcpServers": {
     "agent-auction": { "url": "https://<your-deployment>/api/mcp" }
@@ -109,7 +112,24 @@ Open <http://localhost:3000>.
 }
 ```
 
-Then call `post_task` with `{ prompt, max_budget }` and poll `get_task` until `status === "complete"`.
+For local dev: `"url": "http://localhost:3000/api/mcp"`.
+
+### Tools exposed
+
+| Tool | Purpose |
+|---|---|
+| `post_task` | Post a task to the auction. Returns `{ task_id, web_view_url, ... }`. |
+| `get_task` | Fetch current state — task, bids (sealed until window closes), result, verdict, escrow, lifecycle. |
+| `list_specialists` | List the five specialists with live reputation and capabilities. |
+| `raise_dispute` | Re-run the judge with a dispute reason. Reputation and escrow flow accordingly. |
+
+### Try it from a terminal
+
+```bash
+npx tsx examples/mcp-client.ts "Find a production-quality TypeScript Vickrey auction implementation." 1.00
+```
+
+The client posts a task, prints the live `web_view_url`, then polls until the auction settles. Open the URL to watch the same task unfold in the browser — that's the agent-to-agent proof.
 
 ## Coding constraints
 
