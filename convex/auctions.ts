@@ -477,13 +477,36 @@ export const settle = internalAction({
     const task = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
     });
-    if (!task.winning_bid_id || !task.judge_verdict) {
-      throw new Error("settle called without winner or verdict");
+    if (!task.judge_verdict) {
+      throw new Error("settle called without verdict");
     }
+    const verdict = task.judge_verdict as JudgeVerdict;
+
+    // Parent tasks in a multi-step plan have no winning bid of their own —
+    // each child was auctioned and settled separately. The parent gets a
+    // synthesized result, judged once, and lands as complete/disputed without
+    // a second round of escrow or reputation.
+    if (!task.winning_bid_id) {
+      const finalStatus = verdict.verdict === "accept" ? "complete" : "disputed";
+      await ctx.runMutation(internal.tasks._setStatus, {
+        task_id: args.task_id,
+        status: finalStatus,
+      });
+      await ctx.runMutation(internal.lifecycle.log, {
+        task_id: args.task_id,
+        event_type: "settled",
+        payload: {
+          verdict: verdict.verdict,
+          synthesized: true,
+          quality_score: verdict.quality_score,
+        },
+      });
+      return;
+    }
+
     const winner = await ctx.runQuery(internal.bids._get, {
       bid_id: task.winning_bid_id,
     });
-    const verdict = task.judge_verdict as JudgeVerdict;
 
     // Capture actual runtime from lifecycle events for the dimensions record.
     const lifecycle = await ctx.runQuery(internal.lifecycle._forTask, {
@@ -578,6 +601,15 @@ export const settle = internalAction({
           new_score,
           price_paid: task.price_paid,
         },
+      });
+    }
+
+    // If this is a sub-task in a multi-step plan, hand control back to the
+    // planner to advance to the next step or trigger synthesis. The parent
+    // task gets the final synthesized output and is judged separately.
+    if (task.parent_task_id) {
+      await ctx.scheduler.runAfter(0, internal.planning.advanceOrSynthesize, {
+        task_id: args.task_id,
       });
     }
   },
