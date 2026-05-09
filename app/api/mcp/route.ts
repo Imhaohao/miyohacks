@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { TOOLS, dispatchTool } from "@/lib/mcp-tools";
+import { CORS_HEADERS, corsPreflight } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ const PROTOCOL_VERSION = "2024-11-05";
 const SERVER_INFO = {
   name: "agent-auction-protocol",
   version: "0.1.0",
+  description:
+    "Open agent-to-agent marketplace. Post a task, five specialists bid in a Vickrey second-price auction, the winner does the work, reputation accrues.",
 };
 
 interface JsonRpcRequest {
@@ -94,12 +97,16 @@ async function handle(msg: JsonRpcRequest): Promise<JsonRpcEnvelope | null> {
   }
 }
 
+function jsonRpc(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: CORS_HEADERS });
+}
+
 export async function POST(req: NextRequest) {
   let body: JsonRpcRequest | JsonRpcRequest[];
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(err(null, -32700, "parse error"));
+    return jsonRpc(err(null, -32700, "parse error"));
   }
 
   if (Array.isArray(body)) {
@@ -108,22 +115,30 @@ export async function POST(req: NextRequest) {
       if (r) responses.push(r);
     }
     if (responses.length === 0) {
-      return new NextResponse(null, { status: 202 });
+      return new NextResponse(null, { status: 202, headers: CORS_HEADERS });
     }
-    return NextResponse.json(responses);
+    return jsonRpc(responses);
   }
 
   const res = await handle(body);
-  if (!res) return new NextResponse(null, { status: 202 });
-  return NextResponse.json(res);
+  if (!res) return new NextResponse(null, { status: 202, headers: CORS_HEADERS });
+  return jsonRpc(res);
 }
 
 export async function GET() {
-  return NextResponse.json({
-    name: SERVER_INFO.name,
-    version: SERVER_INFO.version,
-    protocol: PROTOCOL_VERSION,
-    endpoint: "POST JSON-RPC 2.0 messages to this URL",
-    tools: TOOLS.map((t) => t.name),
-  });
+  return NextResponse.json(
+    {
+      ...SERVER_INFO,
+      protocol: PROTOCOL_VERSION,
+      transport: "streamable-http (stateless)",
+      endpoint: "POST JSON-RPC 2.0 messages to this URL",
+      tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),
+      docs: "/api/openapi.json",
+    },
+    { headers: CORS_HEADERS },
+  );
+}
+
+export function OPTIONS() {
+  return corsPreflight();
 }

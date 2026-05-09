@@ -5,7 +5,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { SPECIALISTS, getRunner } from "../lib/specialists/registry";
 import type { AgentId, BidPayload, JudgeVerdict } from "../lib/types";
-import { callClaudeJSON } from "../lib/claude";
+import { callOpenAIJSON } from "../lib/openai";
 
 const BUYER_ID = "buyer:default";
 
@@ -266,7 +266,7 @@ export const judge = internalAction({
     let verdict: JudgeVerdict;
     try {
       verdict = await Promise.race([
-        callClaudeJSON<JudgeVerdict>({
+        callOpenAIJSON<JudgeVerdict>({
           systemPrompt: JUDGE_SYSTEM_PROMPT,
           userPrompt,
           maxTokens: 512,

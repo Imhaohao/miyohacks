@@ -1,5 +1,5 @@
 // Specialist: nia-context (powered by Nia / Nozomio).
-// TODO(stretch): replace with real Nia API integration. For v0 this is a Claude-mocked
+// TODO(stretch): replace with real Nia API integration. For v0 this is an OpenAI-mocked
 // imitation of Nia's code-context retrieval behavior.
 
 import { makeMockSpecialist } from "./base";
