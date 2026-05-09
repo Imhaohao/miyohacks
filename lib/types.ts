@@ -83,10 +83,17 @@ export interface SpecialistConfig {
   /** Public homepage / docs URL for the sponsor. */
   homepage_url?: string;
   /**
-   * Set on specialists that were synthesized at runtime by the discovery flow
-   * (LLM-designed specialist) instead of being hand-authored sponsors.
+   * Set on specialists added at runtime by the discovery flow instead of
+   * being hand-authored sponsors.
    */
   discovered?: boolean;
+  /**
+   * Where the discovered specialist came from:
+   *   - "catalog"      → curated list of known production HTTP MCP servers
+   *   - "registry"     → live search against an MCP registry
+   *   - "synthesized"  → LLM-designed in-persona agent (no real MCP backend)
+   */
+  discovery_source?: "catalog" | "registry" | "synthesized";
   /** Free-form note explaining what query triggered discovery. */
   discovered_for?: string;
 }

@@ -86,5 +86,16 @@ export default defineSchema({
     one_liner: v.string(),
     discovered_for: v.string(),
     created_at: v.number(),
+    discovery_source: v.optional(
+      v.union(
+        v.literal("catalog"),
+        v.literal("registry"),
+        v.literal("synthesized"),
+      ),
+    ),
+    mcp_endpoint: v.optional(v.string()),
+    mcp_api_key_env: v.optional(v.string()),
+    homepage_url: v.optional(v.string()),
+    rationale: v.optional(v.string()),
   }).index("by_agent_id", ["agent_id"]),
 });

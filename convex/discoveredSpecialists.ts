@@ -31,6 +31,17 @@ const SPECIALIST_FIELDS = {
   starting_reputation: v.number(),
   one_liner: v.string(),
   discovered_for: v.string(),
+  discovery_source: v.optional(
+    v.union(
+      v.literal("catalog"),
+      v.literal("registry"),
+      v.literal("synthesized"),
+    ),
+  ),
+  mcp_endpoint: v.optional(v.string()),
+  mcp_api_key_env: v.optional(v.string()),
+  homepage_url: v.optional(v.string()),
+  rationale: v.optional(v.string()),
 };
 
 export const create = mutation({

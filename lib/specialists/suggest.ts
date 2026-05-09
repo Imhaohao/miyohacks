@@ -18,6 +18,10 @@ export interface SpecialistSuggestion {
   fit_score: number;
   fit_reasoning: string;
   discovered: boolean;
+  discovery_source?: "catalog" | "registry" | "synthesized";
+  /** Real MCP endpoint backing this specialist, if any. */
+  mcp_endpoint?: string;
+  homepage_url?: string;
 }
 
 export interface SuggestResult {
@@ -147,25 +151,27 @@ export async function suggestSpecialists(
   if (ranked.length === 0) ranked = fallbackKeywordRank(trimmed, specs);
 
   const byId = new Map(specs.map((s) => [s.agent_id, s]));
-  const suggestions: SpecialistSuggestion[] = ranked
-    .map((r) => {
-      const spec = byId.get(r.agent_id);
-      if (!spec) return null;
-      return {
-        agent_id: spec.agent_id,
-        display_name: spec.display_name,
-        sponsor: spec.sponsor,
-        one_liner: spec.one_liner,
-        capabilities: spec.capabilities,
-        cost_baseline: spec.cost_baseline,
-        fit_score: r.fit_score,
-        fit_reasoning: r.fit_reasoning,
-        discovered: !!spec.discovered,
-      };
-    })
-    .filter((s): s is SpecialistSuggestion => s !== null)
-    .sort((a, b) => b.fit_score - a.fit_score)
-    .slice(0, topN);
+  const suggestions: SpecialistSuggestion[] = [];
+  for (const r of ranked) {
+    const spec = byId.get(r.agent_id);
+    if (!spec) continue;
+    suggestions.push({
+      agent_id: spec.agent_id,
+      display_name: spec.display_name,
+      sponsor: spec.sponsor,
+      one_liner: spec.one_liner,
+      capabilities: spec.capabilities,
+      cost_baseline: spec.cost_baseline,
+      fit_score: r.fit_score,
+      fit_reasoning: r.fit_reasoning,
+      discovered: !!spec.discovered,
+      discovery_source: spec.discovery_source,
+      mcp_endpoint: spec.mcp_endpoint,
+      homepage_url: spec.homepage_url,
+    });
+  }
+  suggestions.sort((a, b) => b.fit_score - a.fit_score);
+  suggestions.length = Math.min(suggestions.length, topN);
 
   const best_fit_score = suggestions[0]?.fit_score ?? 0;
   const low_confidence = best_fit_score < LOW_CONFIDENCE_THRESHOLD;
