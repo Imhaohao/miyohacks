@@ -6,7 +6,33 @@
 // plan instead of letting a generic tool-calling loop spend the full timeout.
 
 import { callRemoteTool, flattenToolResult } from "../mcp-outbound";
+import { isCampaignTask } from "../campaign-context";
 import type { SpecialistConfig, SpecialistRunner } from "../types";
+
+/**
+ * Reacher's domain is TikTok Shop creator-commerce. The bid is hardcoded
+ * (instead of LLM-driven) for demo reliability, so we need a hand-written
+ * scope check — otherwise it bids on every task, including ones that have
+ * nothing to do with creators.
+ */
+function isInScope(prompt: string, taskType: string): boolean {
+  if (taskType === "reacher-live-launch") return true;
+  if (isCampaignTask(taskType)) return true;
+  const p = prompt.toLowerCase();
+  const creatorSignals = [
+    "tiktok",
+    "creator",
+    "influencer",
+    "shop",
+    "gmv",
+    "campaign",
+    "ugc",
+    "outreach",
+    "audience fit",
+    "social commerce",
+  ];
+  return creatorSignals.some((kw) => p.includes(kw));
+}
 
 export const REACHER_SOCIAL_CONFIG: SpecialistConfig = {
   agent_id: "reacher-social",
@@ -111,7 +137,14 @@ function outreachDraft(row: Record<string, unknown>): string {
 export const reacherSocial: SpecialistRunner = {
   config: REACHER_SOCIAL_CONFIG,
 
-  async bid() {
+  async bid(prompt, taskType) {
+    if (!isInScope(prompt, taskType)) {
+      return {
+        decline: true,
+        reason:
+          "Reacher specializes in TikTok Shop creator commerce; this task is outside that scope.",
+      };
+    }
     return {
       bid_price: 0.82,
       capability_claim:

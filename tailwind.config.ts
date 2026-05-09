@@ -66,9 +66,14 @@ const config: Config = {
         DEFAULT: "cubic-bezier(0.4, 0, 0.2, 1)",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03)",
+        // Hairline shadow + tiny lift. The 0 0 0 1px ring substitutes for a
+        // visible border on rounded surfaces (borders anti-alias unevenly at
+        // rounded corners; box-shadow does not).
+        card: "0 0 0 1px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04)",
         "card-hover":
-          "0 6px 24px -8px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.04)",
+          "0 0 0 1px rgba(15, 23, 42, 0.08), 0 8px 24px -8px rgba(15, 23, 42, 0.12), 0 2px 4px rgba(15, 23, 42, 0.04)",
+        hairline: "0 0 0 1px rgba(15, 23, 42, 0.08)",
+        "hairline-strong": "0 0 0 1px rgba(15, 23, 42, 0.16)",
         ring: "0 0 0 4px rgba(24, 119, 242, 0.18)",
       },
       keyframes: {

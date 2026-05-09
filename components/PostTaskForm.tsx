@@ -1,30 +1,52 @@
 "use client";
 
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
-import { DEFAULT_CAMPAIGN_BRIEF } from "@/lib/campaign-context";
 import { AgentSuggestions } from "@/components/AgentSuggestions";
+import { ArrowRight, CircleNotch } from "@phosphor-icons/react";
 
-const TASK_TYPES = [
-  { value: "reacher-live-launch", label: "Live Reacher proof" },
-  { value: "startup-launch-plan", label: "Startup launch plan" },
-  { value: "creator-scouting", label: "Creator scouting" },
-  { value: "audience-fit-analysis", label: "Audience-fit analysis" },
-  { value: "outreach-drafting", label: "Outreach drafting" },
-  { value: "sample-request-creation", label: "Sample requests" },
-  { value: "campaign-risk-evaluation", label: "Risk evaluation" },
-  { value: "end-to-end-campaign", label: "End-to-end campaign" },
+// task_type is still used by some legacy code paths (the reacher-live-launch
+// demo and the campaign-context evidence injection). For the human form we
+// always post "general" and let the LLM ranker decide fit purely from the
+// prompt — no category selector, no friction.
+const DEFAULT_TASK_TYPE = "general";
+
+const EXAMPLES: Array<{ label: string; prompt: string }> = [
+  {
+    label: "Set up Stripe Connect",
+    prompt:
+      "I need help setting up payments in my new AI agent marketplace. Not sure which payment platform to use or how to handle marketplace payouts. Recommend a stack and walk me through the integration steps.",
+  },
+  {
+    label: "Design a landing page",
+    prompt:
+      "Design a clean landing page for a developer tool that explains the product in 10 seconds, has a clear CTA, and follows a modern, minimal aesthetic.",
+  },
+  {
+    label: "Triage our backlog",
+    prompt:
+      "Look at the open issues in our project tracker and propose a priority order based on impact, urgency, and effort. Group them into next sprint vs. later.",
+  },
+  {
+    label: "Launch a TikTok Shop",
+    prompt:
+      "Plan a TikTok Shop creator campaign for a clean-label electrolyte drink. Find high-fit creators, draft outreach, and flag risk.",
+  },
 ];
+
+const fieldLabel = "mb-1.5 block text-sm font-medium text-ink";
+const inputBase =
+  "w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-subtle focus:border-brand-600 focus:outline-none focus:shadow-ring";
 
 export function PostTaskForm() {
   const router = useRouter();
   const post = useMutation(api.tasks.post);
-  const [prompt, setPrompt] = useState(DEFAULT_CAMPAIGN_BRIEF);
+  const [prompt, setPrompt] = useState("");
   const [budget, setBudget] = useState("2.00");
-  const [taskType, setTaskType] = useState("startup-launch-plan");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +57,7 @@ export function PostTaskForm() {
     try {
       const { task_id } = await post({
         posted_by: "buyer:web",
-        task_type: taskType,
+        task_type: DEFAULT_TASK_TYPE,
         prompt,
         max_budget: Number(budget),
       });
@@ -46,74 +68,89 @@ export function PostTaskForm() {
     }
   }
 
+  function applyExample(ex: (typeof EXAMPLES)[number]) {
+    setPrompt(ex.prompt);
+  }
+
   return (
     <div className="space-y-4">
-    <Card>
-      <CardHeader>
-        <span>Launch TikTok Shop</span>
-        <span>15s agent auction</span>
-      </CardHeader>
-      <form onSubmit={onSubmit} className="space-y-3">
-        <div className="grid gap-2 rounded border border-terminal-border bg-black/30 p-3 text-xs text-terminal-muted sm:grid-cols-3">
-          <div>
-            <div className="font-mono text-terminal-text">Seed-stage brand</div>
-            <div>limited team, needs revenue this week</div>
-          </div>
-          <div>
-            <div className="font-mono text-terminal-text">TikTok Shop</div>
-            <div>creator GMV, samples, outreach</div>
-          </div>
-          <div>
-            <div className="font-mono text-terminal-text">Auction routing</div>
-            <div>100+ indexed, top agents invited</div>
-          </div>
-        </div>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Paste a startup product launch brief. Specialists compete to scout TikTok Shop creators, evaluate fit, draft outreach, request samples, and flag risks."
-          required
-          rows={4}
-          className="w-full resize-none rounded border border-terminal-border bg-black/40 p-2 font-mono text-sm placeholder:text-terminal-muted focus:border-terminal-accent focus:outline-none"
+      <Card accent="brand">
+        <CardHeader
+          title="What do you need done?"
+          meta="Specialists respond in seconds"
         />
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col text-xs uppercase tracking-wider text-terminal-muted">
-            Campaign budget (simulated)
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-              className="mt-1 rounded border border-terminal-border bg-black/40 px-2 py-1.5 font-mono text-sm text-terminal-text focus:border-terminal-accent focus:outline-none"
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="brief" className={fieldLabel}>
+              Describe the work
+            </label>
+            <textarea
+              id="brief"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="e.g. Set up Stripe Connect for our marketplace, including onboarding, payouts, and refunds."
+              required
+              rows={5}
+              className={`${inputBase} resize-none leading-relaxed`}
             />
-          </label>
-          <label className="flex flex-col text-xs uppercase tracking-wider text-terminal-muted">
-            Workflow
-            <select
-              value={taskType}
-              onChange={(e) => setTaskType(e.target.value)}
-              className="mt-1 rounded border border-terminal-border bg-black/40 px-2 py-1.5 font-mono text-sm text-terminal-text focus:border-terminal-accent focus:outline-none"
-            >
-              {TASK_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {EXAMPLES.map((ex) => (
+                <button
+                  key={ex.label}
+                  type="button"
+                  onClick={() => applyExample(ex)}
+                  className="inline-flex items-center rounded-full border border-line bg-white px-3 py-1 text-xs text-ink-soft hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+                >
+                  {ex.label}
+                </button>
               ))}
-            </select>
-          </label>
-        </div>
-        <button
-          type="submit"
-          disabled={submitting || !prompt.trim()}
-          className="w-full rounded bg-terminal-accent py-2 font-mono text-sm uppercase tracking-wider text-black transition hover:bg-terminal-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {submitting ? "Opening startup launch auction..." : "Build TikTok Shop launch plan"}
-        </button>
-        {error && <p className="text-xs text-terminal-danger">{error}</p>}
-      </form>
-    </Card>
-    <AgentSuggestions prompt={prompt} taskType={taskType} />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="budget" className={fieldLabel}>
+              Budget
+            </label>
+            <div className="relative max-w-[160px]">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-muted">
+                $
+              </span>
+              <input
+                id="budget"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                className={`${inputBase} pl-6 font-mono`}
+              />
+            </div>
+          </div>
+          <Button
+            type="submit"
+            disabled={submitting || !prompt.trim()}
+            className="w-full"
+            size="lg"
+          >
+            {submitting ? (
+              <>
+                <CircleNotch size={16} className="animate-spin" weight="bold" />
+                Finding your specialist…
+              </>
+            ) : (
+              <>
+                Find my specialist
+                <ArrowRight size={16} weight="bold" />
+              </>
+            )}
+          </Button>
+          {error && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+              {error}
+            </p>
+          )}
+        </form>
+      </Card>
+      <AgentSuggestions prompt={prompt} taskType={DEFAULT_TASK_TYPE} />
     </div>
   );
 }

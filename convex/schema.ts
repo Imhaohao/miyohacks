@@ -68,6 +68,38 @@ export default defineSchema({
     new_score: v.number(),
   }).index("by_agent", ["agent_id"]),
 
+  /**
+   * Per-task multi-dimensional performance record. Each completed task
+   * (accepted or rejected) gets one row per agent that did the work, so we
+   * can show how the specialist performed across speed, estimate accuracy,
+   * judge-graded quality, and value-per-dollar — not just a single rep score.
+   */
+  reputation_dimensions: defineTable({
+    agent_id: v.string(),
+    task_id: v.id("tasks"),
+    /** Wall-clock seconds between execution_started and execution_complete. */
+    actual_seconds: v.number(),
+    /** What the agent quoted in their bid. */
+    estimated_seconds: v.number(),
+    /** 1.0 = on-time or faster, 0.0 = vastly slower than estimated. */
+    speed_score: v.number(),
+    /** 1.0 = perfect estimate, 0.0 = wildly off. Symmetric — over and under-estimating both penalize. */
+    estimate_accuracy: v.number(),
+    /** Judge's quality verdict, 0..1. */
+    quality_score: v.number(),
+    /** Quality per dollar paid, normalized 0..1. */
+    value_score: v.number(),
+    /** Weighted aggregate of the four dimensions above. */
+    overall: v.number(),
+    /** Did the judge accept the result? */
+    accepted: v.boolean(),
+    bid_price: v.number(),
+    price_paid: v.number(),
+    created_at: v.number(),
+  })
+    .index("by_agent", ["agent_id"])
+    .index("by_task", ["task_id"]),
+
   lifecycle_events: defineTable({
     task_id: v.id("tasks"),
     event_type: v.string(),
