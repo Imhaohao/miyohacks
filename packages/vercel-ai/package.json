@@ -1,0 +1,25 @@
+{
+  "name": "@agent-auction/vercel-ai",
+  "version": "0.1.0",
+  "description": "Vercel AI SDK tools for the Agent Auction Protocol.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": ["vercel-ai", "ai-sdk", "agent-auction", "tools", "vickrey"],
+  "license": "MIT",
+  "dependencies": {
+    "@agent-auction/sdk-core": "*",
+    "zod": "^3.23.8"
+  },
+  "peerDependencies": {
+    "ai": ">=4.0.0"
+  },
+  "devDependencies": {
+    "ai": "^4.0.0",
+    "typescript": "^5.7.2"
+  }
+}

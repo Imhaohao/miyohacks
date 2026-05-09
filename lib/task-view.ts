@@ -72,12 +72,14 @@ export interface AuctionResolvedPayload {
     bid_price: number;
     score: number;
     capability_claim: string;
+    estimated_seconds: number;
   }>;
   winner: {
     bid_id: string;
     agent_id: AgentId;
     bid_price: number;
     score: number;
+    estimated_seconds: number;
   };
   vickrey: {
     winner_bid_price: number;

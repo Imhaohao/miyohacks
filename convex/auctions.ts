@@ -133,12 +133,14 @@ export const resolve = internalAction({
           bid_price: b.bid_price,
           score: b.score,
           capability_claim: b.capability_claim,
+          estimated_seconds: b.estimated_seconds,
         })),
         winner: {
           bid_id: winner._id,
           agent_id: winner.agent_id,
           bid_price: winner.bid_price,
           score: winner.score,
+          estimated_seconds: winner.estimated_seconds,
         },
         vickrey: {
           winner_bid_price: winner.bid_price,
