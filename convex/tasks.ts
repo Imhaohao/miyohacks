@@ -7,14 +7,16 @@ import {
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
-const BID_WINDOW_SECONDS = 15;
+export const BID_WINDOW_SECONDS = 15;
 
 const taskStatusValidator = v.union(
   v.literal("open"),
+  v.literal("planning"),
   v.literal("bidding"),
   v.literal("awarded"),
   v.literal("executing"),
   v.literal("judging"),
+  v.literal("synthesizing"),
   v.literal("complete"),
   v.literal("disputed"),
   v.literal("failed"),
@@ -41,7 +43,7 @@ export const post = mutation({
       prompt: args.prompt,
       max_budget: args.max_budget,
       output_schema: args.output_schema,
-      status: "bidding",
+      status: "planning",
       bid_window_seconds: BID_WINDOW_SECONDS,
       bid_window_closes_at: closesAt,
     });
@@ -56,17 +58,106 @@ export const post = mutation({
       },
     });
 
-    // Fan out bid requests immediately, then resolve when the window closes.
-    await ctx.scheduler.runAfter(0, internal.auctions.solicitBids, { task_id });
-    await ctx.scheduler.runAfter(BID_WINDOW_SECONDS * 1000, internal.auctions.resolve, {
-      task_id,
-    });
+    // Planner first: it decides whether the goal is atomic (single auction)
+    // or needs decomposition (a chain of sub-task auctions). The planner
+    // takes over scheduling solicitBids/resolve from here.
+    await ctx.scheduler.runAfter(0, internal.planning.decompose, { task_id });
 
     return {
       task_id,
-      status: "bidding" as const,
+      status: "planning" as const,
       bid_window_closes_at: closesAt,
     };
+  },
+});
+
+/**
+ * Internal: create a sub-task for a step in a parent task's plan. The child
+ * runs the same auction lifecycle as a top-level task, but skips the planner
+ * (children don't recursively decompose) and reports back to the parent on
+ * settle.
+ */
+export const _createChild = internalMutation({
+  args: {
+    parent_task_id: v.id("tasks"),
+    step_index: v.number(),
+    prompt: v.string(),
+    max_budget: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const parent = await ctx.db.get(args.parent_task_id);
+    if (!parent) throw new Error(`parent ${args.parent_task_id} not found`);
+    const now = Date.now();
+    const closesAt = now + BID_WINDOW_SECONDS * 1000;
+    const child_task_id = await ctx.db.insert("tasks", {
+      posted_by: parent.posted_by,
+      task_type: parent.task_type,
+      prompt: args.prompt,
+      max_budget: args.max_budget,
+      status: "bidding",
+      bid_window_seconds: BID_WINDOW_SECONDS,
+      bid_window_closes_at: closesAt,
+      parent_task_id: args.parent_task_id,
+      step_index: args.step_index,
+    });
+    await ctx.runMutation(internal.lifecycle.log, {
+      task_id: child_task_id,
+      event_type: "task_posted",
+      payload: {
+        posted_by: parent.posted_by,
+        prompt: args.prompt,
+        max_budget: args.max_budget,
+        parent_task_id: args.parent_task_id,
+        step_index: args.step_index,
+      },
+    });
+    return { child_task_id, bid_window_closes_at: closesAt };
+  },
+});
+
+export const _setPlan = internalMutation({
+  args: {
+    task_id: v.id("tasks"),
+    plan: v.array(
+      v.object({
+        prompt: v.string(),
+        rationale: v.string(),
+        specialist_hint: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.task_id, { task_plan: args.plan });
+  },
+});
+
+export const _childrenOf = internalQuery({
+  args: { parent_task_id: v.id("tasks") },
+  handler: async (ctx, args) => {
+    const children = await ctx.db
+      .query("tasks")
+      .withIndex("by_parent", (q) =>
+        q.eq("parent_task_id", args.parent_task_id),
+      )
+      .collect();
+    return children.sort(
+      (a, b) => (a.step_index ?? 0) - (b.step_index ?? 0),
+    );
+  },
+});
+
+export const childrenOf = query({
+  args: { parent_task_id: v.id("tasks") },
+  handler: async (ctx, args) => {
+    const children = await ctx.db
+      .query("tasks")
+      .withIndex("by_parent", (q) =>
+        q.eq("parent_task_id", args.parent_task_id),
+      )
+      .collect();
+    return children.sort(
+      (a, b) => (a.step_index ?? 0) - (b.step_index ?? 0),
+    );
   },
 });
 

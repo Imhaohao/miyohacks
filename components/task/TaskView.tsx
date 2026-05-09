@@ -13,6 +13,7 @@ import { isCampaignTask } from "@/lib/campaign-context";
 import { ExecutionPanel } from "./ExecutionPanel";
 import { JudgeVerdictPanel } from "./JudgeVerdictPanel";
 import { SettlementPanel } from "./SettlementPanel";
+import { PlanPanel } from "./PlanPanel";
 import type {
   TaskDoc,
   EscrowDoc,
@@ -44,16 +45,35 @@ export function TaskView({ taskId }: { taskId: string }) {
     );
   }
 
+  // Multi-step parent: show the plan + a final synthesis section. Sub-step
+  // auctions/bids live on the child task pages (linked from PlanPanel).
+  const isMultiStepParent =
+    Array.isArray(task.task_plan) && task.task_plan.length >= 2;
+
   return (
     <div className="space-y-4">
       <TaskHeader task={task} />
       {isCampaignTask(task.task_type) && <CampaignEvidencePanel />}
-      <BidWindow task={task} events={lifecycle} />
-      <AuctionResolution events={lifecycle} />
-      <ValueImpactPanel task={task} events={lifecycle} />
-      <ExecutionPanel task={task} events={lifecycle} />
-      <JudgeVerdictPanel task={task} />
-      <SettlementPanel task={task} escrow={escrow ?? null} events={lifecycle} />
+      {isMultiStepParent ? (
+        <>
+          <PlanPanel task={task} />
+          <ExecutionPanel task={task} events={lifecycle} />
+          <JudgeVerdictPanel task={task} />
+        </>
+      ) : (
+        <>
+          <BidWindow task={task} events={lifecycle} />
+          <AuctionResolution events={lifecycle} />
+          <ValueImpactPanel task={task} events={lifecycle} />
+          <ExecutionPanel task={task} events={lifecycle} />
+          <JudgeVerdictPanel task={task} />
+          <SettlementPanel
+            task={task}
+            escrow={escrow ?? null}
+            events={lifecycle}
+          />
+        </>
+      )}
     </div>
   );
 }
