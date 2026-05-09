@@ -21,7 +21,7 @@ import {
   type RemoteMcpTool,
 } from "../mcp-outbound";
 import { parseJSONLoose } from "../openai";
-import { buildCampaignEvidence } from "../campaign-context";
+import { buildTaskContext } from "../campaign-context";
 import type {
   SpecialistConfig,
   SpecialistDecision,
@@ -158,9 +158,9 @@ export function makeMcpForwardingSpecialist(
         .map((t) => `- ${t.name}: ${t.description?.slice(0, 200) ?? ""}`)
         .join("\n");
 
-      const systemPrompt = `${config.system_prompt}\n\n${VICKREY_PRELUDE}\n\nYou are connected to a real MCP server at ${endpoint}. Available tools:\n${toolList || "(tool discovery unavailable — bid only if your description clearly fits)"}\n\nYour cost baseline for a typical task is $${config.cost_baseline.toFixed(2)}. Adjust by task complexity but stay honest.\n\nReply with JSON only, one of:\n{ "decline": true, "reason": "<short reason>" }\nOR\n{ "bid_price": <number>, "capability_claim": "<one sentence>", "estimated_seconds": <integer> }`;
+      const systemPrompt = `${config.system_prompt}\n\n${VICKREY_PRELUDE}\n\nYou are connected to a real MCP server at ${endpoint}. Available tools:\n${toolList || "(tool discovery unavailable — bid only if your description clearly fits)"}\n\nYour cost baseline for a typical task is $${config.cost_baseline.toFixed(2)}. Adjust by task complexity but stay honest.\n\nIMPORTANT: This marketplace handles tasks across every domain. Decline if the user's goal is outside what your remote tools can actually do — don't translate the goal into your specialty. Your capability_claim must address the user's actual goal.\n\nReply with JSON only, one of:\n{ "decline": true, "reason": "<short reason>" }\nOR\n{ "bid_price": <number>, "capability_claim": "<one sentence about how you would handle this specific task>", "estimated_seconds": <integer> }`;
 
-      const userPrompt = `${buildCampaignEvidence(prompt, taskType)}\n\nDo you bid?`;
+      const userPrompt = `${buildTaskContext(prompt, taskType)}\n\nDo you bid? Bid only if your tools fit this task.`;
       const text = await callPlain(systemPrompt, userPrompt, 256, 10_000);
       const data = parseJSONLoose<BidLLMResponse>(text);
       if (data.decline) {
@@ -191,20 +191,20 @@ export function makeMcpForwardingSpecialist(
       // No tools discovered → fall back to a plain completion in persona, with
       // a note that the MCP server was unreachable. Degrades gracefully.
       if (tools.length === 0) {
-        const sys = `${config.system_prompt}\n\nYou are normally connected to ${endpoint} but tool discovery is unavailable right now. Produce your best persona-driven answer to the task and clearly note in the output that live MCP tool calls were not made.`;
+        const sys = `${config.system_prompt}\n\nYou are normally connected to ${endpoint} but tool discovery is unavailable right now. Produce your best persona-driven answer to the user's actual goal and clearly note in the output that live MCP tool calls were not made.`;
         return await callPlain(
           sys,
-          buildCampaignEvidence(prompt, taskType),
+          buildTaskContext(prompt, taskType),
           1500,
           60_000,
         );
       }
 
       const openaiTools = toOpenAITools(tools);
-      const sysPrompt = `${config.system_prompt}\n\nYou have just won the auction for the task below. You are connected to a real MCP server (${endpoint}). Use the provided tools to actually do the work — call them as needed, then synthesize a clear final answer in markdown. Stay in character as ${config.display_name}. Do not call more than ${MAX_EXECUTE_ROUNDS} rounds of tools.`;
+      const sysPrompt = `${config.system_prompt}\n\nYou were picked for the task below. You are connected to a real MCP server (${endpoint}). Use the provided tools to actually do the work — call them as needed, then synthesize a clear final answer in markdown that directly addresses the user's goal. Stay in character as ${config.display_name}. Do not call more than ${MAX_EXECUTE_ROUNDS} rounds of tools.`;
       const messages: ChatMessage[] = [
         { role: "system", content: sysPrompt },
-        { role: "user", content: buildCampaignEvidence(prompt, taskType) },
+        { role: "user", content: buildTaskContext(prompt, taskType) },
       ];
       const nameMap = new Map<string, string>();
       for (const t of tools) nameMap.set(sanitizeName(t.name), t.name);

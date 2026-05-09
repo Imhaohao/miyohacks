@@ -1,6 +1,7 @@
 import { Card, CardHeader } from "@/components/ui/Card";
 import type { TaskDoc, LifecycleEventDoc } from "@/lib/task-view";
 import { MarkdownLite } from "./MarkdownLite";
+import { CircleNotch } from "@phosphor-icons/react/dist/ssr";
 
 interface Props {
   task: TaskDoc;
@@ -35,15 +36,14 @@ export function ExecutionPanel({ task, events }: Props) {
     const reason =
       (failed.payload as { reason?: string }).reason ?? "unknown error";
     return (
-      <Card>
-        <CardHeader>
-          <span>Execution</span>
-          <span className="text-terminal-danger">failed</span>
-        </CardHeader>
-        <p className="text-sm text-terminal-muted">
-          <span className="font-mono text-terminal-text">{agentId}</span> failed:
-          {" "}
-          {reason}. Escrow refunded.
+      <Card className="animate-fade-up">
+        <CardHeader
+          title="Execution"
+          meta={<span className="text-rose-700">Failed</span>}
+        />
+        <p className="text-sm text-ink-muted">
+          <span className="font-mono text-ink">{agentId}</span> failed: {reason}.
+          Escrow refunded.
         </p>
       </Card>
     );
@@ -51,17 +51,26 @@ export function ExecutionPanel({ task, events }: Props) {
 
   if (!completed) {
     return (
-      <Card>
-        <CardHeader>
-          <span>Execution</span>
-          <span className="animate-pulse text-blue-400">running</span>
-        </CardHeader>
-        <div className="flex items-center gap-3 text-sm text-terminal-muted">
-          <Spinner />
+      <Card className="animate-fade-up">
+        <CardHeader
+          title="Execution"
+          meta={<span className="text-brand-700">Running</span>}
+        />
+        <div className="flex items-center gap-3 text-sm text-ink-muted">
+          <CircleNotch
+            size={14}
+            weight="bold"
+            className="animate-spin text-brand-600"
+          />
           <span>
-            <span className="font-mono text-terminal-text">{agentId}</span> is
-            working…
+            <span className="font-mono text-ink">{agentId}</span> is working
+            <span className="streaming-caret" />
           </span>
+        </div>
+        <div className="mt-4 space-y-2">
+          <div className="shimmer h-3 w-full rounded" />
+          <div className="shimmer h-3 w-5/6 rounded" />
+          <div className="shimmer h-3 w-2/3 rounded" />
         </div>
       </Card>
     );
@@ -74,22 +83,20 @@ export function ExecutionPanel({ task, events }: Props) {
       : "";
 
   return (
-    <Card>
-      <CardHeader>
-        <span>Execution complete</span>
-        <span>by · {agentId}</span>
-      </CardHeader>
+    <Card className="animate-fade-up">
+      <CardHeader
+        title="Execution complete"
+        meta={
+          <span>
+            By <span className="font-mono text-ink">{agentId}</span>
+          </span>
+        }
+      />
       {text ? (
         <MarkdownLite text={text} />
       ) : (
-        <p className="text-xs text-terminal-muted">no output captured</p>
+        <p className="text-sm text-ink-muted">No output captured</p>
       )}
     </Card>
-  );
-}
-
-function Spinner() {
-  return (
-    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
   );
 }

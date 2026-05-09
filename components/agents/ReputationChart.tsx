@@ -28,8 +28,8 @@ export function ReputationChart({
 
   if (data.length < 2) {
     return (
-      <div className="flex h-24 items-center justify-center text-[11px] text-terminal-muted">
-        no reputation events yet
+      <div className="flex h-24 items-center justify-center rounded-lg bg-surface-subtle text-xs text-ink-muted">
+        No reputation events yet
       </div>
     );
   }
@@ -37,34 +37,39 @@ export function ReputationChart({
   return (
     <div className="h-24 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -28 }}>
+        <LineChart
+          data={data}
+          margin={{ top: 4, right: 4, bottom: 0, left: -28 }}
+        >
           <XAxis dataKey="index" hide />
           <YAxis
             domain={[0, 1]}
-            tick={{ fill: "#737373", fontSize: 9 }}
+            tick={{ fill: "#94a3b8", fontSize: 9 }}
             tickLine={false}
             axisLine={false}
             ticks={[0, 0.5, 1]}
           />
           <Tooltip
             contentStyle={{
-              background: "#0a0a0a",
-              border: "1px solid #1f1f1f",
-              borderRadius: 4,
+              background: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
               fontSize: 11,
+              boxShadow: "0 6px 24px -8px rgba(15,23,42,0.12)",
             }}
-            labelStyle={{ color: "#737373" }}
-            itemStyle={{ color: "#22c55e" }}
+            labelStyle={{ color: "#64748b" }}
+            itemStyle={{ color: "#1877f2" }}
             formatter={(v: number) => [v.toFixed(3), "rep"]}
-            labelFormatter={(l) => `event ${l}`}
+            labelFormatter={(l) => `Event ${l}`}
           />
           <Line
             type="monotone"
             dataKey="score"
-            stroke="#22c55e"
-            strokeWidth={1.5}
-            dot={{ r: 2, fill: "#22c55e" }}
-            isAnimationActive={false}
+            stroke="#1877f2"
+            strokeWidth={2}
+            dot={{ r: 2.5, fill: "#1877f2", strokeWidth: 0 }}
+            isAnimationActive
+            animationDuration={400}
           />
         </LineChart>
       </ResponsiveContainer>

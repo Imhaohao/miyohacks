@@ -1,12 +1,19 @@
 /**
  * Score available specialists against a free-form user query so the UI can
  * surface the best matches before the auction is even opened. Used to answer
- * questions like "who can launch a TikTok shop for me?" without forcing the
- * user to read the full registry.
+ * questions like "who can set up Stripe Connect for my marketplace?" without
+ * forcing the user to read the full registry.
+ *
+ * The candidate pool is the live registry **plus** the curated MCP catalog
+ * (Stripe, Notion, GitHub, Linear, Vercel, Supabase, Sentry, Atlassian, Neon,
+ * Figma, etc.). Catalog entries are surfaced in suggestions even though they
+ * haven't been formally registered yet, so the user sees a real-MCP option
+ * before having to click Discover.
  */
 
 import { callOpenAIJSON } from "../openai";
 import type { SpecialistConfig } from "../types";
+import { MCP_CATALOG, type CatalogEntry } from "./catalog";
 
 export interface SpecialistSuggestion {
   agent_id: string;
@@ -22,6 +29,12 @@ export interface SpecialistSuggestion {
   /** Real MCP endpoint backing this specialist, if any. */
   mcp_endpoint?: string;
   homepage_url?: string;
+  /**
+   * True if this suggestion isn't formally enrolled in the marketplace yet —
+   * it's a catalog entry the suggester pulled in for ranking. Calling
+   * `discover_specialist` with the same prompt enrolls it.
+   */
+  enrollable: boolean;
 }
 
 export interface SuggestResult {
@@ -44,33 +57,104 @@ interface RankResponse {
   ranked: RankedItem[];
 }
 
-const RANK_SYSTEM_PROMPT = `You are the routing layer of a creator-marketing agent marketplace. The user describes a goal in plain language; you score how well each available specialist agent fits the goal. Use only the capabilities, sponsor, and one-liner you are shown. Never invent capabilities. Output JSON only with shape:
+const RANK_SYSTEM_PROMPT = `You are the routing layer of a general-purpose marketplace where specialist agents bid on any kind of work — payments, design, code, research, marketing, data, ops, anything. The user describes a goal in plain language; you score how well each available specialist agent fits the goal.
+
+Use only the capabilities, sponsor, and one-liner you are shown. Never invent capabilities. Stay neutral about the domain — if the user asks about payments, score Stripe high regardless of how many marketing agents are in the list. If they ask about design, score Figma/Vercel high. Match by capability, not by category bias.
+
+Output JSON only with shape:
 { "ranked": [ { "agent_id": "<id>", "fit_score": <0..1>, "fit_reasoning": "<one short sentence>" }, ... ] }
 Score 1.0 = directly built for this goal, 0.0 = irrelevant. Include every agent you were given exactly once.`;
 
-function describeSpec(spec: SpecialistConfig): string {
+function describeSpec(spec: CandidateSpec): string {
   return [
     `agent_id: ${spec.agent_id}`,
     `sponsor: ${spec.sponsor}`,
     `capabilities: ${spec.capabilities.join(", ")}`,
     `one_liner: ${spec.one_liner}`,
-    spec.discovered ? `note: runtime-discovered (${spec.discovered_for ?? ""})` : null,
+    spec.tags && spec.tags.length > 0 ? `tags: ${spec.tags.join(", ")}` : null,
+    spec.note ? `note: ${spec.note}` : null,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
+interface CandidateSpec {
+  agent_id: string;
+  display_name: string;
+  sponsor: string;
+  one_liner: string;
+  capabilities: string[];
+  cost_baseline: number;
+  mcp_endpoint?: string;
+  homepage_url?: string;
+  discovered: boolean;
+  discovery_source?: "catalog" | "registry" | "synthesized";
+  enrollable: boolean;
+  tags?: string[];
+  note?: string;
+}
+
+function specToCandidate(spec: SpecialistConfig): CandidateSpec {
+  return {
+    agent_id: spec.agent_id,
+    display_name: spec.display_name,
+    sponsor: spec.sponsor,
+    one_liner: spec.one_liner,
+    capabilities: spec.capabilities,
+    cost_baseline: spec.cost_baseline,
+    mcp_endpoint: spec.mcp_endpoint,
+    homepage_url: spec.homepage_url,
+    discovered: !!spec.discovered,
+    discovery_source: spec.discovery_source,
+    enrollable: false,
+    note: spec.discovered
+      ? `runtime-discovered (${spec.discovered_for ?? ""})`
+      : undefined,
+  };
+}
+
+function catalogToCandidate(entry: CatalogEntry): CandidateSpec {
+  return {
+    agent_id: entry.agent_id,
+    display_name: entry.display_name,
+    sponsor: entry.sponsor,
+    one_liner: entry.one_liner,
+    capabilities: entry.capabilities,
+    cost_baseline: entry.cost_baseline,
+    mcp_endpoint: entry.mcp_endpoint,
+    homepage_url: entry.homepage_url,
+    discovered: true,
+    discovery_source: "catalog",
+    enrollable: true,
+    tags: entry.domain_tags,
+    note: "catalog entry — auto-enrolls when picked",
+  };
+}
+
+function buildCandidatePool(specs: SpecialistConfig[]): CandidateSpec[] {
+  const pool: CandidateSpec[] = specs.map(specToCandidate);
+  const taken = new Set(pool.map((c) => c.agent_id));
+  for (const entry of MCP_CATALOG) {
+    if (taken.has(entry.agent_id)) continue;
+    pool.push(catalogToCandidate(entry));
+    taken.add(entry.agent_id);
+  }
+  return pool;
+}
+
 async function rankWithLLM(
   query: string,
   taskType: string | undefined,
-  specs: SpecialistConfig[],
+  pool: CandidateSpec[],
 ): Promise<RankedItem[]> {
-  if (specs.length === 0) return [];
+  if (pool.length === 0) return [];
   const userPrompt = [
     `User goal:\n${query.trim()}`,
-    taskType ? `Workflow hint: ${taskType}` : null,
+    taskType && taskType !== "general"
+      ? `Workflow hint: ${taskType}`
+      : null,
     "Available specialists:",
-    specs.map(describeSpec).join("\n---\n"),
+    pool.map(describeSpec).join("\n---\n"),
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -78,7 +162,7 @@ async function rankWithLLM(
   const data = await callOpenAIJSON<RankResponse>({
     systemPrompt: RANK_SYSTEM_PROMPT,
     userPrompt,
-    maxTokens: 700,
+    maxTokens: 900,
     timeoutMs: 12_000,
     retries: 0,
   });
@@ -92,7 +176,7 @@ async function rankWithLLM(
           ? r.fit_reasoning.trim()
           : "no rationale provided",
     }))
-    .filter((r) => specs.some((s) => s.agent_id === r.agent_id));
+    .filter((r) => pool.some((s) => s.agent_id === r.agent_id));
 }
 
 function clamp01(n: number): number {
@@ -102,7 +186,7 @@ function clamp01(n: number): number {
 
 function fallbackKeywordRank(
   query: string,
-  specs: SpecialistConfig[],
+  pool: CandidateSpec[],
 ): RankedItem[] {
   const tokens = new Set(
     query
@@ -110,17 +194,24 @@ function fallbackKeywordRank(
       .split(/[^a-z0-9]+/)
       .filter((t) => t.length > 2),
   );
-  return specs.map((s) => {
-    const haystack = [s.sponsor, s.one_liner, ...s.capabilities]
+  return pool.map((s) => {
+    const haystack = [
+      s.sponsor,
+      s.one_liner,
+      ...s.capabilities,
+      ...(s.tags ?? []),
+    ]
       .join(" ")
       .toLowerCase();
     let hits = 0;
     for (const t of tokens) if (haystack.includes(t)) hits += 1;
-    const fit = tokens.size === 0 ? 0.3 : Math.min(1, hits / Math.max(3, tokens.size));
+    const fit =
+      tokens.size === 0 ? 0.3 : Math.min(1, hits / Math.max(3, tokens.size));
     return {
       agent_id: s.agent_id,
       fit_score: fit,
-      fit_reasoning: hits > 0 ? `Matched ${hits} keyword(s)` : "No keyword overlap",
+      fit_reasoning:
+        hits > 0 ? `Matched ${hits} keyword(s)` : "No keyword overlap",
     };
   });
 }
@@ -142,32 +233,35 @@ export async function suggestSpecialists(
     };
   }
 
+  const pool = buildCandidatePool(specs);
+
   let ranked: RankedItem[];
   try {
-    ranked = await rankWithLLM(trimmed, taskType, specs);
+    ranked = await rankWithLLM(trimmed, taskType, pool);
   } catch {
-    ranked = fallbackKeywordRank(trimmed, specs);
+    ranked = fallbackKeywordRank(trimmed, pool);
   }
-  if (ranked.length === 0) ranked = fallbackKeywordRank(trimmed, specs);
+  if (ranked.length === 0) ranked = fallbackKeywordRank(trimmed, pool);
 
-  const byId = new Map(specs.map((s) => [s.agent_id, s]));
+  const byId = new Map(pool.map((c) => [c.agent_id, c]));
   const suggestions: SpecialistSuggestion[] = [];
   for (const r of ranked) {
-    const spec = byId.get(r.agent_id);
-    if (!spec) continue;
+    const c = byId.get(r.agent_id);
+    if (!c) continue;
     suggestions.push({
-      agent_id: spec.agent_id,
-      display_name: spec.display_name,
-      sponsor: spec.sponsor,
-      one_liner: spec.one_liner,
-      capabilities: spec.capabilities,
-      cost_baseline: spec.cost_baseline,
+      agent_id: c.agent_id,
+      display_name: c.display_name,
+      sponsor: c.sponsor,
+      one_liner: c.one_liner,
+      capabilities: c.capabilities,
+      cost_baseline: c.cost_baseline,
       fit_score: r.fit_score,
       fit_reasoning: r.fit_reasoning,
-      discovered: !!spec.discovered,
-      discovery_source: spec.discovery_source,
-      mcp_endpoint: spec.mcp_endpoint,
-      homepage_url: spec.homepage_url,
+      discovered: c.discovered,
+      discovery_source: c.discovery_source,
+      mcp_endpoint: c.mcp_endpoint,
+      homepage_url: c.homepage_url,
+      enrollable: c.enrollable,
     });
   }
   suggestions.sort((a, b) => b.fit_score - a.fit_score);
@@ -175,11 +269,16 @@ export async function suggestSpecialists(
 
   const best_fit_score = suggestions[0]?.fit_score ?? 0;
   const low_confidence = best_fit_score < LOW_CONFIDENCE_THRESHOLD;
+  // Only push the user toward Discover (LLM-synth) when even the catalog/
+  // registry roster has nothing strong — i.e. no real MCP fits.
+  const bestRealFit = suggestions.find((s) => !!s.mcp_endpoint)?.fit_score ?? 0;
+  const recommend_discovery =
+    low_confidence && bestRealFit < LOW_CONFIDENCE_THRESHOLD;
   return {
     query: trimmed,
     suggestions,
     best_fit_score,
     low_confidence,
-    recommend_discovery: low_confidence,
+    recommend_discovery,
   };
 }

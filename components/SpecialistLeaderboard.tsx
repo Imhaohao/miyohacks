@@ -1,72 +1,83 @@
 "use client";
 
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Pill } from "@/components/ui/Pill";
 import { SPECIALISTS } from "@/lib/specialists/registry";
 import { formatMoney, formatScore } from "@/lib/utils";
+import { CheckCircle, Plug, ShieldWarning } from "@phosphor-icons/react";
 
-/**
- * Static leaderboard fed from the in-process specialist registry. Once Convex
- * is wired up, replace the source with a `useQuery(api.agents.list)` call so
- * reputation updates are reactive.
- */
 export function SpecialistLeaderboard() {
   const endpointCount = SPECIALISTS.filter((s) => s.mcp_endpoint).length;
   return (
-    <Card>
-      <CardHeader>
-        <span>Campaign agents · {SPECIALISTS.length}</span>
-        <span className="text-terminal-accent">
-          {endpointCount} MCP endpoint
-        </span>
-      </CardHeader>
-      <div className="divide-y divide-terminal-border">
+    <Card accent="spectrum">
+      <CardHeader
+        title={`Specialists · ${SPECIALISTS.length}`}
+        meta={
+          <span className="text-brand-700">{endpointCount} live MCP</span>
+        }
+      />
+      <div className="divide-y divide-line">
         {SPECIALISTS.map((s) => {
           const hasEndpoint = !!s.mcp_endpoint;
           const live = hasEndpoint && !!s.is_verified;
           return (
             <div
               key={s.agent_id}
-              className="flex items-center justify-between gap-3 py-2 text-sm"
+              className="flex items-center justify-between gap-3 py-3 text-sm"
             >
               <div className="flex min-w-0 flex-col">
-                <span className="flex items-center gap-2 font-mono text-terminal-text">
-                  {s.display_name}
-                  {hasEndpoint && (
-                    <span
-                      title={
-                        live
-                          ? `Verified MCP: ${s.mcp_endpoint}`
-                          : `MCP endpoint configured; set ${s.mcp_api_key_env ?? "API key"} to use live tools`
-                      }
-                      className={
-                        live
-                          ? "rounded bg-terminal-accent/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-terminal-accent"
-                          : "rounded bg-terminal-warn/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-terminal-warn"
-                      }
+                <span className="flex items-center gap-2 text-ink">
+                  <span className="font-medium tracking-tight">
+                    {s.display_name}
+                  </span>
+                  {hasEndpoint && live && (
+                    <Pill
+                      tone="success"
+                      title={`Verified MCP: ${s.mcp_endpoint}`}
                     >
-                      {live ? "MCP ✓" : "MCP auth"}
-                    </span>
+                      <CheckCircle size={11} weight="fill" />
+                      MCP
+                    </Pill>
+                  )}
+                  {hasEndpoint && !live && (
+                    <Pill
+                      tone="warning"
+                      title={`MCP endpoint configured; set ${s.mcp_api_key_env ?? "API key"} to use live tools`}
+                    >
+                      <ShieldWarning size={11} weight="fill" />
+                      Auth needed
+                    </Pill>
                   )}
                   {!hasEndpoint && (
-                    <span className="rounded bg-terminal-border px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-terminal-muted">
-                      soft
-                    </span>
+                    <Pill tone="neutral">
+                      <Plug size={11} />
+                      Soft
+                    </Pill>
                   )}
                 </span>
-                <span className="truncate text-xs text-terminal-muted">
+                <span className="truncate text-xs text-ink-muted">
                   {s.sponsor} · {s.one_liner}
                 </span>
               </div>
-              <div className="flex shrink-0 items-center gap-6 text-right text-xs font-mono">
-                <div>
-                  <div className="text-terminal-muted">rep</div>
-                  <div className="text-terminal-text">
-                    {formatScore(s.starting_reputation)}
+              <div className="flex shrink-0 items-center gap-5 text-right text-xs">
+                <div className="w-24">
+                  <div className="flex items-center justify-between text-[10px] text-ink-subtle">
+                    <span>Reputation</span>
+                    <span className="font-mono text-ink">
+                      {formatScore(s.starting_reputation)}
+                    </span>
+                  </div>
+                  <div className="score-bar mt-1">
+                    <span
+                      style={{
+                        width: `${Math.round(s.starting_reputation * 100)}%`,
+                      }}
+                    />
                   </div>
                 </div>
                 <div>
-                  <div className="text-terminal-muted">cost</div>
-                  <div className="text-terminal-text">
+                  <div className="text-[10px] text-ink-subtle">Cost</div>
+                  <div className="font-mono text-ink">
                     {formatMoney(s.cost_baseline)}
                   </div>
                 </div>

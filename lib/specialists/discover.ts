@@ -221,7 +221,7 @@ function catalogEntryToConfig(
     cost_baseline: entry.cost_baseline,
     starting_reputation: 0.55,
     one_liner: entry.one_liner,
-    system_prompt: `You are ${entry.display_name}, an MCP-equipped specialist for ${entry.sponsor}. The marketplace registered you because the user goal lined up with your real capabilities (${entry.capabilities.join(", ")}). Use your remote tools to ground your answer in real data — never invent results. If the user goal is outside what your tools can do, say so plainly and decline.`,
+    system_prompt: `You are ${entry.display_name}, an MCP-equipped specialist for ${entry.sponsor}. The marketplace registered you because the user goal lined up with your real capabilities (${entry.capabilities.join(", ")}). Use your remote tools to ground your answer in real data — never invent results. If the goal is outside what your tools can do, say so plainly and decline. Treat the user's request on its own terms; don't assume it's marketing/campaign work unless they say so.`,
     mcp_endpoint: entry.mcp_endpoint,
     mcp_api_key_env: entry.mcp_api_key_env,
     is_verified: false,
@@ -411,7 +411,9 @@ async function synthesize(
   existing: SpecialistConfig[],
   taken: Set<string>,
 ): Promise<Omit<DiscoveryResult, "verified_tools">> {
-  const sys = `You design specialist AI agents for an autonomous creator-marketing marketplace. The user describes work the existing roster and the live MCP registry cannot cover well; you invent a new in-persona specialist.
+  const sys = `You design specialist AI agents for a general-purpose marketplace where agents bid on any kind of work — payments, design, code, research, marketing, data, ops, anything. The user describes a goal the existing roster and the live MCP registry cannot cover well; you invent a new in-persona specialist tailored to that goal.
+
+Stay in the user's domain — don't drift toward marketing/campaign framing unless that's literally what they asked for. If the goal is "set up Stripe Connect", build a payments specialist, not a marketing one.
 
 Output JSON only with: agent_id (kebab-case 3-40 chars), display_name, sponsor (suffix " (synthesized)"), one_liner (<=120 chars), capabilities (3-6 short verb-noun), system_prompt (2-4 sentences, second person), cost_baseline (0.30-1.20).
 Do not duplicate any existing agent_id.`;
@@ -486,7 +488,7 @@ Do not duplicate any existing agent_id.`;
     system_prompt:
       typeof raw.system_prompt === "string" && raw.system_prompt.trim()
         ? raw.system_prompt.trim()
-        : `You are ${agent_id}, an LLM-only specialist synthesized for the goal: "${query.trim()}". You have no remote MCP tools — be honest about that and ground your output in the campaign evidence the marketplace provides.`,
+        : `You are ${agent_id}, an LLM-only specialist synthesized for the goal: "${query.trim()}". You have no remote MCP tools — be honest about that limitation and answer the user's request on its own terms, without assuming it's marketing or campaign work.`,
     discovered: true,
     discovery_source: "synthesized",
     discovered_for: query.trim().slice(0, 240),

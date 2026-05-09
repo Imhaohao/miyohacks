@@ -1,4 +1,5 @@
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Pill } from "@/components/ui/Pill";
 import { formatMoney, cn } from "@/lib/utils";
 import type {
   EscrowDoc,
@@ -6,6 +7,7 @@ import type {
   SettledPayload,
   TaskDoc,
 } from "@/lib/task-view";
+import { ArrowRight, ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 
 interface Props {
   task: TaskDoc;
@@ -21,60 +23,51 @@ export function SettlementPanel({ task, escrow, events }: Props) {
   const released = payload.escrow === "released";
 
   return (
-    <Card>
-      <CardHeader>
-        <span>Settlement</span>
-        <span
-          className={cn(
-            "rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
-            released
-              ? "bg-terminal-accent/20 text-terminal-accent"
-              : "bg-terminal-danger/20 text-terminal-danger",
-          )}
-        >
-          {payload.escrow}
-        </span>
-      </CardHeader>
+    <Card className="animate-fade-up">
+      <CardHeader
+        title="Settlement"
+        meta={
+          <Pill tone={released ? "success" : "danger"}>
+            {released ? "Released" : "Refunded"}
+          </Pill>
+        }
+      />
 
-      {/* Escrow flow */}
-      <div className="mb-5 grid grid-cols-3 items-center gap-2 text-center text-xs">
-        <Stop label="buyer" sub={escrow?.buyer_id ?? "—"} />
+      <div className="mb-5 grid grid-cols-3 items-center gap-3 text-center text-sm">
+        <Stop label="Buyer" sub={escrow?.buyer_id ?? "—"} />
         <Arrow
-          amount={payload.price_paid ?? task.price_paid ?? escrow?.locked_amount ?? 0}
+          amount={
+            payload.price_paid ?? task.price_paid ?? escrow?.locked_amount ?? 0
+          }
           direction={released ? "forward" : "backward"}
         />
         <Stop
-          label={released ? "seller" : "buyer (refund)"}
+          label={released ? "Seller" : "Buyer (refund)"}
           sub={released ? payload.seller_id : escrow?.buyer_id ?? "—"}
           highlight={released}
         />
       </div>
 
-      {/* Reputation delta */}
-      <div className="rounded border border-terminal-border bg-black/30 p-3">
-        <div className="flex items-center justify-between text-xs">
+      <div className="rounded-xl border border-line bg-surface-subtle p-4">
+        <div className="flex items-center justify-between">
           <div>
-            <div className="text-terminal-muted">reputation update</div>
-            <div className="font-mono text-terminal-text">
+            <div className="text-xs text-ink-muted">Reputation update</div>
+            <div className="font-mono text-sm text-ink">
               {payload.seller_id}
             </div>
           </div>
           <div className="flex items-center gap-3 font-mono">
             <span
               className={cn(
-                "animate-pulse-once text-lg font-semibold",
-                payload.delta >= 0
-                  ? "text-terminal-accent"
-                  : "text-terminal-danger",
+                "animate-value-pop text-lg font-semibold tracking-tight",
+                payload.delta >= 0 ? "text-emerald-600" : "text-rose-600",
               )}
             >
               {payload.delta >= 0 ? "+" : ""}
               {payload.delta.toFixed(3)}
             </span>
-            <span className="text-terminal-muted">→</span>
-            <span className="text-terminal-text">
-              {payload.new_score.toFixed(2)}
-            </span>
+            <span className="text-ink-subtle">→</span>
+            <span className="text-ink">{payload.new_score.toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -94,16 +87,14 @@ function Stop({
   return (
     <div
       className={cn(
-        "rounded border p-2",
+        "rounded-xl border p-3 text-left",
         highlight
-          ? "border-terminal-accent/50 bg-terminal-accent/10"
-          : "border-terminal-border bg-black/30",
+          ? "border-brand-200 bg-brand-50"
+          : "border-line bg-surface-subtle",
       )}
     >
-      <div className="text-[10px] uppercase tracking-wider text-terminal-muted">
-        {label}
-      </div>
-      <div className="truncate font-mono text-xs text-terminal-text">{sub}</div>
+      <div className="text-xs text-ink-muted">{label}</div>
+      <div className="mt-0.5 truncate font-mono text-sm text-ink">{sub}</div>
     </div>
   );
 }
@@ -116,13 +107,17 @@ function Arrow({
   direction: "forward" | "backward";
 }) {
   return (
-    <div className="flex flex-col items-center justify-center text-xs text-terminal-muted">
-      <div className="font-mono text-terminal-text">{formatMoney(amount)}</div>
-      <div className="my-1 text-2xl leading-none text-terminal-accent">
-        {direction === "forward" ? "→" : "←"}
+    <div className="flex flex-col items-center justify-center text-xs text-ink-muted">
+      <div className="font-mono text-sm text-ink">{formatMoney(amount)}</div>
+      <div className="my-1 text-brand-600">
+        {direction === "forward" ? (
+          <ArrowRight size={20} weight="bold" />
+        ) : (
+          <ArrowLeft size={20} weight="bold" />
+        )}
       </div>
-      <div className="text-[10px] uppercase tracking-wider">
-        {direction === "forward" ? "released" : "refunded"}
+      <div className="text-xs text-ink-muted">
+        {direction === "forward" ? "Released" : "Refunded"}
       </div>
     </div>
   );

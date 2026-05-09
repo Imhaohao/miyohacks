@@ -1,26 +1,23 @@
-import { cn } from "@/lib/utils";
+import { Pill, type PillTone } from "@/components/ui/Pill";
 import type { TaskStatus } from "@/lib/types";
 
-const STYLES: Record<TaskStatus, string> = {
-  open: "bg-terminal-border text-terminal-muted",
-  bidding: "bg-terminal-warn/20 text-terminal-warn animate-pulse",
-  awarded: "bg-blue-500/20 text-blue-400",
-  executing: "bg-blue-500/20 text-blue-400 animate-pulse",
-  judging: "bg-purple-500/20 text-purple-400 animate-pulse",
-  complete: "bg-terminal-accent/20 text-terminal-accent",
-  disputed: "bg-terminal-danger/20 text-terminal-danger",
-  failed: "bg-terminal-danger/20 text-terminal-danger",
+const META: Record<TaskStatus, { label: string; tone: PillTone; pulse?: boolean }> = {
+  open: { label: "Open", tone: "neutral" },
+  bidding: { label: "Bidding", tone: "warning", pulse: true },
+  awarded: { label: "Awarded", tone: "info" },
+  executing: { label: "Executing", tone: "brand", pulse: true },
+  judging: { label: "Judging", tone: "info", pulse: true },
+  complete: { label: "Complete", tone: "success" },
+  disputed: { label: "Disputed", tone: "danger" },
+  failed: { label: "Failed", tone: "danger" },
 };
 
 export function StatusBadge({ status }: { status: TaskStatus }) {
+  const m = META[status];
   return (
-    <span
-      className={cn(
-        "rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
-        STYLES[status],
-      )}
-    >
-      {status}
-    </span>
+    <Pill tone={m.tone} pulse={m.pulse}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+      {m.label}
+    </Pill>
   );
 }

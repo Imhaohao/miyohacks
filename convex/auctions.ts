@@ -8,6 +8,7 @@ import {
   getRunner,
   registerDiscoveredSpecialist,
 } from "../lib/specialists/registry";
+import { MCP_CATALOG } from "../lib/specialists/catalog";
 import type {
   AgentId,
   BidPayload,
@@ -15,7 +16,10 @@ import type {
   SpecialistConfig,
 } from "../lib/types";
 import { callOpenAIJSON } from "../lib/openai";
-import { buildCampaignEvidence } from "../lib/campaign-context";
+import {
+  buildTaskContext,
+  isCampaignTask,
+} from "../lib/campaign-context";
 
 const BUYER_ID = "buyer:default";
 
@@ -50,13 +54,58 @@ export const solicitBids = internalAction({
       return cfg;
     });
 
+    // Auto-enrol every catalog entry (Stripe, Linear, Vercel, etc.) as a
+    // bidder unless it's already covered by a sponsor or discovered config.
+    const taken = new Set([
+      ...SPECIALISTS.map((s) => s.agent_id),
+      ...discoveredConfigs.map((d) => d.agent_id),
+    ]);
+    const catalogConfigs: SpecialistConfig[] = MCP_CATALOG.filter(
+      (c) => !taken.has(c.agent_id),
+    ).map((c) => {
+      const cfg: SpecialistConfig = {
+        agent_id: c.agent_id,
+        display_name: c.display_name,
+        sponsor: c.sponsor,
+        capabilities: c.capabilities,
+        system_prompt: `You are ${c.display_name}, an MCP-equipped specialist for ${c.sponsor}. Your remote tools cover: ${c.capabilities.join(", ")}. ${c.one_liner} Treat the user's goal on its own terms — never translate it into another domain. Decline cleanly when the goal is outside what your tools can do.`,
+        cost_baseline: c.cost_baseline,
+        starting_reputation: 0.55,
+        one_liner: c.one_liner,
+        mcp_endpoint: c.mcp_endpoint,
+        mcp_api_key_env: c.mcp_api_key_env,
+        homepage_url: c.homepage_url,
+        discovered: true,
+        discovery_source: "catalog",
+        discovered_for: "auto-enrolled from catalog",
+      };
+      registerDiscoveredSpecialist(cfg);
+      return cfg;
+    });
+
+    // Make sure every catalog bidder has an agents row so reputation flows.
+    await Promise.allSettled(
+      catalogConfigs.map((c) =>
+        ctx.runMutation(internal.agents._ensureAgent, {
+          agent_id: c.agent_id,
+          display_name: c.display_name,
+          sponsor: c.sponsor,
+          capabilities: c.capabilities,
+          system_prompt: c.system_prompt,
+          cost_per_task_estimate: c.cost_baseline,
+          starting_reputation: c.starting_reputation,
+        }),
+      ),
+    );
+
     // The reacher-live-launch demo bypasses the open auction and routes
     // straight to reacher-social. All other tasks go through the full
-    // roster — sponsors plus runtime-discovered specialists.
+    // roster — sponsors plus runtime-discovered specialists plus the
+    // auto-enrolled MCP catalog (Stripe, Linear, Vercel, etc.).
     const invitedSpecialists: SpecialistConfig[] =
       task.task_type === "reacher-live-launch"
         ? SPECIALISTS.filter((spec) => spec.agent_id === "reacher-social")
-        : [...SPECIALISTS, ...discoveredConfigs];
+        : [...SPECIALISTS, ...discoveredConfigs, ...catalogConfigs];
 
     await Promise.allSettled(
       invitedSpecialists.map(async (spec) => {
@@ -297,7 +346,12 @@ export const execute = internalAction({
 
 // ─── Phase 5: judge ──────────────────────────────────────────────────────
 
-const JUDGE_SYSTEM_PROMPT = `You are an impartial judge for an autonomous creator-campaign marketplace. Evaluate whether the winning agent output satisfies the campaign brief and is grounded in Reacher TikTok Shop evidence plus Nia-backed context. Output JSON only:
+const JUDGE_GENERAL_PROMPT = `You are an impartial judge for a general-purpose agent marketplace. The user described a goal in their own words; a specialist agent produced a deliverable. Decide whether the deliverable actually addresses the user's goal in a useful, specific, well-reasoned way. Output JSON only:
+{ "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
+
+Be strict but fair. Reject if the agent produced a generic specialty pitch instead of doing the actual task (e.g. a creator shortlist when the user asked about Stripe), if the deliverable is vague hand-waving, or if it ignores explicit constraints. Accept when it materially advances the user's goal even if imperfect.`;
+
+const JUDGE_CAMPAIGN_PROMPT = `You are an impartial judge for a creator-campaign workflow. Evaluate whether the winning agent output satisfies the campaign brief and is grounded in Reacher TikTok Shop evidence plus Nia-backed context. Output JSON only:
 { "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
 
 Be strict but fair. Reject if the output lacks a creator shortlist, outreach drafts, sample-request notes, risk evaluation, or evidence tied to Reacher/Nia context. Accept if it satisfies the campaign workflow even if imperfect.`;
@@ -322,7 +376,7 @@ export const judge = internalAction({
       task.task_type === "reacher-live-launch"
         ? "This is the live Reacher proof workflow. The seeded demo creators in the generic campaign evidence are illustrative only. Do not reject merely because the agent used different creators. For this workflow, prefer live Reacher MCP evidence from tools such as list_shops_shops_get, creators_performance_creators_performance_post, and creators_list_creators_list_post. Accept if the output cites those live tool results and includes a creator shortlist, outreach drafts, sample notes, risk flags, and a 7-day launch plan."
         : null,
-      buildCampaignEvidence(task.prompt, task.task_type),
+      buildTaskContext(task.prompt, task.task_type),
       task.output_schema
         ? `Required output schema:\n${JSON.stringify(task.output_schema, null, 2)}`
         : null,
@@ -334,11 +388,15 @@ export const judge = internalAction({
       .filter(Boolean)
       .join("\n\n---\n\n");
 
+    const judgeSystemPrompt = isCampaignTask(task.task_type)
+      ? JUDGE_CAMPAIGN_PROMPT
+      : JUDGE_GENERAL_PROMPT;
+
     let verdict: JudgeVerdict;
     try {
       verdict = await Promise.race([
         callOpenAIJSON<JudgeVerdict>({
-          systemPrompt: JUDGE_SYSTEM_PROMPT,
+          systemPrompt: judgeSystemPrompt,
           userPrompt,
           maxTokens: 512,
           timeoutMs: 20_000,
