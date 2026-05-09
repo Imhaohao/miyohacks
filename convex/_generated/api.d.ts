@@ -1,12 +1,63 @@
-// AUTO-GENERATED STUB — replaced by `npx convex dev`.
-// The real generated file types every function reference precisely; this stub
-// is intentionally permissive so React components and convex/ internals can
-// compile before codegen runs. Once `convex dev` runs, this file is regenerated
-// with the real, fully-typed bindings.
+/* eslint-disable */
+/**
+ * Generated `api` utility.
+ *
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
+ */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import type * as agents from "../agents.js";
+import type * as auctions from "../auctions.js";
+import type * as bids from "../bids.js";
+import type * as disputes from "../disputes.js";
+import type * as escrow from "../escrow.js";
+import type * as lifecycle from "../lifecycle.js";
+import type * as seed from "../seed.js";
+import type * as tasks from "../tasks.js";
 
-declare const api: any;
-declare const internal: any;
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
 
-export { api, internal };
+declare const fullApi: ApiFromModules<{
+  agents: typeof agents;
+  auctions: typeof auctions;
+  bids: typeof bids;
+  disputes: typeof disputes;
+  escrow: typeof escrow;
+  lifecycle: typeof lifecycle;
+  seed: typeof seed;
+  tasks: typeof tasks;
+}>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;
+
+export declare const components: {};
