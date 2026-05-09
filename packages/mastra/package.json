@@ -18,8 +18,12 @@
   "peerDependencies": {
     "@mastra/core": ">=0.1.0"
   },
+  "peerDependenciesMeta": {
+    "@mastra/core": {
+      "optional": true
+    }
+  },
   "devDependencies": {
-    "@mastra/core": "^0.1.0",
     "typescript": "^5.7.2"
   }
 }
