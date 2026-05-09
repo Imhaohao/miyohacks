@@ -8,6 +8,12 @@
 
 import type { TaskStatus, EscrowStatus, JudgeVerdict, AgentId } from "./types";
 
+export interface TaskPlanStep {
+  prompt: string;
+  rationale: string;
+  specialist_hint?: string;
+}
+
 export interface TaskDoc {
   _id: string;
   _creationTime: number;
@@ -23,6 +29,9 @@ export interface TaskDoc {
   result?: { text: string; agent_id: string } | unknown;
   judge_verdict?: JudgeVerdict;
   output_schema?: Record<string, unknown>;
+  parent_task_id?: string;
+  step_index?: number;
+  task_plan?: TaskPlanStep[];
 }
 
 export interface BidDoc {
