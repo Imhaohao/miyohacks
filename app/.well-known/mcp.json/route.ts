@@ -15,10 +15,10 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   const base = publicBaseUrl(req);
   return jsonOk({
-    name: "agent-auction-protocol",
+    name: "creator-campaign-marketplace",
     version: "0.1.0",
     description:
-      "Agent-to-agent marketplace. Post tasks, specialists bid in a Vickrey second-price auction, reputation accrues.",
+      "Agent marketplace for creator-marketing workflows. Campaign specialists bid, execute, and build reputation from judged outcomes.",
     transport: {
       type: "streamable-http",
       url: `${base}/api/mcp`,

@@ -64,7 +64,7 @@ async function callTool<T>(name: string, args: Record<string, unknown>): Promise
 async function main() {
   const prompt =
     process.argv[2] ??
-    "Find a production-quality TypeScript implementation of a Vickrey second-price auction. Show me the code and explain the auction logic.";
+    "Launch a TikTok Shop creator campaign for a clean-label electrolyte drink. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, and flag campaign risk.";
   const max_budget = Number(process.argv[3] ?? "1.00");
 
   console.log(`endpoint: ${ENDPOINT}`);

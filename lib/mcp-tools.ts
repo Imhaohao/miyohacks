@@ -1,5 +1,5 @@
 /**
- * MCP tool definitions for the Agent Auction Protocol.
+ * MCP tool definitions for the creator-campaign marketplace.
  *
  * Tools live here (instead of inline in the route) so the same definitions can
  * back both the HTTP transport and a future stdio transport without drift.
@@ -59,14 +59,14 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "post_task",
     description:
-      "Post a task to the agent auction. Specialists bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins and pays the second-highest bid price. Returns a task_id you can poll with get_task and a web_view_url where humans can watch the auction unfold.",
+      "Post a creator-marketing campaign brief. Specialist agents bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins, produces a creator shortlist plus outreach drafts, and pays the second-highest bid price. Returns a task_id and web_view_url.",
     inputSchema: {
       type: "object",
       required: ["prompt", "max_budget"],
       properties: {
         prompt: {
           type: "string",
-          description: "Natural-language description of what you want done.",
+          description: "Brand campaign brief and desired creator-marketing outcome.",
         },
         max_budget: {
           type: "number",
@@ -75,7 +75,7 @@ export const TOOLS: ToolDefinition[] = [
         task_type: {
           type: "string",
           description:
-            "Optional category hint, e.g. 'code-context-retrieval' or 'multi-step-engineering'.",
+            "Optional workflow hint, e.g. 'creator-scouting', 'outreach-drafting', or 'end-to-end-campaign'.",
         },
         output_schema: {
           type: "object",
@@ -93,7 +93,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "get_task",
     description:
-      "Fetch the current state of an auction task: status, bids (only after window closes), result, judge verdict, and escrow status. Poll until status is 'complete', 'disputed', or 'failed'.",
+      "Fetch the current state of a campaign auction: status, bids (only after window closes), creator shortlist/output, judge verdict, and simulated escrow status.",
     inputSchema: {
       type: "object",
       required: ["task_id"],
@@ -105,7 +105,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "list_specialists",
     description:
-      "List the specialist agents currently registered, with their reputation, capabilities, and cost baselines. Useful for an agent that wants to know who's available before posting.",
+      "List campaign specialist agents with reputation, capabilities, and cost baselines.",
     inputSchema: {
       type: "object",
       properties: {
@@ -190,6 +190,18 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
       one_liner: s.one_liner,
       reputation_score: l?.reputation_score ?? s.starting_reputation,
       total_tasks_completed: l?.total_tasks_completed ?? 0,
+      mcp_endpoint: s.mcp_endpoint,
+      mcp_connected: !!s.mcp_endpoint && !!s.is_verified,
+      mcp_status: s.mcp_endpoint
+        ? s.is_verified
+          ? "verified"
+          : s.mcp_api_key_env
+            ? "auth_required"
+            : "configured"
+        : "mocked",
+      mcp_api_key_env: s.mcp_api_key_env,
+      is_verified: s.is_verified ?? false,
+      homepage_url: s.homepage_url,
     };
   });
 }

@@ -6,6 +6,7 @@ import { internal } from "./_generated/api";
 import { SPECIALISTS, getRunner } from "../lib/specialists/registry";
 import type { AgentId, BidPayload, JudgeVerdict } from "../lib/types";
 import { callOpenAIJSON } from "../lib/openai";
+import { buildCampaignEvidence } from "../lib/campaign-context";
 
 const BUYER_ID = "buyer:default";
 
@@ -231,10 +232,10 @@ export const execute = internalAction({
 
 // ─── Phase 5: judge ──────────────────────────────────────────────────────
 
-const JUDGE_SYSTEM_PROMPT = `You are an impartial judge evaluating whether the agent output satisfies the task. Output JSON only:
+const JUDGE_SYSTEM_PROMPT = `You are an impartial judge for an autonomous creator-campaign marketplace. Evaluate whether the winning agent output satisfies the campaign brief and is grounded in Reacher TikTok Shop evidence plus Nia-backed context. Output JSON only:
 { "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
 
-Be strict but fair. Reject if the output is off-topic, hallucinated, or fails to address the task. Accept if it satisfies the spec even if imperfect.`;
+Be strict but fair. Reject if the output lacks a creator shortlist, outreach drafts, sample-request notes, risk evaluation, or evidence tied to Reacher/Nia context. Accept if it satisfies the campaign workflow even if imperfect.`;
 
 export const judge = internalAction({
   args: {
@@ -253,7 +254,7 @@ export const judge = internalAction({
     });
 
     const userPrompt = [
-      `Task prompt:\n${task.prompt}`,
+      buildCampaignEvidence(task.prompt, task.task_type),
       task.output_schema
         ? `Required output schema:\n${JSON.stringify(task.output_schema, null, 2)}`
         : null,

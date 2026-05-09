@@ -7,6 +7,7 @@ import { TaskHeader } from "./TaskHeader";
 import { BidWindow } from "./BidWindow";
 import { AuctionResolution } from "./AuctionResolution";
 import { ValueImpactPanel } from "./ValueImpactPanel";
+import { CampaignEvidencePanel } from "./CampaignEvidencePanel";
 import { ExecutionPanel } from "./ExecutionPanel";
 import { JudgeVerdictPanel } from "./JudgeVerdictPanel";
 import { SettlementPanel } from "./SettlementPanel";
@@ -42,6 +43,7 @@ export function TaskView({ taskId }: { taskId: string }) {
   return (
     <div className="space-y-4">
       <TaskHeader task={task} />
+      <CampaignEvidencePanel />
       <BidWindow task={task} events={lifecycle} />
       <AuctionResolution events={lifecycle} />
       <ValueImpactPanel task={task} events={lifecycle} />
