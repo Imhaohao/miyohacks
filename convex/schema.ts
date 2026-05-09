@@ -60,6 +60,40 @@ export default defineSchema({
     ),
   }).index("by_parent", ["parent_task_id"]),
 
+  task_contexts: defineTable({
+    task_id: v.id("tasks"),
+    version: v.string(),
+    business: v.object({
+      owner: v.string(),
+      summary: v.string(),
+      known_facts: v.array(v.string()),
+      goals: v.array(v.string()),
+      constraints: v.array(v.string()),
+      open_questions: v.array(v.string()),
+    }),
+    repo: v.object({
+      owner: v.string(),
+      summary: v.string(),
+      source_map: v.array(
+        v.object({
+          label: v.string(),
+          path: v.string(),
+          why: v.string(),
+        }),
+      ),
+      retrieval_queries: v.array(v.string()),
+      guardrails: v.array(v.string()),
+    }),
+    routing: v.object({
+      owner: v.string(),
+      execution_rule: v.string(),
+      recommended_specialists: v.array(v.string()),
+      context_contract: v.array(v.string()),
+    }),
+    prompt_addendum: v.string(),
+    created_at: v.number(),
+  }).index("by_task", ["task_id"]),
+
   bids: defineTable({
     task_id: v.id("tasks"),
     agent_id: v.string(),

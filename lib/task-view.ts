@@ -6,7 +6,13 @@
  * compile-time safety regardless of codegen state.
  */
 
-import type { TaskStatus, EscrowStatus, JudgeVerdict, AgentId } from "./types";
+import type {
+  AgentId,
+  EscrowStatus,
+  ExecutionArtifact,
+  JudgeVerdict,
+  TaskStatus,
+} from "./types";
 
 export interface TaskPlanStep {
   prompt: string;
@@ -26,7 +32,7 @@ export interface TaskDoc {
   bid_window_closes_at: number;
   winning_bid_id?: string;
   price_paid?: number;
-  result?: { text: string; agent_id: string } | unknown;
+  result?: { text: string; agent_id: string; artifact?: ExecutionArtifact } | unknown;
   judge_verdict?: JudgeVerdict;
   output_schema?: Record<string, unknown>;
   parent_task_id?: string;

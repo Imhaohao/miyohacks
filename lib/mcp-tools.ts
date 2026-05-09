@@ -41,6 +41,9 @@ export interface PostTaskArgs {
   task_type?: string;
   output_schema?: Record<string, unknown>;
   agent_id?: string;
+  business_context?: string;
+  repo_context?: string;
+  source_hints?: string[];
 }
 
 export interface GetTaskArgs {
@@ -115,6 +118,22 @@ export const TOOLS: ToolDefinition[] = [
           type: "string",
           description:
             "Optional caller identifier. Defaults to 'agent:mcp'. No auth in v0.",
+        },
+        business_context: {
+          type: "string",
+          description:
+            "Optional Hyperspell-style business context: who this business is, what it knows, and what it wants.",
+        },
+        repo_context: {
+          type: "string",
+          description:
+            "Optional Nia-style repo/source context: how the repo works and what code/docs/sources the executor should use.",
+        },
+        source_hints: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Optional repo paths, docs, URLs, or source IDs that Nia should prioritize.",
         },
       },
     },
@@ -217,6 +236,9 @@ export async function handlePostTask(args: PostTaskArgs) {
     prompt: args.prompt,
     max_budget: args.max_budget,
     output_schema: args.output_schema,
+    business_context: args.business_context,
+    repo_context: args.repo_context,
+    source_hints: args.source_hints,
   });
 
   return {
@@ -233,13 +255,14 @@ export async function handleGetTask(args: GetTaskArgs) {
   // narrow it to Id<"tasks"> at runtime — cast at the boundary.
   const task_id = args.task_id as Id<"tasks">;
   const c = convex();
-  const [task, bids, escrow, lifecycle] = await Promise.all([
+  const [task, bids, escrow, lifecycle, context] = await Promise.all([
     c.query(api.tasks.get, { task_id }),
     c.query(api.bids.forTask, { task_id }),
     c.query(api.escrow.forTask, { task_id }),
     c.query(api.lifecycle.forTask, { task_id }),
+    c.query(api.taskContexts.forTask, { task_id }),
   ]);
-  return { task, bids, escrow, lifecycle };
+  return { task, bids, escrow, lifecycle, context };
 }
 
 export async function handleListSpecialists(_args: ListSpecialistsArgs) {
