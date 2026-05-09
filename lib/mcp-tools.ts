@@ -11,6 +11,7 @@
 
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { SPECIALISTS } from "@/lib/specialists/registry";
 
 function convex() {
@@ -158,12 +159,15 @@ export async function handlePostTask(args: PostTaskArgs) {
 
 export async function handleGetTask(args: GetTaskArgs) {
   if (!args.task_id) throw new Error("task_id is required");
+  // task_id arrives as a string over the wire; the Convex query validators
+  // narrow it to Id<"tasks"> at runtime — cast at the boundary.
+  const task_id = args.task_id as Id<"tasks">;
   const c = convex();
   const [task, bids, escrow, lifecycle] = await Promise.all([
-    c.query(api.tasks.get, { task_id: args.task_id }),
-    c.query(api.bids.forTask, { task_id: args.task_id }),
-    c.query(api.escrow.forTask, { task_id: args.task_id }),
-    c.query(api.lifecycle.forTask, { task_id: args.task_id }),
+    c.query(api.tasks.get, { task_id }),
+    c.query(api.bids.forTask, { task_id }),
+    c.query(api.escrow.forTask, { task_id }),
+    c.query(api.lifecycle.forTask, { task_id }),
   ]);
   return { task, bids, escrow, lifecycle };
 }
@@ -194,7 +198,7 @@ export async function handleRaiseDispute(args: RaiseDisputeArgs) {
   if (!args.task_id || !args.reason)
     throw new Error("task_id and reason are required");
   await convex().action(api.disputes.raise, {
-    task_id: args.task_id,
+    task_id: args.task_id as Id<"tasks">,
     reason: args.reason,
   });
   return { ok: true };
