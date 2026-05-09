@@ -199,7 +199,7 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
       )}
 
       {data && data.recommend_discovery && (
-        <div className="mt-4 animate-fade-up rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
+        <div className="mt-4 animate-fade-up rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-medium">No strong match in the current roster.</p>
           <p className="mt-1 text-xs text-amber-800">
             Spawn a tailor-made specialist for this task. It joins the registry
@@ -209,7 +209,7 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
             type="button"
             onClick={onDiscover}
             disabled={discovering}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:border-amber-400 hover:bg-amber-100 disabled:opacity-50"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-amber-800 shadow-hairline hover:bg-amber-100 hover:shadow-hairline-strong disabled:opacity-50"
           >
             {discovering ? (
               <>
@@ -227,7 +227,7 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
       )}
 
       {discovered && (
-        <div className="mt-4 animate-fade-up rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm">
+        <div className="mt-4 animate-fade-up rounded-xl bg-brand-50 p-4 text-sm">
           <div className="flex items-center justify-between gap-2">
             <p className="inline-flex items-center gap-1.5 font-medium text-brand-700">
               <Lightning size={14} weight="fill" />

@@ -485,6 +485,32 @@ export const settle = internalAction({
     });
     const verdict = task.judge_verdict as JudgeVerdict;
 
+    // Capture actual runtime from lifecycle events for the dimensions record.
+    const lifecycle = await ctx.runQuery(internal.lifecycle._forTask, {
+      task_id: args.task_id,
+    });
+    const startedAt = lifecycle.find(
+      (e) => e.event_type === "execution_started",
+    )?.timestamp;
+    const completedAt = lifecycle.find(
+      (e) => e.event_type === "execution_complete",
+    )?.timestamp;
+    const actualSeconds =
+      startedAt && completedAt
+        ? Math.max(0.1, (completedAt - startedAt) / 1000)
+        : winner.estimated_seconds;
+
+    await ctx.runMutation(internal.reputationDimensions._record, {
+      agent_id: winner.agent_id,
+      task_id: args.task_id,
+      actual_seconds: actualSeconds,
+      estimated_seconds: winner.estimated_seconds,
+      quality_score: verdict.quality_score,
+      accepted: verdict.verdict === "accept",
+      bid_price: winner.bid_price,
+      price_paid: task.price_paid ?? winner.bid_price,
+    });
+
     if (verdict.verdict === "accept") {
       await ctx.runMutation(internal.escrow._settle, {
         task_id: args.task_id,

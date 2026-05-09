@@ -11,7 +11,7 @@ export function MarkdownLite({ text }: { text: string }) {
         seg.kind === "code" ? (
           <pre
             key={i}
-            className="overflow-x-auto rounded-xl border border-line bg-surface-subtle p-3 font-mono text-xs text-ink-soft"
+            className="overflow-x-auto rounded-xl bg-surface-muted p-3 font-mono text-xs text-ink-soft"
           >
             {seg.lang && (
               <div className="mb-1 text-[10px] font-medium text-ink-muted">

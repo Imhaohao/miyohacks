@@ -23,6 +23,37 @@ interface RepEvent {
   event_type: string;
 }
 
+interface RepDimensionRow {
+  speed_score: number;
+  estimate_accuracy: number;
+  quality_score: number;
+  value_score: number;
+  overall: number;
+}
+
+function averageDimensions(rows: RepDimensionRow[]) {
+  if (rows.length === 0) return null;
+  const acc = rows.reduce(
+    (a, r) => ({
+      speed: a.speed + r.speed_score,
+      estimate: a.estimate + r.estimate_accuracy,
+      quality: a.quality + r.quality_score,
+      value: a.value + r.value_score,
+      overall: a.overall + r.overall,
+    }),
+    { speed: 0, estimate: 0, quality: 0, value: 0, overall: 0 },
+  );
+  const n = rows.length;
+  return {
+    speed: acc.speed / n,
+    estimate: acc.estimate / n,
+    quality: acc.quality / n,
+    value: acc.value / n,
+    overall: acc.overall / n,
+    tasks: n,
+  };
+}
+
 export function SpecialistCard({
   spec,
   live,
@@ -33,6 +64,10 @@ export function SpecialistCard({
   const events = (useQuery(api.reputation.history, {
     agent_id: spec.agent_id,
   }) ?? []) as RepEvent[];
+  const dimensionRows = (useQuery(api.reputationDimensions.forAgent, {
+    agent_id: spec.agent_id,
+  }) ?? []) as RepDimensionRow[];
+  const dims = averageDimensions(dimensionRows);
 
   const score = live?.reputation_score ?? spec.starting_reputation;
   const completed = live?.total_tasks_completed ?? 0;
@@ -44,12 +79,7 @@ export function SpecialistCard({
   const mcpConnected = hasMcpEndpoint && !!spec.is_verified;
 
   return (
-    <Card
-      className={cn(
-        "animate-fade-up",
-        hasMcpEndpoint && "border-brand-200",
-      )}
-    >
+    <Card className="animate-fade-up">
       <CardHeader
         title={
           <span className="flex items-center gap-2">
@@ -83,7 +113,7 @@ export function SpecialistCard({
       <p className="mb-4 text-sm text-ink-muted">{spec.one_liner}</p>
 
       {hasMcpEndpoint && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 font-mono text-[11px] text-brand-700">
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 font-mono text-[11px] text-brand-700">
           <span className="font-sans font-medium">
             {mcpConnected ? "Live MCP" : "MCP auth"}
           </span>
@@ -104,6 +134,26 @@ export function SpecialistCard({
         </div>
       </div>
 
+      {dims ? (
+        <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl bg-surface-subtle p-3">
+          <DimensionBar label="Quality" value={dims.quality} />
+          <DimensionBar label="Speed" value={dims.speed} />
+          <DimensionBar label="Estimate accuracy" value={dims.estimate} />
+          <DimensionBar label="Value" value={dims.value} />
+          <div className="col-span-2 flex items-center justify-between border-t border-line/60 pt-2 text-[11px] text-ink-muted">
+            <span>Overall · {formatScore(dims.overall)}</span>
+            <span>
+              {dims.tasks} task{dims.tasks === 1 ? "" : "s"} measured
+            </span>
+          </div>
+        </div>
+      ) : (
+        <p className="mb-4 rounded-xl bg-surface-subtle px-3 py-2 text-[11px] text-ink-muted">
+          No completed tasks yet — speed, estimate accuracy, quality, and value
+          scores appear after the first run.
+        </p>
+      )}
+
       <ReputationChart
         startingScore={spec.starting_reputation}
         events={events}
@@ -123,7 +173,7 @@ export function SpecialistCard({
         {spec.capabilities.map((c) => (
           <span
             key={c}
-            className="rounded-md border border-line bg-surface-subtle px-2 py-0.5 font-mono text-[10px] text-ink-muted"
+            className="rounded-md bg-surface-muted px-2 py-0.5 font-mono text-[10px] text-ink-muted"
           >
             {c}
           </span>
@@ -156,6 +206,21 @@ function Stat({
         )}
       >
         {value}
+      </div>
+    </div>
+  );
+}
+
+function DimensionBar({ label, value }: { label: string; value: number }) {
+  const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-[11px]">
+        <span className="text-ink-muted">{label}</span>
+        <span className="font-mono text-ink">{formatScore(value)}</span>
+      </div>
+      <div className="score-bar mt-1">
+        <span style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

@@ -23,7 +23,7 @@ export function MCPCard() {
         </code>{" "}
         to delegate work to a specialist.
       </p>
-      <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-subtle px-3 py-2 font-mono text-xs text-ink">
+      <div className="flex items-center gap-2 rounded-xl bg-surface-muted px-3 py-2 font-mono text-xs text-ink">
         <span className="flex-1 truncate">{url}</span>
         <button
           type="button"

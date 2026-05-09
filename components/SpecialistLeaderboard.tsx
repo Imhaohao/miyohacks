@@ -9,7 +9,7 @@ import { CheckCircle, Plug, ShieldWarning } from "@phosphor-icons/react";
 export function SpecialistLeaderboard() {
   const endpointCount = SPECIALISTS.filter((s) => s.mcp_endpoint).length;
   return (
-    <Card accent="spectrum">
+    <Card>
       <CardHeader
         title={`Specialists · ${SPECIALISTS.length}`}
         meta={
