@@ -11,6 +11,7 @@
 import type * as agents from "../agents.js";
 import type * as auctions from "../auctions.js";
 import type * as bids from "../bids.js";
+import type * as discoveredSpecialists from "../discoveredSpecialists.js";
 import type * as disputes from "../disputes.js";
 import type * as escrow from "../escrow.js";
 import type * as lifecycle from "../lifecycle.js";
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   agents: typeof agents;
   auctions: typeof auctions;
   bids: typeof bids;
+  discoveredSpecialists: typeof discoveredSpecialists;
   disputes: typeof disputes;
   escrow: typeof escrow;
   lifecycle: typeof lifecycle;

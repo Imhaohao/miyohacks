@@ -21,6 +21,7 @@ import {
   CONVEX_REALTIME_CONFIG,
 } from "./convex-realtime";
 import { makeMcpForwardingSpecialist } from "./mcp-forwarding";
+import { makeMockSpecialist } from "./base";
 import type { SpecialistConfig, SpecialistRunner, AgentId } from "../types";
 
 /**
@@ -54,14 +55,34 @@ export const SPECIALIST_RUNNERS: Partial<Record<AgentId, SpecialistRunner>> = {
   "convex-realtime": convexRealtime,
 };
 
+/**
+ * Discovered specialists registered at runtime. Persisted in Convex so they
+ * survive across requests; this Map is a per-process cache hydrated on demand.
+ */
+const DISCOVERED: Map<string, SpecialistConfig> = new Map();
+
+export function registerDiscoveredSpecialist(config: SpecialistConfig) {
+  DISCOVERED.set(config.agent_id, { ...config, discovered: true });
+}
+
+export function getDiscoveredSpecialists(): SpecialistConfig[] {
+  return Array.from(DISCOVERED.values());
+}
+
+export function getAllSpecialists(): SpecialistConfig[] {
+  return [...SPECIALISTS, ...getDiscoveredSpecialists()];
+}
+
+function buildRunner(cfg: SpecialistConfig): SpecialistRunner {
+  if (cfg.mcp_endpoint) return makeMcpForwardingSpecialist(cfg);
+  return makeMockSpecialist(cfg);
+}
+
 export function getRunner(agent_id: AgentId): SpecialistRunner {
   const runner = SPECIALIST_RUNNERS[agent_id];
   if (runner) return runner;
-  // Fallback: if the agent_id is in SPECIALISTS but no runner is registered
-  // (shouldn't happen for sponsors), build one from the config — MCP-forwarding
-  // when an endpoint is set, mock otherwise.
-  const cfg = SPECIALISTS.find((s) => s.agent_id === agent_id);
+  const cfg =
+    SPECIALISTS.find((s) => s.agent_id === agent_id) ?? DISCOVERED.get(agent_id);
   if (!cfg) throw new Error(`No specialist runner registered for ${agent_id}`);
-  if (cfg.mcp_endpoint) return makeMcpForwardingSpecialist(cfg);
-  throw new Error(`No runner and no mcp_endpoint for ${agent_id}`);
+  return buildRunner(cfg);
 }

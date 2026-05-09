@@ -163,6 +163,66 @@ export async function GET(req: NextRequest) {
           },
         },
       },
+      "/api/v1/suggest": {
+        post: {
+          operationId: "suggest_specialists",
+          summary:
+            "Rank specialists for a free-form goal; flag low-confidence matches.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["prompt"],
+                  properties: {
+                    prompt: { type: "string" },
+                    task_type: { type: "string" },
+                    top_n: { type: "integer", minimum: 1, maximum: 10 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Ranked specialists with fit reasoning.",
+              content: { "application/json": { schema: { type: "object" } } },
+            },
+            "400": { $ref: "#/components/responses/BadRequest" },
+          },
+        },
+      },
+      "/api/v1/discover": {
+        post: {
+          operationId: "discover_specialist",
+          summary:
+            "Synthesize and persist a brand-new specialist tailored to the goal.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["prompt"],
+                  properties: {
+                    prompt: { type: "string" },
+                    task_type: { type: "string" },
+                    persist: { type: "boolean", default: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Discovered specialist config.",
+              content: { "application/json": { schema: { type: "object" } } },
+            },
+            "400": { $ref: "#/components/responses/BadRequest" },
+          },
+        },
+      },
     },
     components: {
       schemas: {

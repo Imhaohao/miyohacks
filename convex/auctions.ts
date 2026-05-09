@@ -2,9 +2,18 @@
 
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
-import { SPECIALISTS, getRunner } from "../lib/specialists/registry";
-import type { AgentId, BidPayload, JudgeVerdict } from "../lib/types";
+import { api, internal } from "./_generated/api";
+import {
+  SPECIALISTS,
+  getRunner,
+  registerDiscoveredSpecialist,
+} from "../lib/specialists/registry";
+import type {
+  AgentId,
+  BidPayload,
+  JudgeVerdict,
+  SpecialistConfig,
+} from "../lib/types";
 import { callOpenAIJSON } from "../lib/openai";
 import { buildCampaignEvidence } from "../lib/campaign-context";
 
@@ -18,10 +27,32 @@ export const solicitBids = internalAction({
     const task = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
     });
-    const invitedSpecialists =
+
+    const discovered = await ctx.runQuery(api.discoveredSpecialists.list, {});
+    const discoveredConfigs: SpecialistConfig[] = discovered.map((d) => {
+      const cfg: SpecialistConfig = {
+        agent_id: d.agent_id,
+        display_name: d.display_name,
+        sponsor: d.sponsor,
+        capabilities: d.capabilities,
+        system_prompt: d.system_prompt,
+        cost_baseline: d.cost_baseline,
+        starting_reputation: d.starting_reputation,
+        one_liner: d.one_liner,
+        discovered: true,
+        discovered_for: d.discovered_for,
+      };
+      registerDiscoveredSpecialist(cfg);
+      return cfg;
+    });
+
+    // The reacher-live-launch demo bypasses the open auction and routes
+    // straight to reacher-social. All other tasks go through the full
+    // roster — sponsors plus runtime-discovered specialists.
+    const invitedSpecialists: SpecialistConfig[] =
       task.task_type === "reacher-live-launch"
         ? SPECIALISTS.filter((spec) => spec.agent_id === "reacher-social")
-        : SPECIALISTS;
+        : [...SPECIALISTS, ...discoveredConfigs];
 
     await Promise.allSettled(
       invitedSpecialists.map(async (spec) => {
@@ -191,6 +222,24 @@ export const execute = internalAction({
     });
 
     try {
+      const discoveredEntry = await ctx.runQuery(
+        internal.discoveredSpecialists._getByAgentId,
+        { agent_id: winner.agent_id },
+      );
+      if (discoveredEntry) {
+        registerDiscoveredSpecialist({
+          agent_id: discoveredEntry.agent_id,
+          display_name: discoveredEntry.display_name,
+          sponsor: discoveredEntry.sponsor,
+          capabilities: discoveredEntry.capabilities,
+          system_prompt: discoveredEntry.system_prompt,
+          cost_baseline: discoveredEntry.cost_baseline,
+          starting_reputation: discoveredEntry.starting_reputation,
+          one_liner: discoveredEntry.one_liner,
+          discovered: true,
+          discovered_for: discoveredEntry.discovered_for,
+        });
+      }
       const runner = getRunner(winner.agent_id as AgentId);
       // 180s cap on execute. MCP-forwarding specialists run multi-round
       // tool-calling loops (6 rounds × ~30s each worst case for Reacher /
