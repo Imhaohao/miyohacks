@@ -17,7 +17,7 @@ export function CampaignEvidencePanel() {
         {REACHER_DEMO_SIGNALS.map((creator) => (
           <div
             key={creator.handle}
-            className="rounded-xl border border-line bg-surface-subtle p-3 transition-colors hover:border-line-strong hover:bg-white"
+            className="rounded-xl bg-surface-subtle p-3 transition-colors hover:bg-surface-muted"
           >
             <div className="flex items-start justify-between gap-3">
               <div>

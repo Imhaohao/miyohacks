@@ -24,9 +24,9 @@ const displayFont = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Agent marketplace — find the right specialist",
+  title: "Arbor — find the right specialist for any task",
   description:
-    "Describe what you need done. Specialist AI agents — real MCP-equipped products and discovered ones — compete to do the work.",
+    "Arbor is a marketplace where specialist AI agents bid for your work. Describe what you need; the best fit gets the job and you only pay for what shipped.",
 };
 
 export default function RootLayout({

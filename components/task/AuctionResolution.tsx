@@ -48,7 +48,7 @@ export function AuctionResolution({ events }: Props) {
   const maxScore = Math.max(...bids.map((b) => b.score), 0.01);
 
   return (
-    <Card accent="brand" className="animate-fade-up border-brand-100">
+    <Card className="animate-fade-up">
       <CardHeader
         title="Specialist selected"
         meta={
@@ -59,38 +59,27 @@ export function AuctionResolution({ events }: Props) {
         }
       />
 
-      {/* Pricing callout — gradient-tinted, animated value pop */}
-      <div className="relative mb-6 overflow-hidden rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-fuchsia-50 p-5">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-12 -top-10 h-40 w-40 rounded-full bg-brand-200/40 blur-3xl"
-        />
-        <div className="relative">
-          <div className="text-xs font-medium uppercase-[none] text-brand-700">
-            Honest pricing · Vickrey second-price
-          </div>
-          <div className="mt-3 flex flex-wrap items-baseline gap-3">
-            <span className="text-sm text-ink-muted">
-              <span className="font-mono">{winner.agent_id}</span> bid
-            </span>
-            <span className="text-2xl text-ink-subtle line-through decoration-rose-400 decoration-2">
-              {formatMoney(vickrey.winner_bid_price)}
-            </span>
-            <ArrowRight
-              size={18}
-              weight="bold"
-              className="text-ink-subtle"
-            />
-            <span className="animate-value-pop font-display text-3xl font-bold tracking-tight text-brand-700 sm:text-4xl">
-              pays {formatMoney(vickrey.price_paid)}
-            </span>
-          </div>
-          <p className="mt-2 text-xs text-ink-muted">
-            {isDegenerate
-              ? "Only one valid offer — they pay their own price."
-              : "They pay the runner-up's price, so the honest move is to quote your true cost."}
-          </p>
+      <div className="mb-6 rounded-2xl bg-brand-50 p-5">
+        <div className="text-xs font-medium text-brand-700">
+          Honest pricing · Vickrey second-price
         </div>
+        <div className="mt-3 flex flex-wrap items-baseline gap-3">
+          <span className="text-sm text-ink-muted">
+            <span className="font-mono">{winner.agent_id}</span> bid
+          </span>
+          <span className="text-2xl text-ink-subtle line-through decoration-rose-400 decoration-2">
+            {formatMoney(vickrey.winner_bid_price)}
+          </span>
+          <ArrowRight size={18} weight="bold" className="text-ink-subtle" />
+          <span className="animate-value-pop font-display text-3xl font-semibold tracking-tight text-brand-700 sm:text-4xl">
+            pays {formatMoney(vickrey.price_paid)}
+          </span>
+        </div>
+        <p className="mt-2 text-xs text-ink-muted">
+          {isDegenerate
+            ? "Only one valid offer — they pay their own price."
+            : "They pay the runner-up's price, so the honest move is to quote your true cost."}
+        </p>
       </div>
 
       {/* Bid ladder — winner is emphasized; everyone else gets a score bar viz */}
@@ -102,10 +91,10 @@ export function AuctionResolution({ events }: Props) {
             <div
               key={b.bid_id}
               className={cn(
-                "group relative overflow-hidden rounded-xl border p-3 text-sm transition-shadow",
+                "rounded-xl p-3 text-sm",
                 isWinner
-                  ? "border-brand-200 bg-gradient-to-r from-brand-50 to-white shadow-sm"
-                  : "border-line bg-white hover:border-line-strong",
+                  ? "bg-brand-50"
+                  : "bg-surface-subtle",
               )}
             >
               <div className="flex items-start gap-3">

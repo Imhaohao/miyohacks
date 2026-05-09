@@ -56,14 +56,14 @@ export function BidWindow({ task, events }: Props) {
       </p>
       <div className="space-y-2">
         {bidEvents.length === 0 && !closed && (
-          <div className="rounded-xl border border-dashed border-line bg-surface-subtle p-4 text-center text-sm text-ink-muted">
+          <div className="rounded-xl bg-surface-muted p-4 text-center text-sm text-ink-muted">
             Waiting for offers…
           </div>
         )}
         {bidEvents.map((b) => (
           <div
             key={b.bid_id}
-            className="flex animate-fade-down items-center justify-between rounded-xl border border-line bg-white p-3 text-sm"
+            className="flex animate-fade-down items-center justify-between rounded-xl bg-surface-subtle p-3 text-sm"
           >
             <div>
               <div className="font-medium text-ink">{b.agent_id}</div>
@@ -82,7 +82,7 @@ export function BidWindow({ task, events }: Props) {
         {declineEvents.map((d, i) => (
           <div
             key={`${d.agent_id}-${i}`}
-            className="flex animate-fade-in items-center justify-between rounded-xl border border-line bg-surface-subtle p-3 text-sm text-ink-muted"
+            className="flex animate-fade-in items-center justify-between rounded-xl bg-surface-muted p-3 text-sm text-ink-muted"
           >
             <span className="font-mono">{d.agent_id}</span>
             <span className="italic">Declined · {d.reason}</span>
