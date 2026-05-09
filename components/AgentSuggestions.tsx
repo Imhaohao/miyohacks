@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { formatMoney, formatScore } from "@/lib/utils";
 
+type DiscoverySource = "catalog" | "registry" | "synthesized";
+
 interface SuggestionItem {
   agent_id: string;
   display_name: string;
@@ -14,6 +16,9 @@ interface SuggestionItem {
   fit_score: number;
   fit_reasoning: string;
   discovered: boolean;
+  discovery_source?: DiscoverySource;
+  mcp_endpoint?: string;
+  homepage_url?: string;
 }
 
 interface SuggestResponse {
@@ -25,7 +30,16 @@ interface SuggestResponse {
 }
 
 interface DiscoverResponse {
-  specialist: SuggestionItem & { system_prompt: string; discovered_for?: string };
+  specialist: SuggestionItem & {
+    system_prompt: string;
+    discovered_for?: string;
+    discovery_source?: DiscoverySource;
+    mcp_endpoint?: string;
+    homepage_url?: string;
+  };
+  source: DiscoverySource;
+  rationale: string;
+  verified_tools: string[];
   persisted: boolean;
 }
 
@@ -145,11 +159,11 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 font-mono text-terminal-text">
                   <span>{s.display_name}</span>
-                  {s.discovered && (
-                    <span className="rounded bg-terminal-accent/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-terminal-accent">
-                      synthesized
-                    </span>
-                  )}
+                  <SourceBadge
+                    discovered={s.discovered}
+                    source={s.discovery_source}
+                    hasEndpoint={!!s.mcp_endpoint}
+                  />
                 </div>
                 <p className="text-xs text-terminal-muted">
                   {s.sponsor} · {s.one_liner}
@@ -193,17 +207,78 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
 
       {discovered && (
         <div className="mt-3 rounded border border-terminal-accent/40 bg-terminal-accent/5 p-3 text-xs">
-          <p className="font-mono text-terminal-accent">
-            new specialist · {discovered.specialist.display_name}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-mono text-terminal-accent">
+              new specialist · {discovered.specialist.display_name}
+            </p>
+            <SourceBadge
+              discovered
+              source={discovered.source}
+              hasEndpoint={!!discovered.specialist.mcp_endpoint}
+            />
+          </div>
           <p className="mt-1 text-terminal-muted">
             {discovered.specialist.sponsor} · {discovered.specialist.one_liner}
           </p>
+          {discovered.specialist.mcp_endpoint && (
+            <p className="mt-1 font-mono text-[11px] text-terminal-text/80">
+              MCP: {discovered.specialist.mcp_endpoint}
+            </p>
+          )}
           <p className="mt-1 text-terminal-text/80">
             Capabilities: {discovered.specialist.capabilities.join(", ")}
           </p>
+          <p className="mt-1 text-terminal-muted">{discovered.rationale}</p>
+          {discovered.verified_tools.length > 0 && (
+            <p className="mt-1 text-terminal-accent/80">
+              tools/list ✓ {discovered.verified_tools.slice(0, 6).join(", ")}
+              {discovered.verified_tools.length > 6 ? "..." : ""}
+            </p>
+          )}
+          {discovered.source === "synthesized" && (
+            <p className="mt-1 text-terminal-warn">
+              No real MCP backend matched — this is an LLM-only fallback.
+            </p>
+          )}
         </div>
       )}
     </Card>
+  );
+}
+
+function SourceBadge({
+  discovered,
+  source,
+  hasEndpoint,
+}: {
+  discovered: boolean;
+  source?: DiscoverySource;
+  hasEndpoint: boolean;
+}) {
+  if (!discovered) return null;
+  const map: Record<DiscoverySource, { label: string; cls: string }> = {
+    catalog: {
+      label: "MCP · catalog",
+      cls: "bg-terminal-accent/20 text-terminal-accent",
+    },
+    registry: {
+      label: "MCP · registry",
+      cls: "bg-terminal-accent/20 text-terminal-accent",
+    },
+    synthesized: {
+      label: "synthesized",
+      cls: "bg-terminal-warn/20 text-terminal-warn",
+    },
+  };
+  const fallback: { label: string; cls: string } = hasEndpoint
+    ? { label: "MCP", cls: "bg-terminal-accent/20 text-terminal-accent" }
+    : { label: "synthesized", cls: "bg-terminal-warn/20 text-terminal-warn" };
+  const meta = source ? map[source] : fallback;
+  return (
+    <span
+      className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${meta.cls}`}
+    >
+      {meta.label}
+    </span>
   );
 }

@@ -33,6 +33,23 @@ Convex tasks, bids, lifecycle, escrow, reputation
         +--> reputation changes affect future bid scores
 ```
 
+## On-demand specialist discovery
+
+When a brief doesn't line up well with the static roster, the marketplace will pull in a *real* specialist on demand instead of failing.
+
+The discover flow tries three sources, in order:
+
+1. **Curated catalog** ([`lib/specialists/catalog.ts`](lib/specialists/catalog.ts)) — hand-vetted production HTTP MCP servers (Stripe, Notion, GitHub, Linear, Vercel/v0, Supabase, Sentry, Atlassian, Neon, Figma). The matched entry registers as a discovered specialist with its real `mcp_endpoint`, so bid + execute proxy to that remote server via [`makeMcpForwardingSpecialist`](lib/specialists/mcp-forwarding.ts) — not a renamed in-process LLM.
+2. **Live MCP registry** ([`lib/specialists/mcp-registry.ts`](lib/specialists/mcp-registry.ts)) — open search against [registry.modelcontextprotocol.io](https://registry.modelcontextprotocol.io). Filters to HTTP-invocable transports (`streamable-http` / `sse`); LLM-ranks the results against the goal.
+3. **LLM synthesis** ([`lib/specialists/discover.ts`](lib/specialists/discover.ts)) — last-resort fallback when neither real source matches. Tagged `synthesized` in storage and clearly labeled in the UI so callers know it's a costumed LLM, not a real backend.
+
+Surfaces:
+
+- `POST /api/v1/suggest` — score the live registry for a free-form goal
+- `POST /api/v1/discover` — synthesize-or-find a specialist; persists by default
+- MCP tools `suggest_specialists` and `discover_specialist`
+- UI: type a brief, watch ranked agents appear under the form; click *Discover a new specialist* when match is weak
+
 ## Specialists — all 10 Nozomio sponsors
 
 Every sponsor on the hackathon roster is a specialist agent in this marketplace. The demo frames a 100+ MCP specialist market, then invites only the most relevant growth agents to each startup launch auction. Sponsors with **MCP ✓** have a verified endpoint configured; sponsors marked `soft` run as in-persona LLM agents pending an official MCP URL.

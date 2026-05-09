@@ -39,7 +39,11 @@ export const solicitBids = internalAction({
         cost_baseline: d.cost_baseline,
         starting_reputation: d.starting_reputation,
         one_liner: d.one_liner,
+        mcp_endpoint: d.mcp_endpoint,
+        mcp_api_key_env: d.mcp_api_key_env,
+        homepage_url: d.homepage_url,
         discovered: true,
+        discovery_source: d.discovery_source,
         discovered_for: d.discovered_for,
       };
       registerDiscoveredSpecialist(cfg);
@@ -236,7 +240,11 @@ export const execute = internalAction({
           cost_baseline: discoveredEntry.cost_baseline,
           starting_reputation: discoveredEntry.starting_reputation,
           one_liner: discoveredEntry.one_liner,
+          mcp_endpoint: discoveredEntry.mcp_endpoint,
+          mcp_api_key_env: discoveredEntry.mcp_api_key_env,
+          homepage_url: discoveredEntry.homepage_url,
           discovered: true,
+          discovery_source: discoveredEntry.discovery_source,
           discovered_for: discoveredEntry.discovered_for,
         });
       }

@@ -67,6 +67,13 @@ export interface DiscoverSpecialistArgs {
   task_type?: string;
   /** When false, the discovered config is returned but not persisted. */
   persist?: boolean;
+  /** When true, attempt tools/list against the chosen endpoint. */
+  verify?: boolean;
+  /**
+   * Restrict / reorder discovery sources. Default order:
+   * catalog → registry → synthesized.
+   */
+  preferred_sources?: Array<"catalog" | "registry" | "synthesized">;
 }
 
 // ─── tool definitions ─────────────────────────────────────────────────────
@@ -289,6 +296,10 @@ async function loadAllSpecialists(): Promise<SpecialistConfig[]> {
     starting_reputation: number;
     one_liner: string;
     discovered_for: string;
+    discovery_source?: "catalog" | "registry" | "synthesized";
+    mcp_endpoint?: string;
+    mcp_api_key_env?: string;
+    homepage_url?: string;
   }>;
   const discoveredConfigs: SpecialistConfig[] = discovered.map((d) => ({
     agent_id: d.agent_id,
@@ -299,7 +310,11 @@ async function loadAllSpecialists(): Promise<SpecialistConfig[]> {
     cost_baseline: d.cost_baseline,
     starting_reputation: d.starting_reputation,
     one_liner: d.one_liner,
+    mcp_endpoint: d.mcp_endpoint,
+    mcp_api_key_env: d.mcp_api_key_env,
+    homepage_url: d.homepage_url,
     discovered: true,
+    discovery_source: d.discovery_source,
     discovered_for: d.discovered_for,
   }));
   for (const cfg of discoveredConfigs) registerDiscoveredSpecialist(cfg);
@@ -326,11 +341,14 @@ export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
   }
   const persist = args.persist !== false;
   const existing = await loadAllSpecialists();
-  const cfg = await discoverSpecialist({
+  const result = await discoverSpecialist({
     query: args.prompt,
     taskType: args.task_type,
     existing,
+    verify: args.verify,
+    preferred_sources: args.preferred_sources,
   });
+  const cfg = result.specialist;
 
   let persisted = false;
   if (persist) {
@@ -345,6 +363,11 @@ export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
         starting_reputation: cfg.starting_reputation,
         one_liner: cfg.one_liner,
         discovered_for: cfg.discovered_for ?? args.prompt,
+        discovery_source: cfg.discovery_source,
+        mcp_endpoint: cfg.mcp_endpoint,
+        mcp_api_key_env: cfg.mcp_api_key_env,
+        homepage_url: cfg.homepage_url,
+        rationale: result.rationale,
       });
       registerDiscoveredSpecialist(cfg);
       persisted = true;
@@ -364,9 +387,16 @@ export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
       starting_reputation: cfg.starting_reputation,
       one_liner: cfg.one_liner,
       system_prompt: cfg.system_prompt,
+      mcp_endpoint: cfg.mcp_endpoint,
+      mcp_api_key_env: cfg.mcp_api_key_env,
+      homepage_url: cfg.homepage_url,
       discovered: true,
+      discovery_source: cfg.discovery_source,
       discovered_for: cfg.discovered_for,
     },
+    source: result.source,
+    rationale: result.rationale,
+    verified_tools: result.verified_tools,
     persisted,
   };
 }
