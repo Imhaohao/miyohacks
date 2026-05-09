@@ -29,8 +29,15 @@ interface JsonRpcRequest {
   params?: Record<string, unknown>;
 }
 
-function ok(id: string | number | null | undefined, result: unknown) {
-  return NextResponse.json({ jsonrpc: "2.0", id: id ?? null, result });
+interface JsonRpcEnvelope {
+  jsonrpc: "2.0";
+  id: string | number | null;
+  result?: unknown;
+  error?: { code: number; message: string; data?: unknown };
+}
+
+function ok(id: string | number | null | undefined, result: unknown): JsonRpcEnvelope {
+  return { jsonrpc: "2.0", id: id ?? null, result };
 }
 
 function err(
@@ -38,15 +45,11 @@ function err(
   code: number,
   message: string,
   data?: unknown,
-) {
-  return NextResponse.json({
-    jsonrpc: "2.0",
-    id: id ?? null,
-    error: { code, message, data },
-  });
+): JsonRpcEnvelope {
+  return { jsonrpc: "2.0", id: id ?? null, error: { code, message, data } };
 }
 
-async function handle(msg: JsonRpcRequest) {
+async function handle(msg: JsonRpcRequest): Promise<JsonRpcEnvelope | null> {
   const { id, method, params } = msg;
 
   switch (method) {
@@ -96,24 +99,23 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return err(null, -32700, "parse error");
+    return NextResponse.json(err(null, -32700, "parse error"));
   }
 
   if (Array.isArray(body)) {
-    const responses = (await Promise.all(body.map(handle))).filter(
-      (r): r is NextResponse => r !== null,
-    );
+    const responses: JsonRpcEnvelope[] = [];
+    for (const r of await Promise.all(body.map(handle))) {
+      if (r) responses.push(r);
+    }
     if (responses.length === 0) {
       return new NextResponse(null, { status: 202 });
     }
-    // For batched requests, return an array of the underlying JSON envelopes.
-    const payloads = await Promise.all(responses.map((r) => r.json()));
-    return NextResponse.json(payloads);
+    return NextResponse.json(responses);
   }
 
   const res = await handle(body);
   if (!res) return new NextResponse(null, { status: 202 });
-  return res;
+  return NextResponse.json(res);
 }
 
 export async function GET() {
