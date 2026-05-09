@@ -2,6 +2,8 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import type { TaskDoc, LifecycleEventDoc } from "@/lib/task-view";
 import { MarkdownLite } from "./MarkdownLite";
 import { CircleNotch } from "@phosphor-icons/react/dist/ssr";
+import { LaunchProduct } from "./LaunchProduct";
+import type { ExecutionArtifact } from "@/lib/types";
 
 interface Props {
   task: TaskDoc;
@@ -11,14 +13,15 @@ interface Props {
 interface ResultShape {
   text: string;
   agent_id: string;
+  artifact?: ExecutionArtifact;
 }
 
 function isResult(v: unknown): v is ResultShape {
   return (
     !!v &&
-    typeof v === "object" &&
-    "text" in v &&
-    typeof (v as Record<string, unknown>).text === "string"
+      typeof v === "object" &&
+      "text" in v &&
+      typeof (v as Record<string, unknown>).text === "string"
   );
 }
 
@@ -81,6 +84,7 @@ export function ExecutionPanel({ task, events }: Props) {
     : task.result
       ? JSON.stringify(task.result, null, 2)
       : "";
+  const artifact = isResult(task.result) ? task.result.artifact : undefined;
 
   return (
     <Card className="animate-fade-up">
@@ -92,7 +96,9 @@ export function ExecutionPanel({ task, events }: Props) {
           </span>
         }
       />
-      {text ? (
+      {artifact?.kind === "campaign_launch" ? (
+        <LaunchProduct artifact={artifact} />
+      ) : text ? (
         <MarkdownLite text={text} />
       ) : (
         <p className="text-sm text-ink-muted">No output captured</p>

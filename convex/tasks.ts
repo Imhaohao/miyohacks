@@ -6,6 +6,7 @@ import {
 } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { buildOrchestrationContext } from "../lib/orchestration-context";
 
 const BID_WINDOW_SECONDS = 15;
 
@@ -31,6 +32,9 @@ export const post = mutation({
     prompt: v.string(),
     max_budget: v.number(),
     output_schema: v.optional(v.any()),
+    business_context: v.optional(v.string()),
+    repo_context: v.optional(v.string()),
+    source_hints: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -46,6 +50,24 @@ export const post = mutation({
       bid_window_closes_at: closesAt,
     });
 
+    const orchestrationContext = buildOrchestrationContext({
+      prompt: args.prompt,
+      taskType: args.task_type ?? "general",
+      businessContext: args.business_context,
+      repoContext: args.repo_context,
+      sourceHints: args.source_hints,
+    });
+
+    await ctx.db.insert("task_contexts", {
+      task_id,
+      version: orchestrationContext.version,
+      business: orchestrationContext.business,
+      repo: orchestrationContext.repo,
+      routing: orchestrationContext.routing,
+      prompt_addendum: orchestrationContext.prompt_addendum,
+      created_at: now,
+    });
+
     await ctx.runMutation(internal.lifecycle.log, {
       task_id,
       event_type: "task_posted",
@@ -54,6 +76,12 @@ export const post = mutation({
         prompt: args.prompt,
         max_budget: args.max_budget,
       },
+    });
+
+    await ctx.runMutation(internal.lifecycle.log, {
+      task_id,
+      event_type: "context_enriched",
+      payload: orchestrationContext,
     });
 
     // Fan out bid requests immediately, then resolve when the window closes.

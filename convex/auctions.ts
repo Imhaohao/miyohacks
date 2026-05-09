@@ -12,8 +12,10 @@ import { MCP_CATALOG } from "../lib/specialists/catalog";
 import type {
   AgentId,
   BidPayload,
+  ExecutionArtifact,
   JudgeVerdict,
   SpecialistConfig,
+  SpecialistOutput,
 } from "../lib/types";
 import { callOpenAIJSON } from "../lib/openai";
 import {
@@ -23,6 +25,17 @@ import {
 
 const BUYER_ID = "buyer:default";
 
+function normalizeSpecialistOutput(output: SpecialistOutput): {
+  text: string;
+  artifact?: ExecutionArtifact;
+} {
+  if (typeof output === "string") return { text: output };
+  return {
+    text: output.summary,
+    artifact: output,
+  };
+}
+
 // ─── Phase 2: bid solicitation ───────────────────────────────────────────
 
 export const solicitBids = internalAction({
@@ -31,6 +44,13 @@ export const solicitBids = internalAction({
     const task = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
     });
+
+    const taskContext = await ctx.runQuery(internal.taskContexts._latestForTask, {
+      task_id: args.task_id,
+    });
+    const promptForAgents = taskContext
+      ? `${task.prompt}\n\n---\n\n${taskContext.prompt_addendum}`
+      : task.prompt;
 
     const discovered = await ctx.runQuery(api.discoveredSpecialists.list, {});
     const discoveredConfigs: SpecialistConfig[] = discovered.map((d) => {
@@ -116,7 +136,7 @@ export const solicitBids = internalAction({
         const reputation = agent?.reputation_score ?? spec.starting_reputation;
 
         try {
-          const decision = await runner.bid(task.prompt, task.task_type);
+          const decision = await runner.bid(promptForAgents, task.task_type);
           if ("decline" in decision) {
             await ctx.runMutation(internal.lifecycle.log, {
               task_id: args.task_id,
@@ -260,6 +280,12 @@ export const execute = internalAction({
     if (!task.winning_bid_id) {
       throw new Error("execute called without a winning bid");
     }
+    const taskContext = await ctx.runQuery(internal.taskContexts._latestForTask, {
+      task_id: args.task_id,
+    });
+    const promptForExecution = taskContext
+      ? `${task.prompt}\n\n---\n\n${taskContext.prompt_addendum}`
+      : task.prompt;
     const winner = await ctx.runQuery(internal.bids._get, {
       bid_id: task.winning_bid_id,
     });
@@ -303,20 +329,25 @@ export const execute = internalAction({
       // Nia), so 60s would force a timeout before they finish. Plain
       // (mock) specialists return well under this.
       const result = await Promise.race([
-        runner.execute(task.prompt, task.task_type),
-        new Promise<string>((_, reject) =>
+        runner.execute(promptForExecution, task.task_type),
+        new Promise<SpecialistOutput>((_, reject) =>
           setTimeout(() => reject(new Error("execution timeout (180s)")), 180_000),
         ),
       ]);
+      const normalized = normalizeSpecialistOutput(result);
 
       await ctx.runMutation(internal.tasks._setResult, {
         task_id: args.task_id,
-        result: { text: result, agent_id: winner.agent_id },
+        result: {
+          text: normalized.text,
+          agent_id: winner.agent_id,
+          artifact: normalized.artifact,
+        },
       });
       await ctx.runMutation(internal.lifecycle.log, {
         task_id: args.task_id,
         event_type: "execution_complete",
-        payload: { agent_id: winner.agent_id, length: result.length },
+        payload: { agent_id: winner.agent_id, length: normalized.text.length },
       });
 
       // Phase 5 — judge.
@@ -372,7 +403,12 @@ export const judge = internalAction({
       status: "judging",
     });
 
+    const taskContext = await ctx.runQuery(internal.taskContexts._latestForTask, {
+      task_id: args.task_id,
+    });
+
     const userPrompt = [
+      taskContext ? taskContext.prompt_addendum : null,
       task.task_type === "reacher-live-launch"
         ? "This is the live Reacher proof workflow. The seeded demo creators in the generic campaign evidence are illustrative only. Do not reject merely because the agent used different creators. For this workflow, prefer live Reacher MCP evidence from tools such as list_shops_shops_get, creators_performance_creators_performance_post, and creators_list_creators_list_post. Accept if the output cites those live tool results and includes a creator shortlist, outreach drafts, sample notes, risk flags, and a 7-day launch plan."
         : null,
