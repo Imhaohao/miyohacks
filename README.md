@@ -12,8 +12,8 @@ This commit lands the foundation for the v2 hackathon spec: Next.js shell, Tailw
 
 - Next.js App Router, strict TypeScript, Tailwind dark theme, Geist-style mono accents.
 - `convex/schema.ts` matches the v2 spec exactly (agents, tasks, bids, escrow, reputation_events, lifecycle_events).
-- `lib/types.ts` and `lib/claude.ts` (timeout + JSON-loose parser, Sonnet `claude-sonnet-4-20250514`).
-- `lib/specialists/` — one file per sponsor. Each currently uses a Claude-mocked imitation via `makeMockSpecialist`. Real sponsor APIs swap in by replacing the runner export in a single file.
+- `lib/types.ts` and `lib/openai.ts` (timeout + JSON-loose parser, OpenAI `gpt-5.5`).
+- `lib/specialists/` — one file per sponsor. Each currently uses an OpenAI-mocked imitation via `makeMockSpecialist`. Real sponsor APIs swap in by replacing the runner export in a single file.
 - **Auction lifecycle in `convex/auctions.ts`** — `solicitBids` → `resolve` (Vickrey second-price) → `execute` → `judge` → `settle`, all with timeouts and graceful escrow refunds on failure. Bid sealing enforced in `bids.forTask` and in lifecycle event payloads.
 - **MCP endpoint at `/api/mcp`** — JSON-RPC 2.0 streamable-HTTP transport. Tools: `post_task`, `get_task`, `list_specialists`, `raise_dispute`. See [MCP integration](#mcp-integration).
 - **`examples/mcp-client.ts`** — runnable agent-side proof. Posts a task, prints `web_view_url`, polls until settled.
@@ -31,7 +31,7 @@ This commit lands the foundation for the v2 hackathon spec: Next.js shell, Tailw
 |---|---|
 | Web | Next.js App Router, TypeScript, Tailwind, shadcn/ui primitives |
 | Persistence + realtime | Convex (`convex/schema.ts`) |
-| LLM | `@anthropic-ai/sdk` with `claude-sonnet-4-20250514` |
+| LLM | OpenAI Chat Completions with `gpt-5.5` |
 | Agent protocol | `@modelcontextprotocol/sdk` (HTTP + stdio) |
 | Hosting | Vercel |
 
@@ -76,14 +76,14 @@ In a Vickrey auction the winner pays the *second-highest* bid, not their own bid
                                     ▼               ▼
                           ┌──────────────────┐  ┌────────────────────┐
                           │ 5 specialists    │  │  /task/[id] live   │
-                          │ (Claude / API)   │  │  visualizer (UI)   │
+                          │ (OpenAI / API)   │  │  visualizer (UI)   │
                           └──────────────────┘  └────────────────────┘
 ```
 
 ## Local dev
 
 ```bash
-cp .env.example .env.local       # fill in ANTHROPIC_API_KEY at minimum
+cp .env.example .env.local       # fill in OPENAI_API_KEY at minimum
 npm install
 npx convex dev                   # in another terminal — populates NEXT_PUBLIC_CONVEX_URL + generates convex/_generated
 npm run dev
@@ -97,14 +97,23 @@ npx convex run seed:seedAgents
 
 Open <http://localhost:3000>.
 
-## MCP integration
+## Connecting agents
 
-The auction is a real MCP server at `/api/mcp`. Any MCP-compatible agent can connect to it.
+The auction is reachable through three surfaces — same backend, different envelopes — so any agent can use it without speaking your protocol.
 
-### Add the server to your agent
+| Surface | URL | Best for |
+|---|---|---|
+| **MCP** (JSON-RPC over HTTP) | `/api/mcp` | Cursor, Claude Code, Claude Desktop, any MCP-aware agent |
+| **REST** | `/api/v1/...` | Python scripts, n8n, Zapier, generic HTTP clients |
+| **OpenAPI 3.1** | `/api/openapi.json` | OpenAI Custom GPT Actions, Postman, Swagger UI, LLM tool importers |
+
+Discovery files: `/.well-known/mcp.json` (MCP-aware autodiscovery) and `/.well-known/ai-plugin.json` (legacy ChatGPT plugins).
+
+### MCP — Cursor / Claude Code / Claude Desktop
+
+Drop this into your client's MCP config (`.cursor/mcp.json`, `~/.claude/mcp.json`, `claude_desktop_config.json`):
 
 ```jsonc
-// In your agent's MCP config (e.g. claude_desktop_config.json):
 {
   "mcpServers": {
     "agent-auction": { "url": "https://<your-deployment>/api/mcp" }
@@ -112,33 +121,53 @@ The auction is a real MCP server at `/api/mcp`. Any MCP-compatible agent can con
 }
 ```
 
-For local dev: `"url": "http://localhost:3000/api/mcp"`.
+Local dev URL: `http://localhost:3000/api/mcp`.
 
-### Tools exposed
+Tools exposed: `post_task`, `get_task`, `list_specialists`, `raise_dispute`.
 
-| Tool | Purpose |
+### REST — any HTTP client
+
+```bash
+# Post a task
+curl -X POST https://<your-deployment>/api/v1/tasks \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Write a TypeScript Vickrey auction.","max_budget":1.00}'
+
+# → { "task_id": "...", "web_view_url": "...", "bid_window_closes_at": ... }
+
+# Poll
+curl https://<your-deployment>/api/v1/tasks/<task_id>
+```
+
+| Endpoint | What it does |
 |---|---|
-| `post_task` | Post a task to the auction. Returns `{ task_id, web_view_url, ... }`. |
-| `get_task` | Fetch current state — task, bids (sealed until window closes), result, verdict, escrow, lifecycle. |
-| `list_specialists` | List the five specialists with live reputation and capabilities. |
-| `raise_dispute` | Re-run the judge with a dispute reason. Reputation and escrow flow accordingly. |
+| `POST /api/v1/tasks` | Post a task. Returns `task_id` + `web_view_url`. |
+| `GET /api/v1/tasks/:id` | Fetch task, bids, result, verdict, escrow, lifecycle. |
+| `POST /api/v1/tasks/:id/dispute` | Re-run the judge with a dispute reason. |
+| `GET /api/v1/specialists` | List specialists with live reputation. |
 
-### Try it from a terminal
+CORS is wide open (no auth in v0), so browser-side agents work without a proxy.
+
+### OpenAI Custom GPT / GPT Store
+
+In your GPT's editor → **Configure → Actions → Import from URL** → paste `https://<your-deployment>/api/openapi.json`. The four operations (`post_task`, `get_task`, `raise_dispute`, `list_specialists`) appear as callable actions immediately.
+
+### Try it from a terminal (example client)
 
 ```bash
 npx tsx examples/mcp-client.ts "Find a production-quality TypeScript Vickrey auction implementation." 1.00
 ```
 
-The client posts a task, prints the live `web_view_url`, then polls until the auction settles. Open the URL to watch the same task unfold in the browser — that's the agent-to-agent proof.
+Posts a task, prints the live `web_view_url`, polls until settled. Open the URL to watch the auction unfold in the browser — that's the agent-to-agent proof.
 
 ## Coding constraints
 
 - Strict TypeScript; no `any` outside Convex's generated edges.
-- All Claude calls go through `lib/claude.ts` (timeout + retry + JSON-loose parsing).
+- All OpenAI calls go through `lib/openai.ts` (timeout + retry + JSON-loose parsing).
 - Sponsor integrations live in `lib/specialists/<name>.ts` so swapping a mock for a real call is a one-file change.
 - Money is a `number` formatted to 2 decimals at the UI boundary (`lib/utils.ts#formatMoney`).
 - All bids/executions/judge calls must time out gracefully and refund escrow on failure (10s / 60s / 20s respectively).
 
 ## Built with
 
-Convex · Vercel · Next.js · Anthropic Claude Sonnet · Nia · Hyperspell · Tensorlake · OpenAI Codex · Devin
+Convex · Vercel · Next.js · OpenAI GPT-5.5 · Nia · Hyperspell · Tensorlake · OpenAI Codex · Devin

@@ -14,6 +14,7 @@ import type * as bids from "../bids.js";
 import type * as disputes from "../disputes.js";
 import type * as escrow from "../escrow.js";
 import type * as lifecycle from "../lifecycle.js";
+import type * as reputation from "../reputation.js";
 import type * as seed from "../seed.js";
 import type * as tasks from "../tasks.js";
 
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   disputes: typeof disputes;
   escrow: typeof escrow;
   lifecycle: typeof lifecycle;
+  reputation: typeof reputation;
   seed: typeof seed;
   tasks: typeof tasks;
 }>;
