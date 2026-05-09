@@ -195,7 +195,7 @@ export function makeMcpForwardingSpecialist(
         return await callPlain(
           sys,
           buildTaskContext(prompt, taskType),
-          1500,
+          4000,
           60_000,
         );
       }
@@ -267,14 +267,17 @@ export function makeMcpForwardingSpecialist(
         content:
           "You've used your tool-call budget. Synthesize your final answer now in markdown, citing what you found via the MCP tools.",
       });
+      // gpt-5.5's max_completion_tokens includes reasoning tokens, so a 1500
+      // cap can leave only ~200 visible tokens after even minimal reasoning
+      // — that's why short outputs were getting truncated mid-sentence.
       const final = await chatCompletion(
         {
           model: MODEL,
           messages,
-          max_completion_tokens: 1500,
+          max_completion_tokens: 4000,
           reasoning_effort: "none",
         },
-        30_000,
+        45_000,
       );
       return (final.choices[0]?.message?.content ?? "").trim();
     },

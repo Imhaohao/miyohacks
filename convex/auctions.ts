@@ -349,7 +349,12 @@ export const execute = internalAction({
 const JUDGE_GENERAL_PROMPT = `You are an impartial judge for a general-purpose agent marketplace. The user described a goal in their own words; a specialist agent produced a deliverable. Decide whether the deliverable actually addresses the user's goal in a useful, specific, well-reasoned way. Output JSON only:
 { "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
 
-Be strict but fair. Reject if the agent produced a generic specialty pitch instead of doing the actual task (e.g. a creator shortlist when the user asked about Stripe), if the deliverable is vague hand-waving, or if it ignores explicit constraints. Accept when it materially advances the user's goal even if imperfect.`;
+Strict rules for your reasoning paragraph:
+- Describe ONLY content that is literally present in the agent's output. Do not invent topics, sections, or shortcomings.
+- Quote or paraphrase specific phrases from the output to ground every claim you make.
+- If the output is shorter than expected, say so plainly — don't fabricate missing content.
+
+Reject when the deliverable is off-topic from the goal, vague hand-waving, ignores an explicit constraint the user stated, or is so incomplete it can't be used. Accept when the output materially advances the user's goal — perfection is not required.`;
 
 const JUDGE_CAMPAIGN_PROMPT = `You are an impartial judge for a creator-campaign workflow. Evaluate whether the winning agent output satisfies the campaign brief and is grounded in Reacher TikTok Shop evidence plus Nia-backed context. Output JSON only:
 { "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }

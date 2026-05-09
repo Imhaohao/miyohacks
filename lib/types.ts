@@ -18,10 +18,12 @@ export type AgentId = KnownAgentId | (string & {});
 
 export type TaskStatus =
   | "open"
+  | "planning"
   | "bidding"
   | "awarded"
   | "executing"
   | "judging"
+  | "synthesizing"
   | "complete"
   | "disputed"
   | "failed";
