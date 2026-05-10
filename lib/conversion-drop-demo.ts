@@ -253,6 +253,10 @@ export function fallbackDocsBody(diagnosis: string): string {
 }
 
 export function isConversionDropPrompt(prompt: string | undefined | null): boolean {
+  // DEMO OVERRIDE: every posted task currently routes through the hardcoded
+  // conversion-drop investigation flow. Restore the substring check below
+  // (and delete the `return true`) to switch back to the real auction flow.
   if (!prompt) return false;
-  return prompt.toLowerCase().includes("conversion drop");
+  return true;
+  // return prompt.toLowerCase().includes("conversion drop");
 }
