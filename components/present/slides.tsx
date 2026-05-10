@@ -1,14 +1,10 @@
 import type { ReactNode } from "react";
 import { Tree } from "@phosphor-icons/react/dist/ssr";
 import {
-  Lightning,
-  CurrencyDollar,
-  Crosshair,
   EnvelopeSimple,
-  ChatCircleDots,
+  SlackLogo,
   GoogleDriveLogo,
   FileCode,
-  Brain,
   GitBranch,
   Files,
   Database,
@@ -16,10 +12,7 @@ import {
   Trophy,
   Sparkle,
   ArrowRight,
-  X,
-  Camera,
   CheckCircle,
-  Warning,
   TrendDown,
   TrendUp,
 } from "@phosphor-icons/react";
@@ -44,7 +37,7 @@ function Stage({
       }`}
     >
       {eyebrow && (
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand-700 animate-fade-down">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700 animate-fade-down">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-600" />
           {eyebrow}
         </div>
@@ -57,11 +50,13 @@ function Stage({
 function Headline({
   children,
   size = "lg",
+  className = "",
 }: {
   children: ReactNode;
   size?: "md" | "lg" | "xl";
+  className?: string;
 }) {
-  const cls =
+  const sizeCls =
     size === "xl"
       ? "text-[clamp(3rem,7vw,6rem)] leading-[1.02]"
       : size === "lg"
@@ -69,20 +64,14 @@ function Headline({
         : "text-[clamp(1.75rem,3.5vw,3rem)] leading-[1.1]";
   return (
     <h2
-      className={`max-w-[20ch] font-display font-semibold tracking-tight text-ink ${cls}`}
+      className={`max-w-[22ch] font-display font-semibold tracking-tight text-ink ${sizeCls} ${className}`}
     >
       {children}
     </h2>
   );
 }
 
-function Sub({ children }: { children: ReactNode }) {
-  return (
-    <p className="mt-6 max-w-[44ch] text-[clamp(1rem,1.4vw,1.4rem)] leading-relaxed text-ink-muted animate-fade-up [animation-delay:200ms]">
-      {children}
-    </p>
-  );
-}
+/* ---------- Brand marks ----------------------------------------- */
 
 function ArborLogo({ size = 1 }: { size?: number }) {
   return (
@@ -103,6 +92,53 @@ function ArborLogo({ size = 1 }: { size?: number }) {
   );
 }
 
+function HyperspellLogo({ size = 1 }: { size?: number }) {
+  return (
+    <span className="inline-flex items-center gap-3 text-ink">
+      <span
+        className="inline-flex items-center justify-center rounded-2xl text-white shadow-card"
+        style={{
+          width: 56 * size,
+          height: 56 * size,
+          background: "linear-gradient(135deg,#7c3aed 0%,#c026d3 100%)",
+        }}
+      >
+        <Sparkle size={26 * size} weight="fill" />
+      </span>
+      <span
+        className="font-display font-bold tracking-tight"
+        style={{ fontSize: 36 * size }}
+      >
+        hyperspell
+      </span>
+    </span>
+  );
+}
+
+function NiaLogo({ size = 1 }: { size?: number }) {
+  return (
+    <span className="inline-flex items-center gap-3 text-ink">
+      <span
+        className="inline-flex items-center justify-center rounded-2xl bg-ink text-white shadow-card"
+        style={{ width: 56 * size, height: 56 * size }}
+      >
+        <span
+          className="font-display font-bold leading-none"
+          style={{ fontSize: 30 * size }}
+        >
+          n
+        </span>
+      </span>
+      <span
+        className="font-display font-bold tracking-tight"
+        style={{ fontSize: 36 * size }}
+      >
+        nia
+      </span>
+    </span>
+  );
+}
+
 /* ---------------------------------------------------------------- */
 /* Slides                                                            */
 /* ---------------------------------------------------------------- */
@@ -116,9 +152,6 @@ function CoverSlide() {
       <p className="mt-10 max-w-[28ch] font-display text-[clamp(1.5rem,2.6vw,2.4rem)] font-medium leading-tight text-ink-soft animate-fade-up [animation-delay:300ms]">
         Find the right specialist for any task.
       </p>
-      <p className="mt-4 text-sm font-medium uppercase tracking-[0.32em] text-ink-subtle animate-fade-up [animation-delay:600ms]">
-        A marketplace for specialized agents
-      </p>
     </Stage>
   );
 }
@@ -129,167 +162,48 @@ function ProblemSlide() {
       <Headline size="xl">
         You&apos;re <span className="text-brand-600">overpaying</span> the generalist.
       </Headline>
-      <Sub>
-        A Stripe specialist doesn&apos;t need to know Java syntax. A frontend
-        agent doesn&apos;t need to think about the Norwegian chocolate industry.
-      </Sub>
     </Stage>
   );
 }
 
 function SpecialistsWinSlide() {
-  const items = [
-    {
-      icon: Lightning,
-      title: "Faster",
-      copy: "Less to load, less to think about, less to retrieve.",
-    },
-    {
-      icon: CurrencyDollar,
-      title: "Cheaper",
-      copy: "Smaller models, narrower scope, fraction of the cost.",
-    },
-    {
-      icon: Crosshair,
-      title: "More accurate",
-      copy: "Tuned on the exact domain. Wins on the metric that matters.",
-    },
-  ];
   return (
-    <Stage eyebrow="What specialists give you">
-      <Headline>Better results, for a fraction of the cost.</Headline>
-      <div className="deck-stagger mt-14 grid w-full max-w-5xl grid-cols-3 gap-6">
-        {items.map((it) => (
-          <div
-            key={it.title}
-            className="rounded-3xl bg-white p-7 text-left shadow-card"
-          >
-            <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
-              <it.icon size={22} weight="bold" />
-            </div>
-            <div className="mt-5 font-display text-2xl font-semibold text-ink">
-              {it.title}
-            </div>
-            <div className="mt-2 text-base text-ink-muted">{it.copy}</div>
-          </div>
-        ))}
-      </div>
+    <Stage>
+      <Headline size="xl">
+        Faster.
+        <br />
+        Cheaper.
+        <br />
+        <span className="text-brand-600">More accurate.</span>
+      </Headline>
     </Stage>
   );
 }
 
 function ImpracticalSlide() {
+  const items = [
+    "Sign up for 10+ providers",
+    "Stitch context across them",
+    "Orchestrate by hand (yuck)",
+  ];
   return (
     <Stage eyebrow="The catch">
-      <Headline>
-        But actually using them is{" "}
-        <span className="text-danger">impractical</span>.
+      <Headline size="lg">
+        But using them is <span className="text-danger">impractical</span>.
       </Headline>
-      <div className="mt-12 grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-10">
-        {/* Left: chaos */}
-        <div className="rounded-3xl bg-surface-subtle p-8 shadow-hairline">
-          <div className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-ink-muted">
-            Doing it yourself
-          </div>
-          <div className="relative h-64">
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-ink shadow-card">
-              You
-            </div>
-            {/* messy connecting lines */}
-            <svg
-              viewBox="0 0 400 240"
-              className="absolute inset-0 h-full w-full"
-              fill="none"
-            >
-              {[
-                "M200 120 L 40 30",
-                "M200 120 L 80 200",
-                "M200 120 L 360 30",
-                "M200 120 L 320 200",
-                "M200 120 L 30 130",
-                "M200 120 L 380 130",
-                "M200 120 L 200 20",
-                "M200 120 L 200 220",
-                "M200 120 L 130 230",
-                "M200 120 L 280 220",
-              ].map((d, i) => (
-                <path
-                  key={i}
-                  d={d}
-                  stroke="#cbd5e1"
-                  strokeWidth="1.5"
-                  strokeDasharray="4 4"
-                />
-              ))}
-            </svg>
-            {/* providers */}
-            {[
-              { x: "5%", y: "8%", label: "Stripe agent" },
-              { x: "78%", y: "6%", label: "SQL agent" },
-              { x: "0%", y: "48%", label: "DB agent" },
-              { x: "84%", y: "48%", label: "DevOps" },
-              { x: "12%", y: "82%", label: "QA agent" },
-              { x: "70%", y: "82%", label: "Linter" },
-              { x: "44%", y: "0%", label: "Frontend" },
-              { x: "44%", y: "88%", label: "Email" },
-            ].map((p) => (
-              <div
-                key={p.label}
-                className="absolute rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-ink-soft shadow-hairline"
-                style={{ left: p.x, top: p.y }}
-              >
-                {p.label}
-              </div>
-            ))}
-          </div>
-          <ul className="mt-6 space-y-2 text-sm text-ink-muted">
-            <li className="flex items-center gap-2">
-              <X size={14} weight="bold" className="text-danger" />
-              Sign up for 10+ providers
-            </li>
-            <li className="flex items-center gap-2">
-              <X size={14} weight="bold" className="text-danger" />
-              Stitch context across them
-            </li>
-            <li className="flex items-center gap-2">
-              <X size={14} weight="bold" className="text-danger" />
-              Orchestrate by hand (yuck)
-            </li>
-          </ul>
-        </div>
-
-        {/* OR */}
-        <div className="font-display text-xl font-medium text-ink-faint">vs.</div>
-
-        {/* Right: just-claude */}
-        <div className="rounded-3xl bg-surface-subtle p-8 shadow-hairline">
-          <div className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-ink-muted">
-            What people actually do
-          </div>
-          <div className="relative flex h-64 items-center justify-center">
-            <div className="rounded-2xl bg-white px-6 py-4 text-center shadow-card">
-              <div className="text-sm font-semibold text-ink">
-                One big generalist
-              </div>
-              <div className="mt-1 text-xs text-ink-muted">Easy. Expensive.</div>
-            </div>
-          </div>
-          <ul className="mt-6 space-y-2 text-sm text-ink-muted">
-            <li className="flex items-center gap-2">
-              <CheckCircle size={14} weight="fill" className="text-success" />
-              One bill, one API
-            </li>
-            <li className="flex items-center gap-2">
-              <Warning size={14} weight="fill" className="text-warning" />
-              Pays for context it&apos;ll never use
-            </li>
-            <li className="flex items-center gap-2">
-              <Warning size={14} weight="fill" className="text-warning" />
-              Mediocre on every domain
-            </li>
-          </ul>
-        </div>
-      </div>
+      <ul className="deck-stagger mt-14 flex flex-col gap-5">
+        {items.map((label) => (
+          <li
+            key={label}
+            className="flex items-center gap-4 font-display text-[clamp(1.5rem,2.8vw,2.4rem)] font-medium text-ink"
+          >
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-danger/10 text-danger">
+              <span className="text-xl font-bold leading-none">×</span>
+            </span>
+            {label}
+          </li>
+        ))}
+      </ul>
     </Stage>
   );
 }
@@ -297,20 +211,15 @@ function ImpracticalSlide() {
 function ArborRevealSlide() {
   return (
     <Stage>
-      <div
-        style={{ animation: "deck-pop 700ms cubic-bezier(0.22,1,0.36,1) both" }}
-      >
+      <div style={{ animation: "deck-pop 700ms cubic-bezier(0.22,1,0.36,1) both" }}>
         <ArborLogo size={1.4} />
       </div>
-      <Headline size="md">
-        <span className="text-ink-muted">A marketplace where </span>
-        <span className="text-ink">specialists bid</span>
-        <span className="text-ink-muted"> for your work.</span>
-      </Headline>
-      <Sub>
-        Describe the task. Arbor splits it, runs an auction, and routes each
-        subtask to the agent best fit to ship it.
-      </Sub>
+      <div className="mt-12 animate-fade-up [animation-delay:300ms]">
+        <Headline size="md">
+          Efficiency through unified access to{" "}
+          <span className="text-brand-600">specialized agents</span>.
+        </Headline>
+      </div>
     </Stage>
   );
 }
@@ -322,7 +231,7 @@ function FlowStep({
   label,
   delay,
 }: {
-  icon: typeof Brain;
+  icon: typeof Sparkle;
   label: string;
   delay: number;
 }) {
@@ -371,10 +280,6 @@ function HowItWorksSlide() {
         <FlowArrow delay={1200} />
         <FlowStep icon={CheckCircle} label="Evaluate" delay={1320} />
       </div>
-      <p className="mt-10 max-w-[60ch] text-base text-ink-muted animate-fade-up [animation-delay:1500ms]">
-        Each subtask gets its own auction. Specialists bid with a price and a
-        plan. Arbor picks the best fit and the work begins.
-      </p>
     </Stage>
   );
 }
@@ -398,7 +303,7 @@ function AuctionCard({
 }) {
   return (
     <div
-      className={`relative rounded-2xl border bg-white p-5 text-left shadow-card transition-all ${
+      className={`relative rounded-2xl border bg-white p-6 text-left shadow-card transition-all ${
         winner ? "border-brand-600 ring-4 ring-brand-100" : "border-line"
       }`}
       style={{
@@ -407,8 +312,8 @@ function AuctionCard({
       }}
     >
       {winner && (
-        <span className="absolute -top-3 left-5 inline-flex items-center gap-1 rounded-full bg-brand-600 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
-          <Trophy size={11} weight="fill" /> Winner
+        <span className="absolute -top-3 left-5 inline-flex items-center gap-1 rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white">
+          <Trophy size={12} weight="fill" /> winner
         </span>
       )}
       <div className="flex items-center justify-between">
@@ -417,13 +322,27 @@ function AuctionCard({
           {bid}
         </div>
       </div>
-      <div className="mt-2 text-sm text-ink-muted">{pitch}</div>
-      <div className="mt-4 flex items-center gap-2 text-xs text-ink-subtle">
-        <span>Reputation</span>
-        <div className="score-bar w-32">
-          <span style={{ width: `${rep}%` }} />
+      <div className="mt-2 text-sm text-ink-soft">{pitch}</div>
+      <div className="mt-5">
+        <div className="mb-1.5 flex items-end justify-between">
+          <span className="text-sm font-semibold text-ink">Reputation</span>
+          <span
+            className={`font-display text-xl font-bold tabular-nums ${
+              winner ? "text-brand-700" : "text-ink"
+            }`}
+          >
+            {rep}
+          </span>
         </div>
-        <span className="tabular-nums">{rep}</span>
+        <div
+          className="relative h-3 w-full overflow-hidden rounded-full bg-surface-sunken"
+          aria-hidden
+        >
+          <span
+            className="absolute inset-y-0 left-0 block rounded-full bg-brand-600 transition-[width] duration-700 ease-out"
+            style={{ width: `${rep}%` }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -432,42 +351,30 @@ function AuctionCard({
 function AuctionSlide() {
   return (
     <Stage eyebrow="The auction">
-      <Headline size="md">
-        Specialists bid. Arbor picks the best fit.
-      </Headline>
-      <div className="mt-12 w-full max-w-5xl">
-        <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-ink shadow-card">
-          <Sparkle size={14} weight="fill" className="text-brand-600" />
-          Subtask: <span className="text-ink-muted">Find the regression in the upgrade flow</span>
-        </div>
-        <div className="grid grid-cols-3 gap-5">
-          <AuctionCard
-            name="StripeOps"
-            bid="$0.40"
-            pitch="Audit Stripe webhook + payment intents."
-            rep={71}
-            delay={300}
-          />
-          <AuctionCard
-            name="FlowDoctor"
-            bid="$0.18"
-            pitch="Diff the funnel events from the deploy date."
-            rep={92}
-            winner
-            delay={500}
-          />
-          <AuctionCard
-            name="Generalist-XL"
-            bid="$3.20"
-            pitch="Try a few things and see what sticks."
-            rep={54}
-            delay={700}
-          />
-        </div>
-        <p className="mt-10 max-w-[58ch] text-center text-base text-ink-muted animate-fade-up [animation-delay:900ms]">
-          Optimize for low cost, high reputation, and best fit. The winner
-          starts work immediately.
-        </p>
+      <Headline size="md">Choose the best specialist in an auction.</Headline>
+      <div className="mt-12 grid w-full max-w-5xl grid-cols-3 gap-5">
+        <AuctionCard
+          name="StripeOps"
+          bid="$0.40"
+          pitch="Audit Stripe webhook + payment intents."
+          rep={71}
+          delay={300}
+        />
+        <AuctionCard
+          name="FlowDoctor"
+          bid="$0.18"
+          pitch="Diff the funnel events from the deploy date."
+          rep={92}
+          winner
+          delay={500}
+        />
+        <AuctionCard
+          name="Generalist-XL"
+          bid="$3.20"
+          pitch="Try a few things and see what sticks."
+          rep={54}
+          delay={700}
+        />
       </div>
     </Stage>
   );
@@ -484,7 +391,6 @@ function ReputationSlide() {
       </Headline>
 
       <div className="mt-14 grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-stretch gap-8">
-        {/* Up branch */}
         <div
           className="rounded-3xl bg-white p-7 shadow-card"
           style={{ animation: "fade-up 0.6s ease-out both", animationDelay: "200ms" }}
@@ -492,21 +398,22 @@ function ReputationSlide() {
           <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-success/10 text-success">
             <TrendUp size={20} weight="bold" />
           </div>
-          <div className="mt-4 font-display text-xl font-semibold text-ink">
-            Cheap & correct
+          <div className="mt-4 font-display text-2xl font-semibold text-ink">
+            Cheap &amp; correct
           </div>
-          <div className="mt-2 text-base text-ink-muted">
-            Reputation goes up. Wins more bids next time.
-          </div>
-          <div className="mt-5 flex items-center gap-3 text-xs text-ink-subtle">
-            <div className="score-bar w-full">
-              <span style={{ width: "84%" }} />
+          <div className="mt-5 flex items-center gap-3 text-sm">
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-surface-sunken">
+              <span
+                className="absolute inset-y-0 left-0 block rounded-full bg-brand-600"
+                style={{ width: "84%" }}
+              />
             </div>
-            <span className="tabular-nums">84</span>
+            <span className="font-display text-xl font-bold tabular-nums text-brand-700">
+              84
+            </span>
           </div>
         </div>
 
-        {/* Center loop */}
         <div className="flex items-center justify-center">
           <div
             className="relative h-40 w-40"
@@ -522,25 +429,17 @@ function ReputationSlide() {
                 strokeWidth="2"
                 strokeDasharray="6 8"
               />
-              <path
-                d="M80 18 L 88 26 L 72 26 Z"
-                fill="#1877f2"
-              />
+              <path d="M80 18 L 88 26 L 72 26 Z" fill="#1877f2" />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <div className="font-display text-3xl font-bold text-brand-700">
-                  ↻
-                </div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                  evaluate
-                </div>
+                <div className="font-display text-4xl font-bold text-brand-700">↻</div>
+                <div className="mt-1 text-sm font-semibold text-ink">evaluate</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Down branch */}
         <div
           className="rounded-3xl bg-white p-7 shadow-card"
           style={{ animation: "fade-up 0.6s ease-out both", animationDelay: "600ms" }}
@@ -548,17 +447,19 @@ function ReputationSlide() {
           <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-danger/10 text-danger">
             <TrendDown size={20} weight="bold" />
           </div>
-          <div className="mt-4 font-display text-xl font-semibold text-ink">
+          <div className="mt-4 font-display text-2xl font-semibold text-ink">
             Overspent or failed
           </div>
-          <div className="mt-2 text-base text-ink-muted">
-            Reputation drops. Less likely to win the next auction.
-          </div>
-          <div className="mt-5 flex items-center gap-3 text-xs text-ink-subtle">
-            <div className="score-bar w-full">
-              <span style={{ width: "26%", backgroundColor: "#ef4444" }} />
+          <div className="mt-5 flex items-center gap-3 text-sm">
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-surface-sunken">
+              <span
+                className="absolute inset-y-0 left-0 block rounded-full"
+                style={{ width: "26%", backgroundColor: "#ef4444" }}
+              />
             </div>
-            <span className="tabular-nums">26</span>
+            <span className="font-display text-xl font-bold tabular-nums text-danger">
+              26
+            </span>
           </div>
         </div>
       </div>
@@ -570,16 +471,9 @@ function EvolvingSlide() {
   return (
     <Stage>
       <Headline size="xl">
-        Best agents.
-        <br />
-        Lowest cost.
-        <br />
-        <span className="text-brand-600">Always.</span>
+        Arbor is{" "}
+        <span className="text-brand-600">constantly evolving</span>.
       </Headline>
-      <Sub>
-        Arbor is a constantly evolving market. The agents that ship the cheapest,
-        highest-quality work float to the top — automatically.
-      </Sub>
     </Stage>
   );
 }
@@ -595,21 +489,18 @@ function DemoScenarioSlide() {
           <EnvelopeSimple size={22} weight="bold" />
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+          <div className="text-sm font-medium text-ink-muted">
             New email · 2 minutes ago
           </div>
           <div className="mt-1 font-display text-2xl font-semibold text-ink">
             Conversion drop on the upgrade flow
           </div>
-          <div className="mt-3 text-base text-ink-muted">
+          <div className="mt-3 text-base text-ink-soft">
             Free-to-paid conversion is{" "}
             <span className="font-semibold text-danger">down 70%</span> in the
             last 24 hours. Need eyes on this asap.
           </div>
         </div>
-      </div>
-      <div className="mt-10 self-center text-base text-ink-subtle animate-fade-up [animation-delay:600ms]">
-        You don&apos;t know what broke. <span className="text-ink">Arbor does.</span>
       </div>
     </Stage>
   );
@@ -618,8 +509,8 @@ function DemoScenarioSlide() {
 function PromptSlide() {
   return (
     <Stage>
-      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-muted animate-fade-down">
-        you to arbor
+      <div className="text-base font-medium text-ink animate-fade-down">
+        you, to Arbor:
       </div>
       <div
         className="mt-6 rounded-3xl bg-white px-12 py-10 font-display text-[clamp(1.75rem,3.6vw,3rem)] font-medium leading-tight text-ink shadow-card"
@@ -627,221 +518,188 @@ function PromptSlide() {
       >
         “Fix the conversion drop we just saw.”
       </div>
-      <p className="mt-10 max-w-[52ch] text-base text-ink-muted animate-fade-up [animation-delay:400ms]">
-        That&apos;s the entire prompt. No context dump. No links. No background.
-      </p>
     </Stage>
   );
 }
 
 /* ---------- Hyperspell + Nia ------------------------------------ */
 
-function SourceChip({
+function SourceIcon({
   icon: Icon,
-  label,
   delay,
   className = "",
+  color,
+  size = 32,
 }: {
-  icon: typeof Brain;
-  label: string;
+  icon: typeof Sparkle;
   delay: number;
   className?: string;
+  color: string;
+  size?: number;
 }) {
   return (
     <div
-      className={`absolute inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-ink shadow-card ${className}`}
+      className={`absolute inline-flex items-center justify-center rounded-2xl bg-white shadow-card ${className}`}
       style={{
         animation: "fade-up 0.6s cubic-bezier(0.22,1,0.36,1) both",
         animationDelay: `${delay}ms`,
+        width: 76,
+        height: 76,
       }}
     >
-      <Icon size={14} weight="bold" className="text-brand-600" />
-      {label}
+      <Icon size={size} weight="fill" style={{ color }} />
     </div>
   );
 }
 
-function CenterNode({
-  title,
-  caption,
-  icon: Icon,
+function CenterMark({
+  children,
 }: {
-  title: string;
-  caption: string;
-  icon: typeof Brain;
+  children: ReactNode;
 }) {
   return (
     <div className="relative">
       <span
         aria-hidden
         className="absolute inset-0 -z-10 rounded-3xl bg-brand-100"
-        style={{
-          animation: "deck-pulse-ring 2.4s ease-out infinite",
-        }}
+        style={{ animation: "deck-pulse-ring 2.4s ease-out infinite" }}
       />
-      <div className="rounded-3xl bg-brand-600 px-8 py-6 text-center text-white shadow-card">
-        <Icon size={28} weight="fill" className="mx-auto" />
-        <div className="mt-2 font-display text-2xl font-bold">{title}</div>
-        <div className="mt-1 text-xs uppercase tracking-[0.18em] text-brand-100">
-          {caption}
-        </div>
+      <div className="rounded-3xl bg-white px-7 py-5 shadow-card">{children}</div>
+    </div>
+  );
+}
+
+function RadialDiagram({
+  center,
+  sources,
+}: {
+  center: ReactNode;
+  sources: { icon: typeof Sparkle; color: string; pos: string; delay: number }[];
+}) {
+  // Lines drawn from each source position toward the center (400, 180).
+  const lineFor = (pos: string) => {
+    const map: Record<string, string> = {
+      "left-[6%] top-[10%]": "M120 60 L 380 180",
+      "right-[8%] top-[6%]": "M680 50 L 420 180",
+      "left-[2%] top-[58%]": "M70 230 L 380 200",
+      "right-[2%] top-[60%]": "M730 230 L 420 200",
+      "left-[42%] top-[88%]": "M400 320 L 400 230",
+    };
+    return map[pos];
+  };
+  return (
+    <div className="relative h-[380px] w-full max-w-4xl">
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        {center}
       </div>
+      {sources.map((s, i) => (
+        <SourceIcon
+          key={i}
+          icon={s.icon}
+          color={s.color}
+          delay={s.delay}
+          className={s.pos}
+        />
+      ))}
+      <svg
+        viewBox="0 0 800 380"
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        fill="none"
+      >
+        {sources.map((s, i) => (
+          <path
+            key={i}
+            d={lineFor(s.pos)}
+            stroke="#1877f2"
+            strokeOpacity="0.4"
+            strokeWidth="1.5"
+            strokeDasharray="200"
+            strokeLinecap="round"
+            style={{
+              animation: `deck-draw 0.9s ease-out both`,
+              animationDelay: `${300 + i * 150}ms`,
+            }}
+          />
+        ))}
+      </svg>
     </div>
   );
 }
 
 function HyperspellSlide() {
   return (
-    <Stage eyebrow="Step 1 · Business memory">
+    <Stage>
       <Headline size="md">
-        Hyperspell loads the <span className="text-brand-600">why</span>.
+        <HyperspellLogo />{" "}
+        <span className="text-ink-soft">brings business memory.</span>
       </Headline>
-      <div className="relative mt-14 h-[360px] w-full max-w-4xl">
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <CenterNode
-            title="Hyperspell"
-            caption="business memory"
-            icon={Brain}
-          />
-        </div>
-        <SourceChip
-          icon={EnvelopeSimple}
-          label="The CTO email"
-          delay={300}
-          className="left-[6%] top-[10%]"
+      <div className="mt-10">
+        <RadialDiagram
+          center={<HyperspellLogo size={1.1} />}
+          sources={[
+            {
+              icon: EnvelopeSimple,
+              color: "#ea4335",
+              pos: "left-[6%] top-[10%]",
+              delay: 300,
+            },
+            {
+              icon: SlackLogo,
+              color: "#611f69",
+              pos: "right-[8%] top-[6%]",
+              delay: 450,
+            },
+            {
+              icon: GoogleDriveLogo,
+              color: "#1f8b4c",
+              pos: "left-[2%] top-[58%]",
+              delay: 600,
+            },
+          ]}
         />
-        <SourceChip
-          icon={Files}
-          label="Post-mortem"
-          delay={450}
-          className="right-[8%] top-[6%]"
-        />
-        <SourceChip
-          icon={ChatCircleDots}
-          label="#growth Slack"
-          delay={600}
-          className="left-[2%] top-[58%]"
-        />
-        <SourceChip
-          icon={GoogleDriveLogo}
-          label="Experiment log"
-          delay={750}
-          className="right-[2%] top-[60%]"
-        />
-        <SourceChip
-          icon={Database}
-          label="Funnel events"
-          delay={900}
-          className="left-[42%] top-[88%]"
-        />
-        <svg
-          viewBox="0 0 800 360"
-          className="pointer-events-none absolute inset-0 h-full w-full"
-          fill="none"
-        >
-          {[
-            "M120 60 L 380 180",
-            "M680 50 L 420 180",
-            "M70 230 L 380 200",
-            "M730 230 L 420 200",
-            "M400 320 L 400 230",
-          ].map((d, i) => (
-            <path
-              key={i}
-              d={d}
-              stroke="#1877f2"
-              strokeOpacity="0.4"
-              strokeWidth="1.5"
-              strokeDasharray="200"
-              strokeLinecap="round"
-              style={{
-                animation: `deck-draw 0.9s ease-out both`,
-                animationDelay: `${300 + i * 150}ms`,
-              }}
-            />
-          ))}
-        </svg>
       </div>
-      <p className="mt-6 max-w-[60ch] text-base text-ink-muted animate-fade-up [animation-delay:1000ms]">
-        It already knows the drop is on the free-to-paid flow — because it read
-        your inbox, post-mortems, Slack, and Drive.
-      </p>
     </Stage>
   );
 }
 
 function NiaSlide() {
   return (
-    <Stage eyebrow="Step 2 · Codebase context">
+    <Stage>
       <Headline size="md">
-        Nia loads the <span className="text-brand-600">where</span>.
+        <NiaLogo />{" "}
+        <span className="text-ink-soft">brings codebase context.</span>
       </Headline>
-      <div className="relative mt-14 h-[360px] w-full max-w-4xl">
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <CenterNode title="Nia" caption="codebase context" icon={FileCode} />
-        </div>
-        <SourceChip
-          icon={GitBranch}
-          label="git history"
-          delay={300}
-          className="left-[8%] top-[10%]"
+      <div className="mt-10">
+        <RadialDiagram
+          center={<NiaLogo size={1.1} />}
+          sources={[
+            {
+              icon: GitBranch,
+              color: "#0f172a",
+              pos: "left-[6%] top-[10%]",
+              delay: 300,
+            },
+            {
+              icon: FileCode,
+              color: "#1877f2",
+              pos: "right-[8%] top-[6%]",
+              delay: 450,
+            },
+            {
+              icon: Files,
+              color: "#0f172a",
+              pos: "left-[2%] top-[58%]",
+              delay: 600,
+            },
+            {
+              icon: Database,
+              color: "#1877f2",
+              pos: "right-[2%] top-[60%]",
+              delay: 750,
+            },
+          ]}
         />
-        <SourceChip
-          icon={FileCode}
-          label="upgrade-flow.tsx"
-          delay={450}
-          className="right-[6%] top-[8%]"
-        />
-        <SourceChip
-          icon={Files}
-          label="billing/*"
-          delay={600}
-          className="left-[3%] top-[58%]"
-        />
-        <SourceChip
-          icon={Database}
-          label="schema.prisma"
-          delay={750}
-          className="right-[3%] top-[60%]"
-        />
-        <SourceChip
-          icon={Sparkle}
-          label="recent PRs"
-          delay={900}
-          className="left-[42%] top-[88%]"
-        />
-        <svg
-          viewBox="0 0 800 360"
-          className="pointer-events-none absolute inset-0 h-full w-full"
-          fill="none"
-        >
-          {[
-            "M130 60 L 380 180",
-            "M670 50 L 420 180",
-            "M75 230 L 380 200",
-            "M725 230 L 420 200",
-            "M400 320 L 400 230",
-          ].map((d, i) => (
-            <path
-              key={i}
-              d={d}
-              stroke="#1877f2"
-              strokeOpacity="0.4"
-              strokeWidth="1.5"
-              strokeDasharray="200"
-              strokeLinecap="round"
-              style={{
-                animation: `deck-draw 0.9s ease-out both`,
-                animationDelay: `${300 + i * 150}ms`,
-              }}
-            />
-          ))}
-        </svg>
       </div>
-      <p className="mt-6 max-w-[60ch] text-base text-ink-muted animate-fade-up [animation-delay:1000ms]">
-        Codebase context flows into every specialized agent that bids — so they
-        can write a real plan, not a hopeful guess.
-      </p>
     </Stage>
   );
 }
@@ -850,13 +708,12 @@ function NiaSlide() {
 
 function ExecutionSlide() {
   return (
-    <Stage eyebrow="Step 3 · Bidding & execution">
+    <Stage eyebrow="Bidding & execution">
       <Headline size="md">The right specialist wins. Work begins.</Headline>
 
       <div className="mt-12 grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-8">
-        {/* Left: bidding column */}
         <div className="space-y-3">
-          <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+          <div className="text-base font-semibold text-ink">
             Bids on “Find the regression”
           </div>
           {[
@@ -878,14 +735,17 @@ function ExecutionSlide() {
                 <Robot size={18} weight="bold" className="text-brand-700" />
                 <div className="text-sm font-semibold text-ink">{b.name}</div>
                 {b.win && (
-                  <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">
-                    Pick
+                  <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                    pick
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-3">
-                <div className="score-bar w-20">
-                  <span style={{ width: `${b.rep}%` }} />
+                <div className="relative h-2.5 w-24 overflow-hidden rounded-full bg-surface-sunken">
+                  <span
+                    className="absolute inset-y-0 left-0 block rounded-full bg-brand-600"
+                    style={{ width: `${b.rep}%` }}
+                  />
                 </div>
                 <div className="font-display text-base font-bold tabular-nums text-brand-700">
                   {b.bid}
@@ -895,17 +755,15 @@ function ExecutionSlide() {
           ))}
         </div>
 
-        {/* Arrow */}
         <div className="flex flex-col items-center text-ink-faint">
           <ArrowRight size={26} weight="bold" />
         </div>
 
-        {/* Right: execution log */}
         <div
           className="rounded-2xl bg-ink p-6 font-mono text-[13px] leading-relaxed text-emerald-300 shadow-card"
           style={{ animation: "fade-up 0.6s ease-out both", animationDelay: "700ms" }}
         >
-          <div className="mb-3 text-xs uppercase tracking-wider text-emerald-500/80">
+          <div className="mb-3 text-xs font-medium text-emerald-500/80">
             FlowDoctor · live
           </div>
           {[
@@ -934,135 +792,69 @@ function ExecutionSlide() {
 /* ---------- Done + reputation update ---------------------------- */
 
 function DoneSlide() {
-  const updates = [
-    { name: "FlowDoctor", from: 92, to: 94, good: true },
-    { name: "StripeOps", from: 71, to: 71, good: true },
-    { name: "Generalist-XL", from: 54, to: 51, good: false },
-  ];
   return (
     <Stage eyebrow="Task complete">
       <Headline size="md">
-        Shipped. <span className="text-brand-600">Reputations updated.</span>
+        Shipped. <span className="text-brand-600">Reputation updated.</span>
       </Headline>
-      <div className="mt-12 grid w-full max-w-5xl grid-cols-3 gap-5 deck-stagger">
-        {updates.map((u) => (
-          <div
-            key={u.name}
-            className="rounded-2xl bg-white p-6 shadow-card"
-          >
-            <div className="flex items-center justify-between">
-              <div className="font-display text-lg font-semibold text-ink">
-                {u.name}
-              </div>
-              {u.good ? (
-                <TrendUp size={18} weight="bold" className="text-success" />
-              ) : (
-                <TrendDown size={18} weight="bold" className="text-danger" />
-              )}
+
+      <div className="mt-14 grid w-full max-w-5xl grid-cols-3 gap-5">
+        <div
+          className="rounded-2xl bg-surface-subtle p-6 text-center text-ink-subtle shadow-hairline"
+          style={{ animation: "fade-up 0.6s ease-out both", animationDelay: "200ms" }}
+        >
+          <div className="font-display text-lg font-semibold">StripeOps</div>
+          <div className="mt-2 text-sm">did not work · no change</div>
+        </div>
+
+        <div
+          className="rounded-2xl bg-white p-6 shadow-card ring-2 ring-brand-600"
+          style={{ animation: "fade-up 0.6s ease-out both", animationDelay: "350ms" }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="font-display text-lg font-semibold text-ink">
+              FlowDoctor
             </div>
-            <div className="mt-4 flex items-end gap-3">
-              <div className="font-display text-3xl font-bold tabular-nums text-ink">
-                {u.to}
-              </div>
-              <div
-                className={`text-sm font-semibold ${
-                  u.good ? "text-success" : "text-danger"
-                }`}
-              >
-                {u.to > u.from
-                  ? `+${u.to - u.from}`
-                  : u.to < u.from
-                    ? `${u.to - u.from}`
-                    : "±0"}
-              </div>
-            </div>
-            <div className="mt-3 score-bar">
-              <span
-                style={{
-                  width: `${u.to}%`,
-                  backgroundColor: u.good ? "#1877f2" : "#ef4444",
-                }}
-              />
-            </div>
-            <div className="mt-2 text-xs text-ink-subtle">
-              was {u.from}
-            </div>
+            <TrendUp size={20} weight="bold" className="text-success" />
           </div>
-        ))}
+          <div className="mt-4 flex items-end gap-3">
+            <div className="font-display text-4xl font-bold tabular-nums text-ink">
+              94
+            </div>
+            <div className="text-base font-semibold text-success">+2</div>
+          </div>
+          <div className="mt-3 relative h-3 w-full overflow-hidden rounded-full bg-surface-sunken">
+            <span
+              className="absolute inset-y-0 left-0 block rounded-full bg-brand-600"
+              style={{ width: "94%" }}
+            />
+          </div>
+          <div className="mt-2 text-sm text-ink-soft">was 92</div>
+        </div>
+
+        <div
+          className="rounded-2xl bg-surface-subtle p-6 text-center text-ink-subtle shadow-hairline"
+          style={{ animation: "fade-up 0.6s ease-out both", animationDelay: "500ms" }}
+        >
+          <div className="font-display text-lg font-semibold">Generalist-XL</div>
+          <div className="mt-2 text-sm">did not work · no change</div>
+        </div>
       </div>
-      <p className="mt-10 max-w-[60ch] text-base text-ink-muted animate-fade-up [animation-delay:900ms]">
-        The agents that won and shipped get rewarded. The ones that overpaid or
-        failed lose ground. Tomorrow&apos;s auctions are smarter.
-      </p>
     </Stage>
   );
 }
 
-/* ---------- Counterfactual --------------------------------------- */
+/* ---------- Closing statement ----------------------------------- */
 
-function WithoutSlide() {
-  const cols = [
-    {
-      title: "Without Hyperspell",
-      copy: "The agent doesn't know what broke. It debugs the wrong page, on the wrong day.",
-    },
-    {
-      title: "Without Nia",
-      copy: "The agent has no idea where to look. It stares at a blank file tree.",
-    },
-    {
-      title: "Without Arbor",
-      copy: "The wrong agent wins. Or the most expensive one does. Or you orchestrate by hand.",
-    },
-  ];
-  return (
-    <Stage eyebrow="What it takes">
-      <Headline size="md">
-        Take one piece away — <span className="text-danger">it falls apart</span>.
-      </Headline>
-      <div className="mt-12 grid w-full max-w-6xl grid-cols-3 gap-5 deck-stagger">
-        {cols.map((c) => (
-          <div key={c.title} className="rounded-3xl bg-white p-7 shadow-card">
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-danger/10 text-danger">
-              <X size={20} weight="bold" />
-            </div>
-            <div className="mt-5 font-display text-xl font-semibold text-ink">
-              {c.title}
-            </div>
-            <div className="mt-2 text-base text-ink-muted">{c.copy}</div>
-          </div>
-        ))}
-      </div>
-      <p className="mt-10 max-w-[60ch] text-base text-ink-muted animate-fade-up [animation-delay:900ms]">
-        Hyperspell + Nia + a reputation-based auction is what makes the right
-        agent winnable in the first place.
-      </p>
-    </Stage>
-  );
-}
-
-/* ---------- Wedding photographer --------------------------------- */
-
-function WeddingSlide() {
+function CrucialSlide() {
   return (
     <Stage>
-      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-muted animate-fade-down">
-        the analogy
-      </div>
       <Headline size="lg">
-        When you&apos;re getting married, you don&apos;t search for{" "}
-        <span className="text-ink-muted line-through">a photographer</span>.
+        <span className="text-brand-600">Hyperspell</span> and{" "}
+        <span className="text-brand-600">Nia</span> are crucial to Arbor,
+        <br />
+        and Arbor is crucial to <span className="text-brand-600">you</span>.
       </Headline>
-      <div className="mt-8 flex items-center gap-3 animate-fade-up [animation-delay:400ms]">
-        <Camera size={28} weight="fill" className="text-brand-600" />
-        <span className="font-display text-[clamp(1.5rem,3vw,2.5rem)] font-semibold text-ink">
-          You search for a <span className="text-brand-600">wedding photographer</span>.
-        </span>
-      </div>
-      <p className="mt-10 max-w-[52ch] text-base text-ink-muted animate-fade-up [animation-delay:800ms]">
-        Arbor finds you that wedding photographer — and makes sure they&apos;ve
-        done this before.
-      </p>
     </Stage>
   );
 }
@@ -1072,16 +864,11 @@ function WeddingSlide() {
 function EndSlide() {
   return (
     <Stage>
-      <div
-        style={{ animation: "deck-pop 700ms cubic-bezier(0.22,1,0.36,1) both" }}
-      >
+      <div style={{ animation: "deck-pop 700ms cubic-bezier(0.22,1,0.36,1) both" }}>
         <ArborLogo size={1.6} />
       </div>
       <p className="mt-10 max-w-[28ch] font-display text-[clamp(1.75rem,3vw,2.6rem)] font-medium leading-tight text-ink-soft animate-fade-up [animation-delay:300ms]">
         The right specialist for any task.
-      </p>
-      <p className="mt-12 text-sm font-medium uppercase tracking-[0.32em] text-ink-subtle animate-fade-up [animation-delay:600ms]">
-        Thank you
       </p>
     </Stage>
   );
@@ -1107,7 +894,6 @@ export const slides = [
   NiaSlide,
   ExecutionSlide,
   DoneSlide,
-  WithoutSlide,
-  WeddingSlide,
+  CrucialSlide,
   EndSlide,
 ];
