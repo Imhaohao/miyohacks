@@ -15,6 +15,8 @@ import { SettlementPanel } from "./SettlementPanel";
 import { PlanPanel } from "./PlanPanel";
 import { ConversionDropDemo } from "./ConversionDropDemo";
 import { isConversionDropPrompt } from "@/lib/conversion-drop-demo";
+import { useStickToLatest } from "@/lib/use-stick-to-latest";
+import { ArrowDown } from "@phosphor-icons/react";
 import type {
   TaskDoc,
   EscrowDoc,
@@ -65,6 +67,34 @@ export function TaskView({ taskId }: { taskId: string }) {
   }
 
   return (
+    <RegularTaskView
+      task={task}
+      escrow={escrow}
+      lifecycle={lifecycle}
+      taskId={taskId}
+      isMultiStepParent={isMultiStepParent}
+    />
+  );
+}
+
+function RegularTaskView({
+  task,
+  escrow,
+  lifecycle,
+  taskId,
+  isMultiStepParent,
+}: {
+  task: TaskDoc;
+  escrow: EscrowDoc | null | undefined;
+  lifecycle: LifecycleEventDoc[];
+  taskId: string;
+  isMultiStepParent: boolean;
+}) {
+  const { sentinelRef, hasNewBelow, scrollToLatest } = useStickToLatest(
+    lifecycle.length,
+  );
+
+  return (
     <div className="space-y-4">
       <TaskHeader task={task} />
       <ContextEnrichmentPanel events={lifecycle} taskId={taskId} />
@@ -87,6 +117,19 @@ export function TaskView({ taskId }: { taskId: string }) {
             events={lifecycle}
           />
         </>
+      )}
+
+      <div ref={sentinelRef} aria-hidden className="h-px" />
+
+      {hasNewBelow && (
+        <button
+          type="button"
+          onClick={scrollToLatest}
+          className="fixed bottom-6 left-1/2 z-30 inline-flex -translate-x-1/2 animate-fade-up items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-ink/90"
+        >
+          <ArrowDown size={14} weight="bold" />
+          See latest
+        </button>
       )}
     </div>
   );

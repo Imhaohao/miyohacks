@@ -14,6 +14,8 @@ import {
   GoogleDriveLogo,
   Lightning,
   ShieldCheck,
+  ThumbsDown,
+  ThumbsUp,
   Trophy,
   Warning,
   XCircle,
@@ -22,6 +24,8 @@ import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
+import { ArrowDown } from "@phosphor-icons/react";
+import { useStickToLatest } from "@/lib/use-stick-to-latest";
 import type { LifecycleEventDoc, TaskDoc } from "@/lib/task-view";
 
 interface Props {
@@ -160,6 +164,12 @@ export function ConversionDropDemo({ task, events }: Props) {
     | undefined;
   const auctionStarted = bidReceived.length > 0 || bidDeclined.length > 0;
   const evaluatedCount = bidReceived.length + bidDeclined.length;
+
+  // Track a single signal that flips whenever any new content lands so the
+  // auto-scroll fires at every meaningful step of the demo.
+  const streamSignal = `${events.length}:${Boolean(prOpened)}:${Boolean(paymentConfirmed)}`;
+  const { sentinelRef, hasNewBelow, scrollToLatest } =
+    useStickToLatest(streamSignal);
 
   return (
     <div className="space-y-4">
@@ -319,7 +329,7 @@ export function ConversionDropDemo({ task, events }: Props) {
                 className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-ink/90"
               >
                 <GithubLogo size={16} weight="fill" />
-                View PR #{prPayload.number} on GitHub
+                View PR on GitHub
               </a>
             ) : v0DonePayload ? (
               <PendingRow text="Committing the patch and opening the PR…" />
@@ -327,7 +337,96 @@ export function ConversionDropDemo({ task, events }: Props) {
           </div>
         )}
       </Card>
+
+      {prPayload && (
+        <FeedbackCard winnerAgentId={auctionPayload?.winner.agent_id} />
+      )}
+
+      <div ref={sentinelRef} aria-hidden className="h-px" />
+
+      {hasNewBelow && (
+        <button
+          type="button"
+          onClick={scrollToLatest}
+          className="fixed bottom-6 left-1/2 z-30 inline-flex -translate-x-1/2 animate-fade-up items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-ink/90"
+        >
+          <ArrowDown size={14} weight="bold" />
+          See latest
+        </button>
+      )}
     </div>
+  );
+}
+
+function FeedbackCard({
+  winnerAgentId,
+}: {
+  winnerAgentId: string | undefined;
+}) {
+  const [choice, setChoice] = useState<"none" | "good" | "bad">("none");
+  const agentLabel = winnerAgentId ? (
+    <span className="font-mono text-ink">{winnerAgentId}</span>
+  ) : (
+    <span>the winning specialist</span>
+  );
+
+  return (
+    <Card className="animate-fade-up [animation-delay:300ms]">
+      <CardHeader title="Was this a good solution?" />
+      {choice === "none" ? (
+        <div className="space-y-3">
+          <p className="text-sm text-ink-soft">
+            Did {agentLabel} actually solve the conversion drop the way
+            you&rsquo;d expect? Your feedback flows back into the
+            specialist&rsquo;s reputation score for future auctions.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setChoice("good")}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+            >
+              <ThumbsUp size={16} weight="bold" />
+              Good solution
+            </button>
+            <button
+              type="button"
+              onClick={() => setChoice("bad")}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100"
+            >
+              <ThumbsDown size={16} weight="bold" />
+              Needs more work
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={
+            choice === "good"
+              ? "flex items-start gap-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900"
+              : "flex items-start gap-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-900"
+          }
+        >
+          {choice === "good" ? (
+            <ThumbsUp size={18} weight="fill" className="mt-0.5 shrink-0 text-emerald-600" />
+          ) : (
+            <ThumbsDown size={18} weight="fill" className="mt-0.5 shrink-0 text-rose-600" />
+          )}
+          <div>
+            <div className="font-medium">
+              {choice === "good"
+                ? "Thanks — reputation bumped."
+                : "Thanks — reputation noted."}
+            </div>
+            <p className="mt-0.5 text-xs">
+              {choice === "good"
+                ? "We'll prioritize this specialist on similar tasks next time."
+                : "We'll deprioritize this specialist on similar tasks next time."}
+            </p>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -379,7 +478,7 @@ function AuctionPanel({
             {bidDeclined.map((d) => (
               <li
                 key={d.agent_id}
-                className="flex items-start gap-2 text-xs text-ink-muted"
+                className="flex animate-fade-in items-start gap-2 text-xs text-ink-muted"
               >
                 <XCircle
                   size={12}
@@ -416,8 +515,8 @@ function BidRow({
     <div
       className={
         isWinner
-          ? "rounded-xl bg-brand-50 p-3 ring-1 ring-inset ring-brand-200"
-          : "rounded-xl border border-line bg-white p-3"
+          ? "animate-fade-down rounded-xl bg-brand-50 p-3 ring-1 ring-inset ring-brand-200"
+          : "animate-fade-down rounded-xl border border-line bg-white p-3"
       }
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -459,13 +558,13 @@ function WinnerCard({ payload }: { payload: AuctionResolvedPayload }) {
         <span>
           bid{" "}
           <span className="font-mono text-white">
-            ${winner.bid_price.toFixed(2)}
+            {Math.round(winner.bid_price * 100)} credits
           </span>
         </span>
         <span>
           paid{" "}
           <span className="font-mono text-white">
-            ${vickrey.price_paid.toFixed(2)}
+            {Math.round(vickrey.price_paid * 100)} credits
           </span>{" "}
           <span className="text-zinc-400">(Vickrey, second-price)</span>
         </span>
@@ -635,20 +734,20 @@ function ConfirmAndPayForm({
           <div>
             <dt className="text-xs text-ink-muted">Their offer</dt>
             <dd className="mt-0.5 font-mono text-ink line-through decoration-rose-400 decoration-2">
-              ${winnerBidPrice.toFixed(2)}
+              {Math.round(winnerBidPrice * 100)} credits
             </dd>
           </div>
           <div>
             <dt className="text-xs text-ink-muted">You pay</dt>
             <dd className="mt-0.5 font-display text-2xl font-semibold tracking-tight text-brand-700">
-              ${pricePaid.toFixed(2)}
+              {Math.round(pricePaid * 100)} credits
             </dd>
           </div>
         </dl>
         {isVickrey && savings > 0 && (
           <p className="mt-3 text-xs text-ink-muted">
             Vickrey second-price · you save{" "}
-            <span className="font-mono text-ink">${savings.toFixed(2)}</span>{" "}
+            <span className="font-mono text-ink">{Math.round(savings * 100)} credits</span>{" "}
             vs. the winner&rsquo;s offer.
           </p>
         )}
@@ -667,7 +766,7 @@ function ConfirmAndPayForm({
         ) : (
           <>
             <CreditCard size={16} weight="bold" />
-            Confirm and pay ${pricePaid.toFixed(2)}
+            Confirm and pay {Math.round(pricePaid * 100)} credits
           </>
         )}
       </Button>
@@ -697,7 +796,7 @@ function PaymentConfirmedRow({
       <div>
         <div className="font-medium">
           {typeof pricePaid === "number"
-            ? `$${pricePaid.toFixed(2)} held in escrow`
+            ? `${Math.round(pricePaid * 100)} credits held in escrow`
             : "Payment held in escrow"}
           {winnerAgentId && (
             <>

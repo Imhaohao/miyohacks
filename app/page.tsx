@@ -3,6 +3,7 @@ import { PostTaskForm } from "@/components/PostTaskForm";
 import { ArborMark } from "@/components/ui/ArborMark";
 import {
   ArrowRight,
+  CaretDown,
   ChatText,
   Coins,
   Trophy,
@@ -11,19 +12,39 @@ import {
 export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 pb-16 pt-6">
-      <nav className="flex items-center justify-between">
+      <nav className="flex items-center justify-between gap-3">
         <ArborMark />
-        <Link
-          href="/agents"
-          className="group inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-brand-700"
-        >
-          Browse specialists
-          <ArrowRight
-            size={14}
-            weight="bold"
-            className="transition-transform group-hover:translate-x-0.5"
-          />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/agents"
+            className="group hidden items-center gap-1 text-sm font-medium text-ink-muted hover:text-brand-700 sm:inline-flex"
+          >
+            Browse specialists
+            <ArrowRight
+              size={14}
+              weight="bold"
+              className="transition-transform group-hover:translate-x-0.5"
+            />
+          </Link>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+            <Coins size={12} weight="fill" />
+            <span className="font-mono">2,400</span> credits
+          </span>
+          <button
+            type="button"
+            aria-label="Account menu"
+            className="inline-flex items-center gap-2 rounded-full bg-surface-subtle py-1 pl-1 pr-2.5 text-left transition-colors hover:bg-surface-muted"
+          >
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-[11px] font-semibold text-brand-700">
+              JS
+            </span>
+            <span className="hidden flex-col leading-tight sm:flex">
+              <span className="text-sm font-medium text-ink">Jamie Sole</span>
+              <span className="text-[10px] text-ink-muted">Stackform</span>
+            </span>
+            <CaretDown size={12} weight="bold" className="text-ink-muted" />
+          </button>
+        </div>
       </nav>
 
       <section className="mt-16 animate-fade-up text-center">

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Tree } from "@phosphor-icons/react/dist/ssr";
 import {
   ArrowRight,
@@ -753,20 +753,23 @@ function PromptSlide() {
 function SourceChip({
   delay,
   className = "",
+  style,
   children,
 }: {
   delay: number;
   className?: string;
+  style?: CSSProperties;
   children: ReactNode;
 }) {
   return (
     <div
       className={`absolute inline-flex items-center justify-center overflow-hidden rounded-2xl bg-white p-2 shadow-card ${className}`}
       style={{
-        animation: "fade-up 0.6s cubic-bezier(0.22,1,0.36,1) both",
-        animationDelay: `${delay}ms`,
         width: 84,
         height: 84,
+        animation: "fade-up 0.6s cubic-bezier(0.22,1,0.36,1) both",
+        animationDelay: `${delay}ms`,
+        ...style,
       }}
     >
       {children}
@@ -817,12 +820,7 @@ function CenterMark({
 }
 
 type RadialSource = {
-  pos:
-    | "left-[6%] top-[10%]"
-    | "right-[8%] top-[6%]"
-    | "left-[2%] top-[58%]"
-    | "right-[2%] top-[60%]"
-    | "left-[42%] top-[88%]";
+  angle: number;
   delay: number;
   content: ReactNode;
 };
@@ -834,36 +832,40 @@ function RadialDiagram({
   center: ReactNode;
   sources: RadialSource[];
 }) {
-  const lineFor: Record<RadialSource["pos"], string> = {
-    "left-[6%] top-[10%]": "M120 60 L 380 180",
-    "right-[8%] top-[6%]": "M680 50 L 420 180",
-    "left-[2%] top-[58%]": "M70 230 L 380 200",
-    "right-[2%] top-[60%]": "M730 230 L 420 200",
-    "left-[42%] top-[88%]": "M400 320 L 400 230",
-  };
+  const W = 720;
+  const H = 360;
+  const cx = W / 2;
+  const cy = H / 2;
+  const rx = 270;
+  const ry = 130;
+  const innerRx = 110;
+  const innerRy = 75;
+  const chip = 84;
+
+  const positions = sources.map((s) => {
+    const a = (s.angle * Math.PI) / 180;
+    return {
+      x: cx + rx * Math.cos(a),
+      y: cy + ry * Math.sin(a),
+      ix: cx + innerRx * Math.cos(a),
+      iy: cy + innerRy * Math.sin(a),
+    };
+  });
+
   return (
-    <div className="relative h-[380px] w-full max-w-4xl">
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        {center}
-      </div>
-      {sources.map((s, i) => (
-        <SourceChip key={i} delay={s.delay} className={s.pos}>
-          {s.content}
-        </SourceChip>
-      ))}
+    <div className="relative mx-auto" style={{ width: W, height: H }}>
       <svg
-        viewBox="0 0 800 380"
+        viewBox={`0 0 ${W} ${H}`}
         className="pointer-events-none absolute inset-0 h-full w-full"
         fill="none"
       >
-        {sources.map((s, i) => (
+        {positions.map((p, i) => (
           <path
             key={i}
-            d={lineFor[s.pos]}
+            d={`M${p.x} ${p.y} L ${p.ix} ${p.iy}`}
             stroke="#1877f2"
             strokeOpacity="0.4"
             strokeWidth="1.5"
-            strokeDasharray="200"
             strokeLinecap="round"
             style={{
               animation: `deck-draw 0.9s ease-out both`,
@@ -872,6 +874,18 @@ function RadialDiagram({
           />
         ))}
       </svg>
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        {center}
+      </div>
+      {sources.map((s, i) => (
+        <SourceChip
+          key={i}
+          delay={s.delay}
+          style={{ left: positions[i].x - chip / 2, top: positions[i].y - chip / 2 }}
+        >
+          {s.content}
+        </SourceChip>
+      ))}
     </div>
   );
 }
@@ -879,26 +893,26 @@ function RadialDiagram({
 function HyperspellSlide() {
   return (
     <Stage>
-      <Headline size="md">
-        <HyperspellLogo />{" "}
+      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 font-display text-[clamp(1.75rem,3.5vw,3rem)] font-semibold leading-[1.1] tracking-tight text-ink">
+        <HyperspellLogo />
         <span className="text-ink-soft">brings business memory.</span>
-      </Headline>
+      </div>
       <div className="mt-10">
         <RadialDiagram
           center={<HyperspellLogo size={1.1} />}
           sources={[
             {
-              pos: "left-[6%] top-[10%]",
+              angle: 215,
               delay: 300,
               content: <ChipImg src={LOGOS.gmail} alt="Gmail" />,
             },
             {
-              pos: "right-[8%] top-[6%]",
+              angle: 325,
               delay: 450,
               content: <ChipImg src={LOGOS.slack} alt="Slack" />,
             },
             {
-              pos: "left-[2%] top-[58%]",
+              angle: 90,
               delay: 600,
               content: <ChipImg src={LOGOS.gdrive} alt="Google Drive" />,
             },
@@ -912,31 +926,31 @@ function HyperspellSlide() {
 function NiaSlide() {
   return (
     <Stage>
-      <Headline size="md">
-        <NiaLogo />{" "}
+      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 font-display text-[clamp(1.75rem,3.5vw,3rem)] font-semibold leading-[1.1] tracking-tight text-ink">
+        <NiaLogo />
         <span className="text-ink-soft">brings codebase context.</span>
-      </Headline>
+      </div>
       <div className="mt-10">
         <RadialDiagram
           center={<NiaLogo size={1.1} />}
           sources={[
             {
-              pos: "left-[6%] top-[10%]",
+              angle: 215,
               delay: 300,
               content: <ChipIcon icon={GitBranch} color="#0f172a" />,
             },
             {
-              pos: "right-[8%] top-[6%]",
+              angle: 325,
               delay: 450,
               content: <ChipIcon icon={FileCode} color="#1877f2" />,
             },
             {
-              pos: "left-[2%] top-[58%]",
+              angle: 145,
               delay: 600,
               content: <ChipIcon icon={Files} color="#0f172a" />,
             },
             {
-              pos: "right-[2%] top-[60%]",
+              angle: 35,
               delay: 750,
               content: <ChipIcon icon={Database} color="#1877f2" />,
             },
