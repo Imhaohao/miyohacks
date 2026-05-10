@@ -1,21 +1,33 @@
 import type { ReactNode } from "react";
 import { Tree } from "@phosphor-icons/react/dist/ssr";
 import {
+  ArrowRight,
   EnvelopeSimple,
-  SlackLogo,
-  GoogleDriveLogo,
   FileCode,
   GitBranch,
   Files,
   Database,
   Robot,
-  Trophy,
   Sparkle,
-  ArrowRight,
-  CheckCircle,
   TrendDown,
   TrendUp,
+  Trophy,
 } from "@phosphor-icons/react";
+
+/* External brand logos. The sandbox can't fetch these but the user's
+ * browser can. If they ever break, drop replacements into /public/logos
+ * and swap the URLs. */
+const LOGOS = {
+  hyperspell:
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpd-LWIVew2l64OKrrrE9J6jMJg_Rz1Bo1Tg&s",
+  gdrive:
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS3cPiiBjAeOParQoWl8fOkW7C_ymO6IWjIYg&s",
+  slack:
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQK72M84jyOoaT2cb2QcJv8L1O8TTeMjBUYGA&s",
+  gmail:
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/1280px-Gmail_icon_%282020%29.svg.png",
+  nia: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTo9Lot-_eyPvt9yhu_zi1FAOEKP0E4cn-txA&s",
+} as const;
 
 /* ---------------------------------------------------------------- */
 /* Shared layout primitives                                          */
@@ -95,16 +107,14 @@ function ArborLogo({ size = 1 }: { size?: number }) {
 function HyperspellLogo({ size = 1 }: { size?: number }) {
   return (
     <span className="inline-flex items-center gap-3 text-ink">
-      <span
-        className="inline-flex items-center justify-center rounded-2xl text-white shadow-card"
-        style={{
-          width: 56 * size,
-          height: 56 * size,
-          background: "linear-gradient(135deg,#7c3aed 0%,#c026d3 100%)",
-        }}
-      >
-        <Sparkle size={26 * size} weight="fill" />
-      </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={LOGOS.hyperspell}
+        alt="Hyperspell"
+        width={56 * size}
+        height={56 * size}
+        className="rounded-2xl object-contain shadow-card"
+      />
       <span
         className="font-display font-bold tracking-tight"
         style={{ fontSize: 36 * size }}
@@ -118,17 +128,14 @@ function HyperspellLogo({ size = 1 }: { size?: number }) {
 function NiaLogo({ size = 1 }: { size?: number }) {
   return (
     <span className="inline-flex items-center gap-3 text-ink">
-      <span
-        className="inline-flex items-center justify-center rounded-2xl bg-ink text-white shadow-card"
-        style={{ width: 56 * size, height: 56 * size }}
-      >
-        <span
-          className="font-display font-bold leading-none"
-          style={{ fontSize: 30 * size }}
-        >
-          n
-        </span>
-      </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={LOGOS.nia}
+        alt="Nia"
+        width={56 * size}
+        height={56 * size}
+        className="rounded-2xl object-contain shadow-card"
+      />
       <span
         className="font-display font-bold tracking-tight"
         style={{ fontSize: 36 * size }}
@@ -224,61 +231,280 @@ function ArborRevealSlide() {
   );
 }
 
-/* ---------- How-it-works flow diagram ---------------------------- */
-
-function FlowStep({
-  icon: Icon,
-  label,
-  delay,
-}: {
-  icon: typeof Sparkle;
-  label: string;
-  delay: number;
-}) {
-  return (
-    <div
-      className="flex flex-col items-center gap-3"
-      style={{
-        animation: `fade-up 0.6s cubic-bezier(0.22,1,0.36,1) both`,
-        animationDelay: `${delay}ms`,
-      }}
-    >
-      <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white text-brand-700 shadow-card">
-        <Icon size={28} weight="bold" />
-      </div>
-      <div className="text-sm font-semibold text-ink">{label}</div>
-    </div>
-  );
-}
-
-function FlowArrow({ delay }: { delay: number }) {
-  return (
-    <div
-      className="flex items-center text-ink-faint"
-      style={{
-        animation: "fade-in 0.5s ease-out both",
-        animationDelay: `${delay}ms`,
-      }}
-    >
-      <ArrowRight size={20} weight="bold" />
-    </div>
-  );
-}
+/* ---------- How-it-works hand-drawn diagram --------------------- */
 
 function HowItWorksSlide() {
+  // Stagger fade-ins down the page so the diagram “draws itself”.
+  const layer = (delay: number) => ({
+    style: {
+      animation: "fade-up 0.6s cubic-bezier(0.22,1,0.36,1) both",
+      animationDelay: `${delay}ms`,
+    } as const,
+  });
   return (
-    <Stage eyebrow="How it works">
-      <Headline>Split. Auction. Execute. Evaluate.</Headline>
-      <div className="mt-16 flex w-full max-w-6xl items-center justify-between rounded-3xl bg-surface-subtle px-10 py-12 shadow-hairline">
-        <FlowStep icon={Sparkle} label="Task in" delay={120} />
-        <FlowArrow delay={300} />
-        <FlowStep icon={GitBranch} label="Split" delay={420} />
-        <FlowArrow delay={600} />
-        <FlowStep icon={Trophy} label="Auction" delay={720} />
-        <FlowArrow delay={900} />
-        <FlowStep icon={Robot} label="Execute" delay={1020} />
-        <FlowArrow delay={1200} />
-        <FlowStep icon={CheckCircle} label="Evaluate" delay={1320} />
+    <Stage>
+      <div className="font-handdrawn relative flex h-full max-h-[88vh] w-full items-center justify-center">
+        <svg
+          viewBox="0 0 800 940"
+          className="h-full w-auto max-w-full"
+          fill="none"
+        >
+          <defs>
+            {(["ink", "grey", "blue", "green"] as const).map((k) => {
+              const color = {
+                ink: "#0f172a",
+                grey: "#94a3b8",
+                blue: "#1877f2",
+                green: "#10b981",
+              }[k];
+              return (
+                <marker
+                  key={k}
+                  id={`arr-${k}`}
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill={color} />
+                </marker>
+              );
+            })}
+          </defs>
+
+          {/* User Query */}
+          <g {...layer(0)}>
+            <rect
+              x="20"
+              y="20"
+              width="280"
+              height="100"
+              rx="22"
+              fill="white"
+              stroke="#0f172a"
+              strokeWidth="2.5"
+            />
+            <text
+              x="160"
+              y="83"
+              textAnchor="middle"
+              fontSize="36"
+              fontWeight={500}
+              fill="#0f172a"
+            >
+              User Query
+            </text>
+          </g>
+
+          {/* Curved arrow → subtask */}
+          <g {...layer(250)}>
+            <path
+              d="M 160 122 C 170 200, 380 195, 400 230"
+              stroke="#0f172a"
+              strokeWidth="2"
+              strokeLinecap="round"
+              markerEnd="url(#arr-ink)"
+            />
+          </g>
+
+          {/* subtask: design page */}
+          <g {...layer(450)}>
+            <rect
+              x="160"
+              y="240"
+              width="480"
+              height="100"
+              rx="22"
+              fill="white"
+              stroke="#0f172a"
+              strokeWidth="2.5"
+            />
+            <text
+              x="400"
+              y="303"
+              textAnchor="middle"
+              fontSize="34"
+              fontWeight={500}
+              fill="#0f172a"
+            >
+              subtask: design page
+            </text>
+          </g>
+
+          {/* Splitting arrows */}
+          <g {...layer(700)}>
+            <path
+              d="M 320 342 C 250 400, 150 410, 130 470"
+              stroke="#94a3b8"
+              strokeWidth="2"
+              strokeLinecap="round"
+              markerEnd="url(#arr-grey)"
+            />
+            <path
+              d="M 400 342 L 400 470"
+              stroke="#0f172a"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              markerEnd="url(#arr-ink)"
+            />
+            <path
+              d="M 480 342 C 550 400, 600 410, 600 470"
+              stroke="#94a3b8"
+              strokeWidth="2"
+              strokeLinecap="round"
+              markerEnd="url(#arr-grey)"
+            />
+            <path
+              d="M 580 340 C 670 400, 750 430, 760 470"
+              stroke="#cbd5e1"
+              strokeWidth="2"
+              strokeDasharray="6 7"
+              strokeLinecap="round"
+              markerEnd="url(#arr-grey)"
+            />
+          </g>
+
+          {/* Specialists row */}
+          <g {...layer(900)}>
+            <rect
+              x="40"
+              y="480"
+              width="180"
+              height="90"
+              rx="20"
+              fill="white"
+              stroke="#94a3b8"
+              strokeWidth="2"
+            />
+            <text
+              x="130"
+              y="535"
+              textAnchor="middle"
+              fontSize="30"
+              fontWeight={500}
+              fill="#94a3b8"
+            >
+              Stripe
+            </text>
+
+            <rect
+              x="310"
+              y="480"
+              width="180"
+              height="90"
+              rx="20"
+              fill="white"
+              stroke="#1877f2"
+              strokeWidth="2.5"
+            />
+            <text
+              x="400"
+              y="535"
+              textAnchor="middle"
+              fontSize="30"
+              fontWeight={500}
+              fill="#1877f2"
+            >
+              v0.dev
+            </text>
+
+            <rect
+              x="510"
+              y="480"
+              width="180"
+              height="90"
+              rx="20"
+              fill="white"
+              stroke="#94a3b8"
+              strokeWidth="2"
+            />
+            <text
+              x="600"
+              y="535"
+              textAnchor="middle"
+              fontSize="30"
+              fontWeight={500}
+              fill="#94a3b8"
+            >
+              codex
+            </text>
+
+            <text
+              x="745"
+              y="540"
+              textAnchor="middle"
+              fontSize="40"
+              fill="#cbd5e1"
+            >
+              …
+            </text>
+          </g>
+
+          {/* Select best arrow */}
+          <g {...layer(1100)}>
+            <path
+              d="M 400 580 L 400 690"
+              stroke="#1877f2"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              markerEnd="url(#arr-blue)"
+            />
+            <text x="305" y="640" fontSize="28" fontWeight={500} fill="#1877f2">
+              Select best
+            </text>
+          </g>
+
+          {/* Hyperspell & Nia context */}
+          <g {...layer(1300)}>
+            <rect
+              x="80"
+              y="700"
+              width="640"
+              height="100"
+              rx="22"
+              fill="white"
+              stroke="#0f172a"
+              strokeWidth="2.5"
+            />
+            <text
+              x="400"
+              y="763"
+              textAnchor="middle"
+              fontSize="34"
+              fontWeight={500}
+              fill="#0f172a"
+            >
+              Hyperspell &amp; Nia context
+            </text>
+          </g>
+
+          {/* Green tail arrow */}
+          <g {...layer(1500)}>
+            <path
+              d="M 400 800 L 400 870"
+              stroke="#10b981"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              markerEnd="url(#arr-green)"
+            />
+          </g>
+
+          {/* Final celebration line */}
+          <g {...layer(1700)}>
+            <text
+              x="400"
+              y="920"
+              textAnchor="middle"
+              fontSize="34"
+              fontWeight={700}
+              fill="#10b981"
+            >
+              HAPPY HAPPY HAPPY HAPPY HAPPY TASK DONE!!
+            </text>
+          </g>
+        </svg>
       </div>
     </Stage>
   );
@@ -524,31 +750,52 @@ function PromptSlide() {
 
 /* ---------- Hyperspell + Nia ------------------------------------ */
 
-function SourceIcon({
-  icon: Icon,
+function SourceChip({
   delay,
   className = "",
-  color,
-  size = 32,
+  children,
 }: {
-  icon: typeof Sparkle;
   delay: number;
   className?: string;
-  color: string;
-  size?: number;
+  children: ReactNode;
 }) {
   return (
     <div
-      className={`absolute inline-flex items-center justify-center rounded-2xl bg-white shadow-card ${className}`}
+      className={`absolute inline-flex items-center justify-center overflow-hidden rounded-2xl bg-white p-2 shadow-card ${className}`}
       style={{
         animation: "fade-up 0.6s cubic-bezier(0.22,1,0.36,1) both",
         animationDelay: `${delay}ms`,
-        width: 76,
-        height: 76,
+        width: 84,
+        height: 84,
       }}
     >
-      <Icon size={size} weight="fill" style={{ color }} />
+      {children}
     </div>
+  );
+}
+
+function ChipIcon({
+  icon: Icon,
+  color,
+  size = 36,
+}: {
+  icon: typeof Sparkle;
+  color: string;
+  size?: number;
+}) {
+  return <Icon size={size} weight="fill" style={{ color }} />;
+}
+
+function ChipImg({ src, alt }: { src: string; alt: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      width={56}
+      height={56}
+      className="h-14 w-14 object-contain"
+    />
   );
 }
 
@@ -569,23 +816,30 @@ function CenterMark({
   );
 }
 
+type RadialSource = {
+  pos:
+    | "left-[6%] top-[10%]"
+    | "right-[8%] top-[6%]"
+    | "left-[2%] top-[58%]"
+    | "right-[2%] top-[60%]"
+    | "left-[42%] top-[88%]";
+  delay: number;
+  content: ReactNode;
+};
+
 function RadialDiagram({
   center,
   sources,
 }: {
   center: ReactNode;
-  sources: { icon: typeof Sparkle; color: string; pos: string; delay: number }[];
+  sources: RadialSource[];
 }) {
-  // Lines drawn from each source position toward the center (400, 180).
-  const lineFor = (pos: string) => {
-    const map: Record<string, string> = {
-      "left-[6%] top-[10%]": "M120 60 L 380 180",
-      "right-[8%] top-[6%]": "M680 50 L 420 180",
-      "left-[2%] top-[58%]": "M70 230 L 380 200",
-      "right-[2%] top-[60%]": "M730 230 L 420 200",
-      "left-[42%] top-[88%]": "M400 320 L 400 230",
-    };
-    return map[pos];
+  const lineFor: Record<RadialSource["pos"], string> = {
+    "left-[6%] top-[10%]": "M120 60 L 380 180",
+    "right-[8%] top-[6%]": "M680 50 L 420 180",
+    "left-[2%] top-[58%]": "M70 230 L 380 200",
+    "right-[2%] top-[60%]": "M730 230 L 420 200",
+    "left-[42%] top-[88%]": "M400 320 L 400 230",
   };
   return (
     <div className="relative h-[380px] w-full max-w-4xl">
@@ -593,13 +847,9 @@ function RadialDiagram({
         {center}
       </div>
       {sources.map((s, i) => (
-        <SourceIcon
-          key={i}
-          icon={s.icon}
-          color={s.color}
-          delay={s.delay}
-          className={s.pos}
-        />
+        <SourceChip key={i} delay={s.delay} className={s.pos}>
+          {s.content}
+        </SourceChip>
       ))}
       <svg
         viewBox="0 0 800 380"
@@ -609,7 +859,7 @@ function RadialDiagram({
         {sources.map((s, i) => (
           <path
             key={i}
-            d={lineFor(s.pos)}
+            d={lineFor[s.pos]}
             stroke="#1877f2"
             strokeOpacity="0.4"
             strokeWidth="1.5"
@@ -638,22 +888,19 @@ function HyperspellSlide() {
           center={<HyperspellLogo size={1.1} />}
           sources={[
             {
-              icon: EnvelopeSimple,
-              color: "#ea4335",
               pos: "left-[6%] top-[10%]",
               delay: 300,
+              content: <ChipImg src={LOGOS.gmail} alt="Gmail" />,
             },
             {
-              icon: SlackLogo,
-              color: "#611f69",
               pos: "right-[8%] top-[6%]",
               delay: 450,
+              content: <ChipImg src={LOGOS.slack} alt="Slack" />,
             },
             {
-              icon: GoogleDriveLogo,
-              color: "#1f8b4c",
               pos: "left-[2%] top-[58%]",
               delay: 600,
+              content: <ChipImg src={LOGOS.gdrive} alt="Google Drive" />,
             },
           ]}
         />
@@ -674,28 +921,24 @@ function NiaSlide() {
           center={<NiaLogo size={1.1} />}
           sources={[
             {
-              icon: GitBranch,
-              color: "#0f172a",
               pos: "left-[6%] top-[10%]",
               delay: 300,
+              content: <ChipIcon icon={GitBranch} color="#0f172a" />,
             },
             {
-              icon: FileCode,
-              color: "#1877f2",
               pos: "right-[8%] top-[6%]",
               delay: 450,
+              content: <ChipIcon icon={FileCode} color="#1877f2" />,
             },
             {
-              icon: Files,
-              color: "#0f172a",
               pos: "left-[2%] top-[58%]",
               delay: 600,
+              content: <ChipIcon icon={Files} color="#0f172a" />,
             },
             {
-              icon: Database,
-              color: "#1877f2",
               pos: "right-[2%] top-[60%]",
               delay: 750,
+              content: <ChipIcon icon={Database} color="#1877f2" />,
             },
           ]}
         />
