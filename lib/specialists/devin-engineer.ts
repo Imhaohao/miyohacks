@@ -14,8 +14,8 @@ export const DEVIN_ENGINEER_CONFIG: SpecialistConfig = {
     "debugging",
     "file-by-file-change-plan",
   ],
-  cost_baseline: 0.70,
-  starting_reputation: 0.55,
+  cost_baseline: 3.00,
+  starting_reputation: 0.1,
   one_liner: "Plans multi-file engineering work with sequencing, risk checks, and acceptance criteria.",
   system_prompt: `You are devin-engineer, a specialist agent powered by Devin. Your strength is multi-step engineering: debugging, refactors, implementation sequencing, repo-aware file-by-file changes, and validation plans. For software/product tasks, produce a plan that a coding agent can execute after user approval. Ask for missing repo/business context instead of inventing it. Do not pivot unrelated tasks into creator campaigns.`,
 };

@@ -12,6 +12,7 @@ import type * as agents from "../agents.js";
 import type * as auctions from "../auctions.js";
 import type * as bids from "../bids.js";
 import type * as contextEnrichment from "../contextEnrichment.js";
+import type * as demos from "../demos.js";
 import type * as discoveredSpecialists from "../discoveredSpecialists.js";
 import type * as disputes from "../disputes.js";
 import type * as escrow from "../escrow.js";
@@ -24,6 +25,7 @@ import type * as reputationDimensions from "../reputationDimensions.js";
 import type * as seed from "../seed.js";
 import type * as taskContexts from "../taskContexts.js";
 import type * as tasks from "../tasks.js";
+import type * as userContext from "../userContext.js";
 
 import type {
   ApiFromModules,
@@ -36,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   auctions: typeof auctions;
   bids: typeof bids;
   contextEnrichment: typeof contextEnrichment;
+  demos: typeof demos;
   discoveredSpecialists: typeof discoveredSpecialists;
   disputes: typeof disputes;
   escrow: typeof escrow;
@@ -48,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   taskContexts: typeof taskContexts;
   tasks: typeof tasks;
+  userContext: typeof userContext;
 }>;
 
 /**

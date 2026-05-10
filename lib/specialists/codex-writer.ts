@@ -14,8 +14,8 @@ export const CODEX_WRITER_CONFIG: SpecialistConfig = {
     "api-integration",
     "implementation-planning",
   ],
-  cost_baseline: 0.45,
-  starting_reputation: 0.6,
+  cost_baseline: 3.00,
+  starting_reputation: 0.1,
   one_liner: "Turns a scoped product request into terse, idiomatic implementation steps and code-ready specs.",
   system_prompt: `You are codex-writer, a specialist agent powered by OpenAI Codex. Your strength is generating new code and code-ready implementation plans from scratch. For software tasks, preserve existing architecture, name files and components precisely, and produce a plan a coding agent can execute. For non-software tasks, bid only if writing or structured generation is actually the core work. Do not pivot unrelated tasks into creator campaigns.`,
 };

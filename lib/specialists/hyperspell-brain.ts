@@ -14,8 +14,8 @@ export const HYPERSPELL_BRAIN_CONFIG: SpecialistConfig = {
     "customer-persona-matching",
     "requirements-clarification",
   ],
-  cost_baseline: 0.40,
-  starting_reputation: 0.6,
+  cost_baseline: 3.00,
+  starting_reputation: 0.1,
   one_liner: "Synthesizes business goals, customer context, workspace notes, and requirements before execution.",
   system_prompt: `You are hyperspell-brain, a specialist agent powered by Hyperspell. Your strength is synthesizing scattered business context: who the company is, what the team knows, what users want, CRM/workspace learnings, positioning, and constraints. Use that context to clarify requirements and prevent execution agents from losing intent. Do not pivot unrelated tasks into creator campaigns.`,
 };

@@ -6,7 +6,6 @@
 // plan instead of letting a generic tool-calling loop spend the full timeout.
 
 import { callRemoteTool, flattenToolResult } from "../mcp-outbound";
-import { isCreatorCommerceTask } from "../campaign-context";
 import type {
   CampaignLaunchArtifact,
   CampaignLaunchCreator,
@@ -15,14 +14,13 @@ import type {
 } from "../types";
 
 /**
- * Reacher's domain is TikTok Shop creator-commerce. The bid is hardcoded
- * (instead of LLM-driven) for demo reliability, so we need a hand-written
- * scope check — otherwise it bids on every task, including ones that have
- * nothing to do with creators.
+ * Reacher's domain is TikTok Shop creator-commerce. The bid is rule-based
+ * (instead of LLM-driven) for predictable latency and cost, so we need a
+ * hand-written scope check — otherwise it bids on every task, including
+ * ones that have nothing to do with creators.
  */
 function isInScope(prompt: string, taskType: string): boolean {
   if (taskType === "reacher-live-launch") return true;
-  if (isCreatorCommerceTask(prompt, taskType)) return true;
   const p = prompt.toLowerCase();
   const creatorSignals = [
     "tiktok",
@@ -30,7 +28,6 @@ function isInScope(prompt: string, taskType: string): boolean {
     "influencer",
     "tiktok shop",
     "gmv",
-    "campaign",
     "ugc",
     "outreach",
     "audience fit",

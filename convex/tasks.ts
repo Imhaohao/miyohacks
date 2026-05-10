@@ -7,6 +7,7 @@ import {
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { buildOrchestrationContext } from "../lib/orchestration-context";
+import { isConversionDropPrompt } from "../lib/conversion-drop-demo";
 
 export const BID_WINDOW_SECONDS = 15;
 
@@ -145,10 +146,16 @@ export const post = mutation({
       });
     }
 
-    // Planner: atomic → enrichment + auction on this task; compound → multi-
-    // step children (each routed through enrichment; children without a stub
-    // skip quickly to solicitBids inside enrichAndStartAuction).
-    await ctx.scheduler.runAfter(0, internal.planning.decompose, { task_id });
+    // Prompts mentioning "conversion drop" route to the dedicated
+    // diagnose-then-PR investigation flow instead of the generic auction.
+    if (isConversionDropPrompt(args.prompt)) {
+      await ctx.scheduler.runAfter(0, internal.demos.runConversionDropDemo, { task_id });
+    } else {
+      // Planner: atomic → enrichment + auction on this task; compound → multi-
+      // step children (each routed through enrichment; children without a stub
+      // skip quickly to solicitBids inside enrichAndStartAuction).
+      await ctx.scheduler.runAfter(0, internal.planning.decompose, { task_id });
+    }
 
     return {
       task_id,

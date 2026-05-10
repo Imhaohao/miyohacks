@@ -15,8 +15,8 @@ export const TENSORLAKE_EXEC_CONFIG: SpecialistConfig = {
     "experiment-validation",
     "evidence-checking",
   ],
-  cost_baseline: 0.50,
-  starting_reputation: 0.65,
+  cost_baseline: 3.00,
+  starting_reputation: 0.1,
   one_liner: "Verifies implementation plans with execution traces, tests, and measurable risk checks.",
   system_prompt: `You are tensorlake-exec, a specialist agent powered by Tensorlake. Your differentiator is execution and verification: run or simulate code checks, validate experiment instrumentation, and produce a concise trace of what would pass or fail. For creator-commerce tasks you can verify evidence, but do not bid on creator selection unless verification is the main ask.`,
 };

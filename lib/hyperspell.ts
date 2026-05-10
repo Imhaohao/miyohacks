@@ -76,7 +76,12 @@ export interface HyperspellBusinessEnrichment {
   answer: string;
   document_count: number;
   duration_ms: number;
+  user_id_used: string;
 }
+
+export type HyperspellEnrichmentResult =
+  | { ok: true; enrichment: HyperspellBusinessEnrichment }
+  | { ok: false; reason: string; user_id_used: string | null; duration_ms: number };
 
 const HYPERSPELL_BASE_URL = "https://api.hyperspell.com";
 
@@ -205,15 +210,31 @@ function splitSentences(text: string, limit: number): string[] {
     .slice(0, limit);
 }
 
+/**
+ * Resolves which Hyperspell user identity to send via X-As-User.
+ *
+ * The web form hardcodes `posted_by: "buyer:web"`, which has no connected
+ * sources in Hyperspell. Setting HYPERSPELL_USER_ID overrides per-task ids
+ * and lets the demo query the identity that actually owns the Drive/Notion/
+ * etc. integrations.
+ */
+function resolveHyperspellUserId(taskUserId: string): string {
+  const override = process.env.HYPERSPELL_USER_ID?.trim();
+  return override && override.length > 0 ? override : taskUserId;
+}
+
 export async function enrichBusinessContextFromHyperspell(args: {
   userId: string;
   prompt: string;
   taskType: string;
   fallback: BusinessContext;
-}): Promise<HyperspellBusinessEnrichment | null> {
-  if (!process.env.HYPERSPELL_API_KEY) return null;
-
+}): Promise<HyperspellEnrichmentResult> {
   const started = Date.now();
+  if (!process.env.HYPERSPELL_API_KEY) {
+    return { ok: false, reason: "HYPERSPELL_API_KEY is not set", user_id_used: null, duration_ms: 0 };
+  }
+
+  const userId = resolveHyperspellUserId(args.userId);
   const query = [
     "What business context, customer knowledge, constraints, prior decisions,",
     "workspace facts, or user preferences are relevant to this agent task?",
@@ -222,56 +243,72 @@ export async function enrichBusinessContextFromHyperspell(args: {
     `Task: ${args.prompt}`,
   ].join("\n");
 
+  let result: MemoryQueryResult;
   try {
-    const result = await searchMemories({
-      userId: args.userId,
+    result = await searchMemories({
+      userId,
       query,
       answer: true,
       maxResults: 5,
     });
-    const answer = result.answer?.trim() ?? "";
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, reason: message, user_id_used: userId, duration_ms: Date.now() - started };
+  }
 
-    await addMemory({
-      userId: args.userId,
-      title: `Arbor task brief: ${args.taskType}`,
-      collection: "arbor_task_briefs",
-      text: [
-        `Task type: ${args.taskType}`,
-        `Posted at: ${new Date().toISOString()}`,
-        "",
-        args.prompt,
-      ].join("\n"),
-      date: new Date().toISOString(),
-      metadata: {
-        task_type: args.taskType,
-        source: "arbor",
-      },
-    }).catch(() => undefined);
+  await addMemory({
+    userId,
+    title: `Arbor task brief: ${args.taskType}`,
+    collection: "arbor_task_briefs",
+    text: [
+      `Task type: ${args.taskType}`,
+      `Posted at: ${new Date().toISOString()}`,
+      "",
+      args.prompt,
+    ].join("\n"),
+    date: new Date().toISOString(),
+    metadata: {
+      task_type: args.taskType,
+      source: "arbor",
+    },
+  }).catch(() => undefined);
 
-    if (!answer && result.documents.length === 0) return null;
-
-    const facts = splitSentences(answer, 4);
-    const business: BusinessContext = {
-      ...args.fallback,
-      summary: answer || args.fallback.summary,
-      known_facts: [...args.fallback.known_facts, ...facts].slice(0, 8),
-      constraints: [
-        ...args.fallback.constraints,
-        "Hyperspell memory search should be treated as business/workspace context, not repo truth.",
-      ],
-      open_questions: [
-        ...args.fallback.open_questions,
-        "Which retrieved workspace memories should be confirmed by the user before execution?",
-      ],
-    };
-
+  const answer = result.answer?.trim() ?? "";
+  if (!answer && result.documents.length === 0) {
+    const errorDetail = result.errors?.length
+      ? result.errors.map((e) => `${e.error}: ${e.message}`).join("; ")
+      : `no documents matched for X-As-User=${userId}`;
     return {
+      ok: false,
+      reason: `Hyperspell returned no answer (${errorDetail})`,
+      user_id_used: userId,
+      duration_ms: Date.now() - started,
+    };
+  }
+
+  const facts = splitSentences(answer, 4);
+  const business: BusinessContext = {
+    ...args.fallback,
+    summary: answer || args.fallback.summary,
+    known_facts: [...args.fallback.known_facts, ...facts].slice(0, 8),
+    constraints: [
+      ...args.fallback.constraints,
+      "Hyperspell memory search should be treated as business/workspace context, not repo truth.",
+    ],
+    open_questions: [
+      ...args.fallback.open_questions,
+      "Which retrieved workspace memories should be confirmed by the user before execution?",
+    ],
+  };
+
+  return {
+    ok: true,
+    enrichment: {
       business,
       answer,
       document_count: result.documents.length,
       duration_ms: Date.now() - started,
-    };
-  } catch {
-    return null;
-  }
+      user_id_used: userId,
+    },
+  };
 }

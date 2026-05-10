@@ -1,4 +1,4 @@
-import { isCreatorCommerceTask, isImplementationTask } from "./campaign-context";
+import { isImplementationTask } from "./campaign-context";
 
 export interface ContextInput {
   prompt: string;
@@ -56,36 +56,31 @@ export function buildOrchestrationContext(input: ContextInput): OrchestrationCon
   const prompt = input.prompt.trim();
   const lower = prompt.toLowerCase();
   const isStartup = includesAny(lower, ["startup", "seed", "founder", "tiny growth team"]);
-  const isTikTok = isCreatorCommerceTask(prompt, input.taskType);
   const isRepo = isImplementationTask(prompt, input.taskType);
 
   const business: BusinessContext = {
     owner: "hyperspell",
     summary: input.businessContext?.trim() ||
       (isStartup
-        ? "Seed-stage business with limited operator bandwidth that needs founder-ready growth execution, not generic advice."
+        ? "Seed-stage business with limited operator bandwidth that needs founder-ready execution, not generic advice."
         : "Business context should be inferred from the buyer's brief and treated as the current operating reality."),
     known_facts: cleanList([
-      isStartup ? "Small team; output must be immediately usable by a founder or growth lead." : undefined,
-      isTikTok ? "Revenue motion depends on TikTok Shop creators, samples, outreach, and measurable GMV." : undefined,
+      isStartup ? "Small team; output must be immediately usable by a founder or operator." : undefined,
       input.businessContext?.trim(),
     ]),
     goals: cleanList([
-      isTikTok
-        ? "Launch a creator-commerce workflow that can produce first-week learning and GMV."
-        : isRepo
-          ? "Plan the requested software/product change before execution, preserving existing repo behavior."
-          : "Complete the requested business workflow with evidence-backed execution.",
+      isRepo
+        ? "Plan the requested software/product change before execution, preserving existing repo behavior."
+        : "Complete the requested workflow with evidence-backed execution.",
       "Minimize coordination loss when handing work to a specialized execution agent.",
     ]),
     constraints: cleanList([
       "Do not assume the executor knows hidden business context unless it is included in this packet.",
       "Keep outputs concrete enough for a human operator or downstream agent to act on.",
-      isTikTok ? "Avoid medical, exaggerated, or non-disclosure-safe creator claims." : undefined,
     ]),
     open_questions: cleanList([
       "What exact evidence did the executor use?",
-      "Which assumptions should be verified before spending money or shipping samples?",
+      "Which assumptions should be verified before acting on the deliverable?",
     ]),
   };
 
@@ -102,13 +97,6 @@ export function buildOrchestrationContext(input: ContextInput): OrchestrationCon
         why: "Caller-provided source hint for Nia retrieval.",
       })),
       {
-        label: isTikTok ? "campaign-context" : "task-classification",
-        path: "lib/campaign-context.ts",
-        why: isTikTok
-          ? "Defines the demo's Reacher-style campaign evidence and Nia-backed constraints."
-          : "Defines task classification so creator-commerce context is not injected into unrelated tasks.",
-      },
-      {
         label: "auction-lifecycle",
         path: "convex/auctions.ts",
         why: "Controls specialist bidding, execution, judging, settlement, and context injection.",
@@ -120,7 +108,9 @@ export function buildOrchestrationContext(input: ContextInput): OrchestrationCon
       },
     ],
     retrieval_queries: cleanList([
-      isRepo ? "Find files and docs that define the requested implementation path." : "Find source snippets and docs that constrain the campaign workflow.",
+      isRepo
+        ? "Find files and docs that define the requested implementation path."
+        : "Find source snippets and docs that constrain the requested workflow.",
       "Find prior context, helper APIs, and data contracts the executor must not invent.",
       "Find edge cases that could make the downstream execution fail.",
     ]),
@@ -131,22 +121,15 @@ export function buildOrchestrationContext(input: ContextInput): OrchestrationCon
     ]),
   };
 
-  const recommended = input.taskType === "reacher-live-launch"
-    ? ["reacher-social"]
-    : isTikTok
-      ? ["reacher-social", "hyperspell-brain", "nia-context", "codex-writer", "devin-engineer"]
-      : isRepo
-        ? [
-            "nia-context",
-            "devin-engineer",
-            "codex-writer",
-            "convex-realtime",
-            "vercel-v0",
-            "github-engineering",
-            "vercel-deploy",
-            "stripe-payments",
-          ]
-        : ["hyperspell-brain", "nia-context", "codex-writer", "devin-engineer"];
+  const recommended = isRepo
+    ? [
+        "nia-context",
+        "devin-engineer",
+        "codex-writer",
+        "convex-realtime",
+        "vercel-v0",
+      ]
+    : ["hyperspell-brain", "nia-context", "codex-writer", "devin-engineer"];
 
   const routing: RoutingContext = {
     owner: "auction-house",
@@ -175,7 +158,6 @@ export function buildOrchestrationContext(input: ContextInput): OrchestrationCon
     `- guardrails: ${repo.guardrails.join(" | ")}`,
     "",
     "Auction-house routing context:",
-    `- recommended specialists: ${routing.recommended_specialists.join(", ")}`,
     `- execution rule: ${routing.execution_rule}`,
     `- context contract: ${routing.context_contract.join(" | ")}`,
   ].join("\n");

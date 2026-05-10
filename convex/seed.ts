@@ -16,6 +16,7 @@ export const seedAgents = mutation({
           capabilities: spec.capabilities,
           system_prompt: spec.system_prompt,
           cost_per_task_estimate: spec.cost_baseline,
+          reputation_score: spec.starting_reputation,
         });
         continue;
       }

@@ -108,33 +108,7 @@ export interface CampaignLaunchArtifact {
   }>;
 }
 
-export interface ImplementationPlanArtifact {
-  kind: "implementation_plan";
-  title: string;
-  summary: string;
-  agent_id: string;
-  mode: "plan_for_approval";
-  user_goal: string;
-  context_required: Array<{
-    owner: "hyperspell" | "nia" | "user" | "auction-house";
-    item: string;
-    why: string;
-  }>;
-  proposed_build: Array<{
-    step: number;
-    title: string;
-    deliverable: string;
-    files_or_surfaces: string[];
-  }>;
-  acceptance_criteria: string[];
-  user_questions: string[];
-  payment_checkpoint: {
-    required_before_execution: boolean;
-    reason: string;
-  };
-}
-
-export type ExecutionArtifact = CampaignLaunchArtifact | ImplementationPlanArtifact;
+export type ExecutionArtifact = CampaignLaunchArtifact;
 
 export type SpecialistOutput = string | ExecutionArtifact;
 

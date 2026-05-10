@@ -9,12 +9,12 @@ import { ContextEnrichmentPanel } from "./ContextEnrichmentPanel";
 import { BidWindow } from "./BidWindow";
 import { AuctionResolution } from "./AuctionResolution";
 import { ValueImpactPanel } from "./ValueImpactPanel";
-import { CampaignEvidencePanel } from "./CampaignEvidencePanel";
-import { isCreatorCommerceTask } from "@/lib/campaign-context";
 import { ExecutionPanel } from "./ExecutionPanel";
 import { JudgeVerdictPanel } from "./JudgeVerdictPanel";
 import { SettlementPanel } from "./SettlementPanel";
 import { PlanPanel } from "./PlanPanel";
+import { ConversionDropDemo } from "./ConversionDropDemo";
+import { isConversionDropPrompt } from "@/lib/conversion-drop-demo";
 import type {
   TaskDoc,
   EscrowDoc,
@@ -46,18 +46,28 @@ export function TaskView({ taskId }: { taskId: string }) {
     );
   }
 
+  // Prompts mentioning "conversion drop" route to the dedicated
+  // diagnose-then-PR investigation view instead of the generic auction view.
+  const isConversionDemo = isConversionDropPrompt(task.prompt);
+
   // Multi-step parent: show the plan + a final synthesis section. Sub-step
   // auctions/bids live on the child task pages (linked from PlanPanel).
   const isMultiStepParent =
     Array.isArray(task.task_plan) && task.task_plan.length >= 2;
 
+  if (isConversionDemo) {
+    return (
+      <div className="space-y-4">
+        <TaskHeader task={task} />
+        <ConversionDropDemo task={task} events={lifecycle} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <TaskHeader task={task} />
-      <ContextEnrichmentPanel events={lifecycle} />
-      {isCreatorCommerceTask(task.prompt, task.task_type) && (
-        <CampaignEvidencePanel />
-      )}
+      <ContextEnrichmentPanel events={lifecycle} taskId={taskId} />
       {isMultiStepParent ? (
         <>
           <PlanPanel task={task} />

@@ -18,11 +18,7 @@ import type {
   SpecialistOutput,
 } from "../lib/types";
 import { callOpenAIJSON } from "../lib/openai";
-import {
-  buildTaskContext,
-  isCreatorCommerceTask,
-  isImplementationTask,
-} from "../lib/campaign-context";
+import { buildTaskContext } from "../lib/campaign-context";
 
 const BUYER_ID = "buyer:default";
 
@@ -127,19 +123,14 @@ export const solicitBids = internalAction({
       ),
     );
 
-    // The reacher-live-launch demo bypasses the open auction and routes
-    // straight to reacher-social. Other tasks invite only the specialists from
-    // the Hyperspell/Nia routing packet. This prevents a creator-commerce
-    // specialist from winning a SaaS engineering task just because it can
-    // produce a polished but unrelated artifact.
-    const recommended = new Set(taskContext?.routing.recommended_specialists ?? []);
+    // Open auction: every registered specialist gets a chance to bid. Each
+    // runner's bid prompt tells it to decline when the task is out of scope,
+    // and the Vickrey score (reputation / bid_price) handles the rest.
     const roster = [...SPECIALISTS, ...discoveredConfigs, ...catalogConfigs];
     const invitedSpecialists: SpecialistConfig[] =
       task.task_type === "reacher-live-launch"
         ? SPECIALISTS.filter((spec) => spec.agent_id === "reacher-social")
-        : recommended.size > 0
-          ? roster.filter((spec) => recommended.has(spec.agent_id))
-          : roster;
+        : roster;
 
     await Promise.allSettled(
       invitedSpecialists.map(async (spec) => {
@@ -401,16 +392,6 @@ Strict rules for your reasoning paragraph:
 
 Reject when the deliverable is off-topic from the goal, vague hand-waving, ignores an explicit constraint the user stated, or is so incomplete it can't be used. Accept when the output materially advances the user's goal — perfection is not required.`;
 
-const JUDGE_CAMPAIGN_PROMPT = `You are an impartial judge for a creator-campaign workflow. Evaluate whether the winning agent output satisfies the campaign brief and is grounded in Reacher TikTok Shop evidence plus Nia-backed context. Output JSON only:
-{ "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
-
-Be strict but fair. Reject if the output lacks a creator shortlist, outreach drafts, sample-request notes, risk evaluation, or evidence tied to Reacher/Nia context. Accept if it satisfies the campaign workflow even if imperfect.`;
-
-const JUDGE_IMPLEMENTATION_PLAN_PROMPT = `You are an impartial judge for the planning phase of a software/product execution marketplace. The winning agent is expected to return an implementation_plan artifact for user approval before payment/execution, not finished code. Output JSON only:
-{ "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
-
-Be strict but fair. Accept if the plan directly addresses the requested product/software change, identifies relevant context relay needs (Hyperspell business context and Nia repo/source context), names concrete implementation surfaces, preserves critical constraints such as Stripe checkout or existing UI, asks useful refinement questions, and defines acceptance criteria. Reject if it drifts into an unrelated domain, ignores the user's actual request, or pretends work is complete without a plan.`;
-
 export const judge = internalAction({
   args: {
     task_id: v.id("tasks"),
@@ -434,7 +415,7 @@ export const judge = internalAction({
     const userPrompt = [
       taskContext ? taskContext.prompt_addendum : null,
       task.task_type === "reacher-live-launch"
-        ? "This is the live Reacher proof workflow. The seeded demo creators in the generic campaign evidence are illustrative only. Do not reject merely because the agent used different creators. For this workflow, prefer live Reacher MCP evidence from tools such as list_shops_shops_get, creators_performance_creators_performance_post, and creators_list_creators_list_post. Accept if the output cites those live tool results and includes a creator shortlist, outreach drafts, sample notes, risk flags, and a 7-day launch plan."
+        ? "This is the live Reacher launch workflow. The example creators in the generic campaign evidence are illustrative only — do not reject merely because the agent used different creators. Prefer live Reacher MCP evidence from tools such as list_shops_shops_get, creators_performance_creators_performance_post, and creators_list_creators_list_post. Accept if the output cites those live tool results and includes a creator shortlist, outreach drafts, sample notes, risk flags, and a 7-day launch plan."
         : null,
       buildTaskContext(task.prompt, task.task_type),
       task.output_schema
@@ -448,11 +429,7 @@ export const judge = internalAction({
       .filter(Boolean)
       .join("\n\n---\n\n");
 
-    const judgeSystemPrompt = isCreatorCommerceTask(task.prompt, task.task_type)
-      ? JUDGE_CAMPAIGN_PROMPT
-      : isImplementationTask(task.prompt, task.task_type)
-        ? JUDGE_IMPLEMENTATION_PLAN_PROMPT
-        : JUDGE_GENERAL_PROMPT;
+    const judgeSystemPrompt = JUDGE_GENERAL_PROMPT;
 
     let verdict: JudgeVerdict;
     try {

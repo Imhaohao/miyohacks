@@ -6,7 +6,6 @@ import { LoadingProgress, useElapsedSeconds } from "./LoadingProgress";
 import type { TaskDoc, LifecycleEventDoc } from "@/lib/task-view";
 import { MarkdownLite } from "./MarkdownLite";
 import { LaunchProduct } from "./LaunchProduct";
-import { ImplementationPlanProduct } from "./ImplementationPlanProduct";
 import type { ExecutionArtifact } from "@/lib/types";
 
 interface Props {
@@ -119,8 +118,6 @@ export function ExecutionPanel({ task, events }: Props) {
       />
       {artifact?.kind === "campaign_launch" ? (
         <LaunchProduct artifact={artifact} />
-      ) : artifact?.kind === "implementation_plan" ? (
-        <ImplementationPlanProduct artifact={artifact} />
       ) : text ? (
         <MarkdownLite text={text} />
       ) : (
