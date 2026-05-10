@@ -164,8 +164,8 @@ export function Deck() {
           {isFs ? <ArrowsIn size={12} weight="bold" /> : <ArrowsOut size={12} weight="bold" />}
           <span className="hidden sm:inline">{isFs ? "Exit" : "Full screen"}</span>
         </button>
-        <span className="hidden text-[10px] uppercase tracking-wider text-ink-faint sm:inline">
-          F · ← → · Space
+        <span className="hidden text-[11px] text-ink-faint sm:inline">
+          f · ← → · space
         </span>
       </div>
     </div>
