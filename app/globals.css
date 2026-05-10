@@ -96,6 +96,98 @@ textarea,
   color: #143f8a;
 }
 
+/* Presentation deck (used by /present). */
+@keyframes slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translate3d(40px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@keyframes slide-in-left {
+  0% {
+    opacity: 0;
+    transform: translate3d(-40px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@keyframes deck-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes deck-draw {
+  0% {
+    stroke-dashoffset: var(--dash, 200);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+@keyframes deck-orbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes deck-pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+.deck-stagger > * {
+  opacity: 0;
+  animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.deck-stagger > *:nth-child(1) {
+  animation-delay: 120ms;
+}
+.deck-stagger > *:nth-child(2) {
+  animation-delay: 240ms;
+}
+.deck-stagger > *:nth-child(3) {
+  animation-delay: 360ms;
+}
+.deck-stagger > *:nth-child(4) {
+  animation-delay: 480ms;
+}
+.deck-stagger > *:nth-child(5) {
+  animation-delay: 600ms;
+}
+.deck-stagger > *:nth-child(6) {
+  animation-delay: 720ms;
+}
+.deck-stagger > *:nth-child(7) {
+  animation-delay: 840ms;
+}
+
 /* Mini horizontal score bar used in lists. Solid brand fill, no gradient. */
 .score-bar {
   position: relative;
