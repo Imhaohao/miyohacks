@@ -12,15 +12,19 @@ export const BID_WINDOW_SECONDS = 15;
 
 const taskStatusValidator = v.union(
   v.literal("open"),
+  v.literal("shortlisting"),
   v.literal("planning"),
   v.literal("bidding"),
   v.literal("awarded"),
+  v.literal("plan_review"),
+  v.literal("approved"),
   v.literal("executing"),
   v.literal("judging"),
   v.literal("synthesizing"),
   v.literal("complete"),
   v.literal("disputed"),
   v.literal("failed"),
+  v.literal("cancelled"),
 );
 
 function cleanOptional(value: string | undefined): string | undefined {
@@ -89,11 +93,18 @@ export const post = mutation({
       task_type: args.task_type ?? "general",
       prompt: args.prompt,
       max_budget: args.max_budget,
+      payment_status: "unfunded",
       output_schema: args.output_schema,
       status: "planning",
       bid_window_seconds: BID_WINDOW_SECONDS,
       bid_window_closes_at: closesAt,
       product_context_profile_id: profile?._id,
+    });
+
+    await ctx.runMutation(internal.payments._reserveTaskBudget, {
+      task_id,
+      buyer_id: args.posted_by,
+      amount: args.max_budget,
     });
 
     const orchestrationContext = buildOrchestrationContext({
@@ -181,12 +192,18 @@ export const _createChild = internalMutation({
       task_type: parent.task_type,
       prompt: args.prompt,
       max_budget: args.max_budget,
+      payment_status: "funds_reserved",
       status: "bidding",
       bid_window_seconds: BID_WINDOW_SECONDS,
       bid_window_closes_at: closesAt,
       parent_task_id: args.parent_task_id,
       step_index: args.step_index,
       product_context_profile_id: parent.product_context_profile_id,
+    });
+    await ctx.runMutation(internal.payments._allocateChildBudget, {
+      parent_task_id: args.parent_task_id,
+      child_task_id,
+      amount: args.max_budget,
     });
     const parentContext = await ctx.db
       .query("task_contexts")

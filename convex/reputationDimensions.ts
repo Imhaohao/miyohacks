@@ -1,4 +1,4 @@
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
 
 const WEIGHT = {
@@ -102,6 +102,53 @@ export const forAgent = query({
       .withIndex("by_agent", (q) => q.eq("agent_id", args.agent_id))
       .collect();
     return rows.sort((a, b) => b.created_at - a.created_at);
+  },
+});
+
+export const _summaryForAgent = internalQuery({
+  args: { agent_id: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("reputation_dimensions")
+      .withIndex("by_agent", (q) => q.eq("agent_id", args.agent_id))
+      .collect();
+
+    if (rows.length === 0) {
+      return {
+        agent_id: args.agent_id,
+        tasks: 0,
+        speed: 0.65,
+        estimate: 0.65,
+        quality: 0.65,
+        value: 0.65,
+        overall: 0.65,
+        acceptance_rate: 0.65,
+      };
+    }
+
+    const totals = rows.reduce(
+      (acc, r) => {
+        acc.speed += r.speed_score;
+        acc.estimate += r.estimate_accuracy;
+        acc.quality += r.quality_score;
+        acc.value += r.value_score;
+        acc.overall += r.overall;
+        acc.accepted += r.accepted ? 1 : 0;
+        return acc;
+      },
+      { speed: 0, estimate: 0, quality: 0, value: 0, overall: 0, accepted: 0 },
+    );
+
+    return {
+      agent_id: args.agent_id,
+      tasks: rows.length,
+      speed: totals.speed / rows.length,
+      estimate: totals.estimate / rows.length,
+      quality: totals.quality / rows.length,
+      value: totals.value / rows.length,
+      overall: totals.overall / rows.length,
+      acceptance_rate: totals.accepted / rows.length,
+    };
   },
 });
 

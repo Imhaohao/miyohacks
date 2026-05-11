@@ -4,14 +4,18 @@ import type { TaskStatus } from "@/lib/types";
 const META: Record<string, { label: string; tone: PillTone; pulse?: boolean }> = {
   open: { label: "Open", tone: "neutral" },
   planning: { label: "Planning", tone: "info", pulse: true },
+  shortlisting: { label: "Shortlisting", tone: "info", pulse: true },
   bidding: { label: "Bidding", tone: "warning", pulse: true },
   awarded: { label: "Awarded", tone: "info" },
+  plan_review: { label: "Plan Review", tone: "warning", pulse: true },
+  approved: { label: "Approved", tone: "success" },
   executing: { label: "Executing", tone: "brand", pulse: true },
   judging: { label: "Judging", tone: "info", pulse: true },
   synthesizing: { label: "Synthesizing", tone: "brand", pulse: true },
   complete: { label: "Complete", tone: "success" },
   disputed: { label: "Disputed", tone: "danger" },
   failed: { label: "Failed", tone: "danger" },
+  cancelled: { label: "Cancelled", tone: "neutral" },
 };
 
 const FALLBACK = { label: "Unknown", tone: "neutral" as PillTone, pulse: false };

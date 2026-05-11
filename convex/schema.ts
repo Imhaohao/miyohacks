@@ -20,17 +20,31 @@ export default defineSchema({
     prompt: v.string(),
     output_schema: v.optional(v.any()),
     max_budget: v.number(),
+    payment_status: v.optional(
+      v.union(
+        v.literal("unfunded"),
+        v.literal("funds_reserved"),
+        v.literal("escrow_locked"),
+        v.literal("released"),
+        v.literal("refunded"),
+        v.literal("payout_pending"),
+      ),
+    ),
     status: v.union(
       v.literal("open"),
+      v.literal("shortlisting"),
       v.literal("planning"),
       v.literal("bidding"),
       v.literal("awarded"),
+      v.literal("plan_review"),
+      v.literal("approved"),
       v.literal("executing"),
       v.literal("judging"),
       v.literal("synthesizing"),
       v.literal("complete"),
       v.literal("disputed"),
       v.literal("failed"),
+      v.literal("cancelled"),
     ),
     bid_window_seconds: v.number(),
     bid_window_closes_at: v.number(),
@@ -121,6 +135,31 @@ export default defineSchema({
     capability_claim: v.string(),
     estimated_seconds: v.number(),
     score: v.number(),
+    task_fit_score: v.optional(v.number()),
+    historical_quality: v.optional(v.number()),
+    acceptance_rate: v.optional(v.number()),
+    reliability_score: v.optional(v.number()),
+    speed_score: v.optional(v.number()),
+    estimate_accuracy: v.optional(v.number()),
+    availability_score: v.optional(v.number()),
+    expected_quality: v.optional(v.number()),
+    latency_penalty: v.optional(v.number()),
+    effective_price: v.optional(v.number()),
+    value_score: v.optional(v.number()),
+    execution_preview: v.optional(v.string()),
+    tool_availability: v.optional(
+      v.object({
+        status: v.union(
+          v.literal("available"),
+          v.literal("manual"),
+          v.literal("mock"),
+          v.literal("missing"),
+        ),
+        checked: v.array(v.string()),
+        missing: v.optional(v.array(v.string())),
+        reason: v.optional(v.string()),
+      }),
+    ),
   }).index("by_task", ["task_id"]),
 
   escrow: defineTable({
@@ -128,12 +167,119 @@ export default defineSchema({
     buyer_id: v.string(),
     seller_id: v.string(),
     locked_amount: v.number(),
+    platform_fee: v.optional(v.number()),
+    agent_net_amount: v.optional(v.number()),
     status: v.union(
       v.literal("locked"),
       v.literal("released"),
       v.literal("refunded"),
     ),
   }).index("by_task", ["task_id"]),
+
+  buyer_wallets: defineTable({
+    buyer_id: v.string(),
+    available_credits: v.number(),
+    reserved_credits: v.number(),
+    lifetime_purchased: v.number(),
+    lifetime_spent: v.number(),
+    updated_at: v.number(),
+  }).index("by_buyer", ["buyer_id"]),
+
+  agent_wallets: defineTable({
+    agent_id: v.string(),
+    available_earnings: v.number(),
+    pending_earnings: v.number(),
+    lifetime_earned: v.number(),
+    lifetime_paid_out: v.number(),
+    updated_at: v.number(),
+  }).index("by_agent", ["agent_id"]),
+
+  ledger_entries: defineTable({
+    account_id: v.string(),
+    account_type: v.union(
+      v.literal("buyer"),
+      v.literal("agent"),
+      v.literal("platform"),
+      v.literal("escrow"),
+    ),
+    entry_type: v.union(
+      v.literal("credit_purchase"),
+      v.literal("credit_reserve"),
+      v.literal("credit_release"),
+      v.literal("credit_refund"),
+      v.literal("escrow_release"),
+      v.literal("agent_earning_available"),
+      v.literal("agent_payout"),
+      v.literal("agent_payout_failed"),
+      v.literal("platform_fee"),
+    ),
+    amount: v.number(),
+    currency: v.string(),
+    task_id: v.optional(v.id("tasks")),
+    stripe_event_id: v.optional(v.string()),
+    stripe_session_id: v.optional(v.string()),
+    stripe_transfer_id: v.optional(v.string()),
+    idempotency_key: v.string(),
+    created_at: v.number(),
+  })
+    .index("by_account", ["account_type", "account_id"])
+    .index("by_task", ["task_id"])
+    .index("by_idempotency_key", ["idempotency_key"]),
+
+  stripe_checkout_sessions: defineTable({
+    buyer_id: v.string(),
+    session_id: v.string(),
+    amount_usd: v.number(),
+    credits: v.number(),
+    status: v.union(
+      v.literal("created"),
+      v.literal("completed"),
+      v.literal("expired"),
+      v.literal("failed"),
+    ),
+    stripe_customer_id: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_session", ["session_id"])
+    .index("by_buyer", ["buyer_id"]),
+
+  agent_payout_accounts: defineTable({
+    agent_id: v.string(),
+    stripe_connect_account_id: v.string(),
+    onboarding_status: v.union(
+      v.literal("not_started"),
+      v.literal("pending"),
+      v.literal("complete"),
+      v.literal("restricted"),
+    ),
+    charges_enabled: v.boolean(),
+    payouts_enabled: v.boolean(),
+    requirements_due: v.array(v.string()),
+    last_checked_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_agent", ["agent_id"])
+    .index("by_connect_account", ["stripe_connect_account_id"]),
+
+  payouts: defineTable({
+    agent_id: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    status: v.union(
+      v.literal("requested"),
+      v.literal("processing"),
+      v.literal("paid"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+    ),
+    stripe_transfer_id: v.optional(v.string()),
+    failure_reason: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_agent", ["agent_id"])
+    .index("by_transfer", ["stripe_transfer_id"]),
 
   reputation_events: defineTable({
     agent_id: v.string(),
@@ -180,6 +326,83 @@ export default defineSchema({
     task_id: v.id("tasks"),
     event_type: v.string(),
     payload: v.any(),
+    timestamp: v.number(),
+  }).index("by_task", ["task_id"]),
+
+  agent_contacts: defineTable({
+    agent_id: v.string(),
+    display_name: v.string(),
+    sponsor: v.string(),
+    industry: v.string(),
+    protocol: v.union(
+      v.literal("a2a"),
+      v.literal("mcp"),
+      v.literal("mock"),
+      v.literal("manual"),
+    ),
+    one_liner: v.string(),
+    capabilities: v.array(v.string()),
+    domain_tags: v.array(v.string()),
+    endpoint_url: v.optional(v.string()),
+    agent_card_url: v.optional(v.string()),
+    auth_type: v.string(),
+    auth_env: v.optional(v.string()),
+    verification_status: v.string(),
+    health_status: v.string(),
+    supported_input_modes: v.array(v.string()),
+    supported_output_modes: v.array(v.string()),
+    artifact_types: v.array(v.string()),
+    cost_baseline: v.number(),
+    starting_reputation: v.number(),
+    homepage_url: v.optional(v.string()),
+    updated_at: v.number(),
+  }).index("by_agent_id", ["agent_id"]),
+
+  agent_health_checks: defineTable({
+    agent_id: v.string(),
+    status: v.string(),
+    checked_at: v.number(),
+    latency_ms: v.optional(v.number()),
+    message: v.optional(v.string()),
+  }).index("by_agent", ["agent_id"]),
+
+  agent_shortlists: defineTable({
+    task_id: v.id("tasks"),
+    agent_id: v.string(),
+    rank: v.number(),
+    score: v.number(),
+    reputation_score: v.number(),
+    reasons: v.array(v.string()),
+    industry: v.string(),
+    protocol: v.string(),
+    created_at: v.number(),
+  }).index("by_task", ["task_id"]),
+
+  execution_plans: defineTable({
+    task_id: v.id("tasks"),
+    agent_id: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("revision_requested"),
+      v.literal("cancelled"),
+    ),
+    plan: v.any(),
+    revision_count: v.number(),
+    feedback: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  }).index("by_task", ["task_id"]),
+
+  approval_events: defineTable({
+    task_id: v.id("tasks"),
+    event_type: v.union(
+      v.literal("approved"),
+      v.literal("revision_requested"),
+      v.literal("cancelled"),
+    ),
+    actor: v.string(),
+    reason: v.optional(v.string()),
     timestamp: v.number(),
   }).index("by_task", ["task_id"]),
 

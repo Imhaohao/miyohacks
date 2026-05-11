@@ -34,10 +34,7 @@ export const enrichAndStartAuction = internalAction({
         event_type: "context_enrichment_skipped",
         payload: { reason: "no synthetic stub found" },
       });
-      await ctx.scheduler.runAfter(0, internal.auctions.solicitBids, {
-        task_id: args.task_id,
-      });
-      await ctx.scheduler.runAfter(BID_WINDOW_MS, internal.auctions.resolve, {
+      await ctx.scheduler.runAfter(0, internal.broker.shortlist, {
         task_id: args.task_id,
       });
       return;
@@ -141,10 +138,7 @@ export const enrichAndStartAuction = internalAction({
       bid_window_closes_at: closes_at,
     });
 
-    await ctx.scheduler.runAfter(0, internal.auctions.solicitBids, {
-      task_id: args.task_id,
-    });
-    await ctx.scheduler.runAfter(BID_WINDOW_MS, internal.auctions.resolve, {
+    await ctx.scheduler.runAfter(0, internal.broker.shortlist, {
       task_id: args.task_id,
     });
   },

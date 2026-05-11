@@ -16,7 +16,9 @@ export const forTask = query({
       .query("bids")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
       .collect();
-    return bids.sort((a, b) => b.score - a.score);
+    return bids.sort(
+      (a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score),
+    );
   },
 });
 
@@ -28,6 +30,31 @@ export const _insert = internalMutation({
     capability_claim: v.string(),
     estimated_seconds: v.number(),
     score: v.number(),
+    task_fit_score: v.optional(v.number()),
+    historical_quality: v.optional(v.number()),
+    acceptance_rate: v.optional(v.number()),
+    reliability_score: v.optional(v.number()),
+    speed_score: v.optional(v.number()),
+    estimate_accuracy: v.optional(v.number()),
+    availability_score: v.optional(v.number()),
+    expected_quality: v.optional(v.number()),
+    latency_penalty: v.optional(v.number()),
+    effective_price: v.optional(v.number()),
+    value_score: v.optional(v.number()),
+    execution_preview: v.optional(v.string()),
+    tool_availability: v.optional(
+      v.object({
+        status: v.union(
+          v.literal("available"),
+          v.literal("manual"),
+          v.literal("mock"),
+          v.literal("missing"),
+        ),
+        checked: v.array(v.string()),
+        missing: v.optional(v.array(v.string())),
+        reason: v.optional(v.string()),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bids", args);

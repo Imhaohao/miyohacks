@@ -8,14 +8,20 @@
  * @module
  */
 
+import type * as agentContacts from "../agentContacts.js";
+import type * as agentShortlists from "../agentShortlists.js";
 import type * as agents from "../agents.js";
+import type * as auctionSelection from "../auctionSelection.js";
 import type * as auctions from "../auctions.js";
 import type * as bids from "../bids.js";
+import type * as broker from "../broker.js";
 import type * as contextEnrichment from "../contextEnrichment.js";
 import type * as discoveredSpecialists from "../discoveredSpecialists.js";
 import type * as disputes from "../disputes.js";
 import type * as escrow from "../escrow.js";
+import type * as executionPlans from "../executionPlans.js";
 import type * as lifecycle from "../lifecycle.js";
+import type * as payments from "../payments.js";
 import type * as planning from "../planning.js";
 import type * as productContext from "../productContext.js";
 import type * as productContextActions from "../productContextActions.js";
@@ -32,14 +38,20 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  agentContacts: typeof agentContacts;
+  agentShortlists: typeof agentShortlists;
   agents: typeof agents;
+  auctionSelection: typeof auctionSelection;
   auctions: typeof auctions;
   bids: typeof bids;
+  broker: typeof broker;
   contextEnrichment: typeof contextEnrichment;
   discoveredSpecialists: typeof discoveredSpecialists;
   disputes: typeof disputes;
   escrow: typeof escrow;
+  executionPlans: typeof executionPlans;
   lifecycle: typeof lifecycle;
+  payments: typeof payments;
   planning: typeof planning;
   productContext: typeof productContext;
   productContextActions: typeof productContextActions;

@@ -9,17 +9,25 @@ export default function HomePage() {
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 pb-16 pt-6">
       <nav className="flex items-center justify-between">
         <ArborMark />
-        <Link
-          href="/agents"
-          className="group inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-brand-700"
-        >
-          Browse specialists
-          <ArrowRight
-            size={14}
-            weight="bold"
-            className="transition-transform group-hover:translate-x-0.5"
-          />
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/billing"
+            className="text-sm font-medium text-ink-muted hover:text-brand-700"
+          >
+            Billing
+          </Link>
+          <Link
+            href="/agents"
+            className="group inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-brand-700"
+          >
+            Browse specialists
+            <ArrowRight
+              size={14}
+              weight="bold"
+              className="transition-transform group-hover:translate-x-0.5"
+            />
+          </Link>
+        </div>
       </nav>
 
       <section className="mx-auto mt-12 max-w-2xl animate-fade-up text-center">

@@ -8,6 +8,8 @@ import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { AgentSuggestions } from "@/components/AgentSuggestions";
 import { ArrowRight, CircleNotch } from "@phosphor-icons/react";
+import Link from "next/link";
+import { formatCredits } from "@/lib/payments";
 
 // task_type is still used by some legacy code paths (the reacher-live-launch
 // demo and the campaign-context evidence injection). For the human form we
@@ -48,6 +50,9 @@ export function PostTaskForm() {
   const productContext = useQuery(api.productContext.latest, {
     owner_id: "buyer:web",
   });
+  const wallet = useQuery(api.payments.walletForBuyer, {
+    buyer_id: "buyer:web",
+  });
   const [prompt, setPrompt] = useState("");
   const [budget, setBudget] = useState("2.00");
   const [submitting, setSubmitting] = useState(false);
@@ -74,6 +79,13 @@ export function PostTaskForm() {
   function applyExample(ex: (typeof EXAMPLES)[number]) {
     setPrompt(ex.prompt);
   }
+
+  const budgetNumber = Number(budget);
+  const availableCredits = wallet?.available_credits ?? 0;
+  const insufficientCredits =
+    wallet !== undefined &&
+    Number.isFinite(budgetNumber) &&
+    budgetNumber > availableCredits;
 
   return (
     <div className="space-y-4">
@@ -120,24 +132,44 @@ export function PostTaskForm() {
             <label htmlFor="budget" className={fieldLabel}>
               Budget
             </label>
-            <div className="relative max-w-[160px]">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-muted">
-                $
-              </span>
-              <input
-                id="budget"
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                className={`${inputBase} pl-6 font-mono`}
-              />
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="relative max-w-[160px]">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-muted">
+                  $
+                </span>
+                <input
+                  id="budget"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  className={`${inputBase} pl-6 font-mono`}
+                />
+              </div>
+              <div className="pb-2 text-xs text-ink-muted">
+                Wallet:{" "}
+                <span className="font-mono text-ink">
+                  {formatCredits(availableCredits)}
+                </span>
+                {insufficientCredits && (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <Link
+                      href="/billing"
+                      className="font-medium text-brand-700 hover:text-brand-800"
+                    >
+                      buy credits
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
           <Button
             type="submit"
-            disabled={submitting || !prompt.trim()}
+            disabled={submitting || !prompt.trim() || insufficientCredits}
             className="w-full"
             size="lg"
           >

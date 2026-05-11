@@ -21,7 +21,17 @@ import {
   type SuggestResult,
 } from "@/lib/specialists/suggest";
 import { discoverSpecialist } from "@/lib/specialists/discover";
-import type { SpecialistConfig } from "@/lib/types";
+import {
+  AGENT_CONTACT_CATALOG,
+} from "@/lib/agent-contacts";
+import { rankAgentContacts } from "@/lib/agent-broker";
+import type { AgentIndustry, AgentProtocol, SpecialistConfig } from "@/lib/types";
+import {
+  amountToCents,
+  checkoutMetadata,
+  creditPackForCredits,
+} from "@/lib/payments";
+import { getStripe, paymentServerSecret } from "@/lib/stripe";
 
 function convex() {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
@@ -44,6 +54,19 @@ export interface PostTaskArgs {
   business_context?: string;
   repo_context?: string;
   source_hints?: string[];
+}
+
+export interface GetWalletArgs {
+  buyer_id?: string;
+}
+
+export interface CreateCreditCheckoutArgs {
+  buyer_id?: string;
+  credits: number;
+}
+
+export interface GetAgentEarningsArgs {
+  agent_id: string;
 }
 
 export interface GetTaskArgs {
@@ -86,6 +109,18 @@ export interface DiscoverSpecialistArgs {
   preferred_sources?: Array<"catalog" | "registry" | "synthesized">;
 }
 
+export interface ListAgentContactsArgs {
+  industry?: AgentIndustry;
+  protocol?: AgentProtocol;
+  verified_only?: boolean;
+}
+
+export interface SuggestAgentContactsArgs {
+  prompt: string;
+  task_type?: string;
+  top_n?: number;
+}
+
 export interface UpsertProductContextArgs {
   agent_id?: string;
   company_name: string;
@@ -94,6 +129,19 @@ export interface UpsertProductContextArgs {
   business_context: string;
   repo_context?: string;
   source_hints?: string[];
+}
+
+export interface PlanActionArgs {
+  task_id: string;
+  actor?: string;
+}
+
+export interface PlanRevisionArgs extends PlanActionArgs {
+  feedback: string;
+}
+
+export interface CancelTaskArgs extends PlanActionArgs {
+  reason?: string;
 }
 
 // ─── tool definitions ─────────────────────────────────────────────────────
@@ -105,6 +153,91 @@ export interface ToolDefinition {
 }
 
 export const TOOLS: ToolDefinition[] = [
+  {
+    name: "get_wallet",
+    description:
+      "Fetch a buyer's Arbor credit wallet, including available and reserved credits.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        buyer_id: {
+          type: "string",
+          description: "Buyer/caller id. Defaults to 'agent:mcp'.",
+        },
+      },
+    },
+  },
+  {
+    name: "create_credit_checkout",
+    description:
+      "Create a Stripe Checkout URL for buying Arbor credits. Credits are added only after the Stripe webhook confirms payment.",
+    inputSchema: {
+      type: "object",
+      required: ["credits"],
+      properties: {
+        buyer_id: {
+          type: "string",
+          description: "Buyer/caller id. Defaults to 'agent:mcp'.",
+        },
+        credits: {
+          type: "number",
+          description: "Credit pack size: 10, 25, 100, or 250.",
+        },
+      },
+    },
+  },
+  {
+    name: "get_agent_earnings",
+    description:
+      "Fetch an agent's available earnings and Stripe Connect payout readiness.",
+    inputSchema: {
+      type: "object",
+      required: ["agent_id"],
+      properties: {
+        agent_id: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_agent_contacts",
+    description:
+      "List the 100-agent cross-industry A2A/MCP/contact registry with protocol, health, verification, capabilities, and live reputation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        industry: {
+          type: "string",
+          description:
+            "Optional industry filter: software, finance, legal, healthcare, ecommerce, marketing, sales, operations, data, creative-media.",
+        },
+        protocol: {
+          type: "string",
+          description: "Optional protocol filter: a2a, mcp, mock, manual.",
+        },
+        verified_only: {
+          type: "boolean",
+          description: "If true, only return verified contacts.",
+        },
+      },
+    },
+  },
+  {
+    name: "suggest_agent_contacts",
+    description:
+      "Run the deterministic broker ranker over the 100-agent registry and return the best-fit contacts for a task.",
+    inputSchema: {
+      type: "object",
+      required: ["prompt"],
+      properties: {
+        prompt: { type: "string" },
+        task_type: { type: "string" },
+        top_n: {
+          type: "integer",
+          description: "Number of contacts to return. Default 12, max 20.",
+        },
+      },
+    },
+  },
   {
     name: "upsert_product_context",
     description:
@@ -201,7 +334,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "get_task",
     description:
-      "Fetch current task state: status, bids (only after window closes), output artifact, judge verdict, context packet, and simulated escrow status.",
+      "Fetch current task state: status, bids (only after window closes), output artifact, judge verdict, context packet, wallet-backed escrow status, and payment ledger.",
     inputSchema: {
       type: "object",
       required: ["task_id"],
@@ -266,6 +399,47 @@ export const TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "approve_execution_plan",
+    description:
+      "Approve the winning agent's execution plan so the task can move from plan_review to execution.",
+    inputSchema: {
+      type: "object",
+      required: ["task_id"],
+      properties: {
+        task_id: { type: "string" },
+        actor: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "request_plan_revision",
+    description:
+      "Ask the winning agent to revise the execution plan before approval. Execution does not start.",
+    inputSchema: {
+      type: "object",
+      required: ["task_id", "feedback"],
+      properties: {
+        task_id: { type: "string" },
+        feedback: { type: "string" },
+        actor: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "cancel_task",
+    description:
+      "Cancel a task before execution approval. Simulated escrow is refunded and no agent executes.",
+    inputSchema: {
+      type: "object",
+      required: ["task_id"],
+      properties: {
+        task_id: { type: "string" },
+        reason: { type: "string" },
+        actor: { type: "string" },
+      },
+    },
+  },
+  {
     name: "raise_dispute",
     description:
       "Raise a dispute on a completed task. The judge re-evaluates with the dispute reason injected; reputation and escrow flow accordingly.",
@@ -310,6 +484,75 @@ export const TOOLS: ToolDefinition[] = [
 
 // ─── tool handlers ────────────────────────────────────────────────────────
 
+export async function handleGetWallet(args: GetWalletArgs) {
+  const buyerId = args.buyer_id ?? "agent:mcp";
+  const c = convex();
+  const [wallet, ledger] = await Promise.all([
+    c.query(api.payments.walletForBuyer, { buyer_id: buyerId }),
+    c.query(api.payments.ledgerForBuyer, { buyer_id: buyerId, limit: 20 }),
+  ]);
+  return { buyer_id: buyerId, wallet, ledger };
+}
+
+export async function handleCreateCreditCheckout(args: CreateCreditCheckoutArgs) {
+  const buyerId = args.buyer_id ?? "agent:mcp";
+  const pack = creditPackForCredits(Number(args.credits));
+  if (!pack) throw new Error("credits must be one of 10, 25, 100, or 250");
+
+  const metadata = checkoutMetadata({ buyerId, credits: pack.credits });
+  const session = await getStripe().checkout.sessions.create({
+    mode: "payment",
+    payment_method_types: ["card"],
+    customer_creation: "always",
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: amountToCents(pack.amountUsd),
+          product_data: {
+            name: `${pack.credits} Arbor credits`,
+            description: "Credits fund agent auctions, escrow, and payouts.",
+          },
+        },
+      },
+    ],
+    metadata,
+    payment_intent_data: { metadata },
+    success_url: `${appUrl()}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${appUrl()}/billing?checkout=cancelled`,
+  });
+
+  if (!session.url) throw new Error("Stripe did not return a checkout URL");
+  await convex().mutation(api.payments.recordCheckoutSessionCreated, {
+    server_secret: paymentServerSecret(),
+    buyer_id: buyerId,
+    session_id: session.id,
+    amount_usd: pack.amountUsd,
+    credits: pack.credits,
+    stripe_customer_id:
+      typeof session.customer === "string" ? session.customer : undefined,
+  });
+
+  return {
+    buyer_id: buyerId,
+    checkout_url: session.url,
+    session_id: session.id,
+    credits: pack.credits,
+    amount_usd: pack.amountUsd,
+  };
+}
+
+export async function handleGetAgentEarnings(args: GetAgentEarningsArgs) {
+  if (!args.agent_id?.trim()) throw new Error("agent_id is required");
+  const c = convex();
+  const [wallet, payout_account] = await Promise.all([
+    c.query(api.payments.agentWallet, { agent_id: args.agent_id }),
+    c.query(api.payments.payoutAccountForAgent, { agent_id: args.agent_id }),
+  ]);
+  return { agent_id: args.agent_id, wallet, payout_account };
+}
+
 export async function handlePostTask(args: PostTaskArgs) {
   if (!args.prompt) throw new Error("prompt is required");
   if (typeof args.max_budget !== "number")
@@ -330,6 +573,8 @@ export async function handlePostTask(args: PostTaskArgs) {
     task_id: result.task_id,
     status: result.status,
     bid_window_closes_at: result.bid_window_closes_at,
+    shortlist_status: "pending",
+    shortlist_size_target: 12,
     web_view_url: `${appUrl()}/task/${result.task_id}`,
   };
 }
@@ -340,14 +585,76 @@ export async function handleGetTask(args: GetTaskArgs) {
   // narrow it to Id<"tasks"> at runtime — cast at the boundary.
   const task_id = args.task_id as Id<"tasks">;
   const c = convex();
-  const [task, bids, escrow, lifecycle, context] = await Promise.all([
+  const [
+    task,
+    bids,
+    escrow,
+    lifecycle,
+    context,
+    shortlist,
+    execution_plan,
+    approval_events,
+    payment_ledger,
+  ] = await Promise.all([
     c.query(api.tasks.get, { task_id }),
     c.query(api.bids.forTask, { task_id }),
     c.query(api.escrow.forTask, { task_id }),
     c.query(api.lifecycle.forTask, { task_id }),
     c.query(api.taskContexts.forTask, { task_id }),
+    c.query(api.agentShortlists.forTask, { task_id }),
+    c.query(api.executionPlans.forTask, { task_id }),
+    c.query(api.executionPlans.approvalEventsForTask, { task_id }),
+    c.query(api.payments.ledgerForTask, { task_id }),
   ]);
-  return { task, bids, escrow, lifecycle, context };
+  return {
+    task,
+    bids,
+    escrow,
+    lifecycle,
+    context,
+    shortlist,
+    execution_plan,
+    approval_events,
+    payment_ledger,
+  };
+}
+
+export async function handleListAgentContacts(args: ListAgentContactsArgs) {
+  return await convex().query(api.agentContacts.list, {
+    industry: args.industry,
+    protocol: args.protocol,
+    verified_only: args.verified_only,
+  });
+}
+
+export async function handleSuggestAgentContacts(args: SuggestAgentContactsArgs) {
+  if (!args.prompt?.trim()) throw new Error("prompt is required");
+  const topN =
+    typeof args.top_n === "number" && args.top_n > 0
+      ? Math.min(20, Math.floor(args.top_n))
+      : 12;
+  const live = (await convex().query(api.agents.list, {})) as Array<{
+    agent_id: string;
+    reputation_score: number;
+  }>;
+  const reputations = Object.fromEntries(
+    live.map((agent) => [agent.agent_id, agent.reputation_score]),
+  );
+  return {
+    contacts: rankAgentContacts({
+      prompt: args.prompt,
+      taskType: args.task_type ?? "general",
+      contacts: AGENT_CONTACT_CATALOG,
+      reputations,
+      limit: topN,
+    }).map((item) => ({
+      rank: item.rank,
+      score: item.score,
+      reasons: item.reasons,
+      reputation_score: item.reputation_score,
+      ...item.contact,
+    })),
+  };
 }
 
 export async function handleListSpecialists(_args: ListSpecialistsArgs) {
@@ -557,6 +864,34 @@ export async function handleOverrideJudge(args: OverrideJudgeArgs) {
   });
 }
 
+export async function handleApproveExecutionPlan(args: PlanActionArgs) {
+  if (!args.task_id) throw new Error("task_id is required");
+  return await convex().mutation(api.executionPlans.approve, {
+    task_id: args.task_id as Id<"tasks">,
+    actor: args.actor ?? "agent:mcp",
+  });
+}
+
+export async function handleRequestPlanRevision(args: PlanRevisionArgs) {
+  if (!args.task_id || !args.feedback) {
+    throw new Error("task_id and feedback are required");
+  }
+  return await convex().mutation(api.executionPlans.requestRevision, {
+    task_id: args.task_id as Id<"tasks">,
+    feedback: args.feedback,
+    actor: args.actor ?? "agent:mcp",
+  });
+}
+
+export async function handleCancelTask(args: CancelTaskArgs) {
+  if (!args.task_id) throw new Error("task_id is required");
+  return await convex().mutation(api.executionPlans.cancel, {
+    task_id: args.task_id as Id<"tasks">,
+    reason: args.reason,
+    actor: args.actor ?? "agent:mcp",
+  });
+}
+
 // ─── unified dispatch ─────────────────────────────────────────────────────
 
 export async function dispatchTool(
@@ -564,6 +899,22 @@ export async function dispatchTool(
   args: Record<string, unknown>,
 ): Promise<unknown> {
   switch (name) {
+    case "get_wallet":
+      return await handleGetWallet(args as unknown as GetWalletArgs);
+    case "create_credit_checkout":
+      return await handleCreateCreditCheckout(
+        args as unknown as CreateCreditCheckoutArgs,
+      );
+    case "get_agent_earnings":
+      return await handleGetAgentEarnings(
+        args as unknown as GetAgentEarningsArgs,
+      );
+    case "list_agent_contacts":
+      return await handleListAgentContacts(args as unknown as ListAgentContactsArgs);
+    case "suggest_agent_contacts":
+      return await handleSuggestAgentContacts(
+        args as unknown as SuggestAgentContactsArgs,
+      );
     case "upsert_product_context":
       return await handleUpsertProductContext(
         args as unknown as UpsertProductContextArgs,
@@ -584,6 +935,12 @@ export async function dispatchTool(
       );
     case "raise_dispute":
       return await handleRaiseDispute(args as unknown as RaiseDisputeArgs);
+    case "approve_execution_plan":
+      return await handleApproveExecutionPlan(args as unknown as PlanActionArgs);
+    case "request_plan_revision":
+      return await handleRequestPlanRevision(args as unknown as PlanRevisionArgs);
+    case "cancel_task":
+      return await handleCancelTask(args as unknown as CancelTaskArgs);
     case "override_judge":
       return await handleOverrideJudge(args as unknown as OverrideJudgeArgs);
     default:

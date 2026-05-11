@@ -9,9 +9,14 @@ import {
   registerDiscoveredSpecialist,
 } from "../lib/specialists/registry";
 import { MCP_CATALOG } from "../lib/specialists/catalog";
+import {
+  AGENT_CONTACT_CATALOG,
+  contactToSpecialistConfig,
+} from "../lib/agent-contacts";
 import type {
   AgentId,
   BidPayload,
+  ExecutionPlanArtifact,
   ExecutionArtifact,
   JudgeVerdict,
   SpecialistConfig,
@@ -23,6 +28,11 @@ import {
   isCreatorCommerceTask,
   isImplementationTask,
 } from "../lib/campaign-context";
+import {
+  clamp01,
+  computeAuctionValue,
+  qualityAdjustedVickreyPrice,
+} from "../lib/auction-value";
 
 const BUYER_ID = "buyer:default";
 
@@ -43,6 +53,88 @@ function formatResultForJudge(result: unknown): string {
     return JSON.stringify(result, null, 2);
   }
   return JSON.stringify(result);
+}
+
+type ToolAvailability = NonNullable<BidPayload["tool_availability"]>;
+
+function checkToolAvailability(spec: SpecialistConfig): ToolAvailability {
+  const checked: string[] = [];
+  const missing: string[] = [];
+
+  if (spec.mcp_api_key_env) {
+    checked.push(spec.mcp_api_key_env);
+    if (!process.env[spec.mcp_api_key_env]?.trim()) {
+      missing.push(spec.mcp_api_key_env);
+    }
+  }
+
+  if (missing.length > 0) {
+    return {
+      status: "missing",
+      checked,
+      missing,
+      reason: `missing required credential${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`,
+    };
+  }
+
+  if (spec.protocol === "manual") {
+    return {
+      status: "manual",
+      checked,
+      reason: "manual specialist; no live API credential required",
+    };
+  }
+
+  if (spec.verification_status === "mock" || spec.protocol === "mock") {
+    return {
+      status: "mock",
+      checked,
+      reason: "demo/mock specialist; output must be treated as synthetic",
+    };
+  }
+
+  return {
+    status: "available",
+    checked,
+    reason: checked.length > 0 ? "required credentials are configured" : "no credential required",
+  };
+}
+
+function isHardUnavailable(spec: SpecialistConfig, availability: ToolAvailability) {
+  return (
+    availability.status === "missing" &&
+    (Boolean(spec.mcp_endpoint) ||
+      Boolean(spec.a2a_endpoint) ||
+      Boolean(spec.a2a_agent_card_url) ||
+      Boolean(spec.mcp_api_key_env) ||
+      spec.agent_id === "vercel-v0")
+  );
+}
+
+function inferTaskFitScore(args: {
+  agent_id: string;
+  shortlistScore?: number;
+  recommended: Set<string>;
+  task_type: string;
+}): number {
+  if (typeof args.shortlistScore === "number") return clamp01(args.shortlistScore);
+  if (args.recommended.has(args.agent_id)) return 0.82;
+  if (args.task_type === "reacher-live-launch" && args.agent_id === "reacher-social") {
+    return 1;
+  }
+  return 0.58;
+}
+
+function reliabilityFromAgent(agent?: {
+  reputation_score?: number;
+  total_tasks_completed?: number;
+  total_disputes_lost?: number;
+}) {
+  if (!agent) return 0.65;
+  const completed = agent.total_tasks_completed ?? 0;
+  const disputes = agent.total_disputes_lost ?? 0;
+  if (completed + disputes === 0) return clamp01(agent.reputation_score ?? 0.65);
+  return clamp01(completed / (completed + disputes));
 }
 
 // ─── Phase 2: bid solicitation ───────────────────────────────────────────
@@ -132,14 +224,48 @@ export const solicitBids = internalAction({
     // the Hyperspell/Nia routing packet. This prevents a creator-commerce
     // specialist from winning a SaaS engineering task just because it can
     // produce a polished but unrelated artifact.
+    const shortlist = await ctx.runQuery(api.agentShortlists.forTask, {
+      task_id: args.task_id,
+    });
+    const shortlistedIds = new Set(shortlist.map((item) => item.agent_id));
+    const shortlistScores = new Map(
+      shortlist.map((item) => [item.agent_id, item.score] as const),
+    );
+    const contactConfigs: SpecialistConfig[] = AGENT_CONTACT_CATALOG.filter((contact) =>
+      shortlistedIds.has(contact.agent_id),
+    ).map((contact) => {
+      const cfg = contactToSpecialistConfig(contact);
+      registerDiscoveredSpecialist(cfg);
+      return cfg;
+    });
+    await Promise.allSettled(
+      contactConfigs.map((c) =>
+        ctx.runMutation(internal.agents._ensureAgent, {
+          agent_id: c.agent_id,
+          display_name: c.display_name,
+          sponsor: c.sponsor,
+          capabilities: c.capabilities,
+          system_prompt: c.system_prompt,
+          cost_per_task_estimate: c.cost_baseline,
+          starting_reputation: c.starting_reputation,
+        }),
+      ),
+    );
+
     const recommended = new Set(taskContext?.routing.recommended_specialists ?? []);
     const roster = [...SPECIALISTS, ...discoveredConfigs, ...catalogConfigs];
+    const fullRoster = [...roster, ...contactConfigs].filter(
+      (spec, index, list) =>
+        list.findIndex((candidate) => candidate.agent_id === spec.agent_id) === index,
+    );
     const invitedSpecialists: SpecialistConfig[] =
       task.task_type === "reacher-live-launch"
         ? SPECIALISTS.filter((spec) => spec.agent_id === "reacher-social")
+        : shortlistedIds.size > 0
+          ? fullRoster.filter((spec) => shortlistedIds.has(spec.agent_id))
         : recommended.size > 0
-          ? roster.filter((spec) => recommended.has(spec.agent_id))
-          : roster;
+          ? fullRoster.filter((spec) => recommended.has(spec.agent_id))
+          : fullRoster;
 
     await Promise.allSettled(
       invitedSpecialists.map(async (spec) => {
@@ -148,6 +274,20 @@ export const solicitBids = internalAction({
           agent_id: spec.agent_id,
         });
         const reputation = agent?.reputation_score ?? spec.starting_reputation;
+        const toolAvailability = checkToolAvailability(spec);
+
+        if (isHardUnavailable(spec, toolAvailability)) {
+          await ctx.runMutation(internal.lifecycle.log, {
+            task_id: args.task_id,
+            event_type: "bid_declined",
+            payload: {
+              agent_id: spec.agent_id,
+              reason: toolAvailability.reason ?? "required tool is unavailable",
+              tool_availability: toolAvailability,
+            },
+          });
+          return;
+        }
 
         try {
           const decision = await runner.bid(promptForAgents, task.task_type);
@@ -160,7 +300,45 @@ export const solicitBids = internalAction({
             return;
           }
           const bid = decision satisfies BidPayload;
-          const score = reputation / Math.max(0.01, bid.bid_price);
+          const reputationSummary = await ctx.runQuery(
+            internal.reputationDimensions._summaryForAgent,
+            { agent_id: spec.agent_id },
+          );
+          const taskFitScore = inferTaskFitScore({
+            agent_id: spec.agent_id,
+            shortlistScore: shortlistScores.get(spec.agent_id),
+            recommended,
+            task_type: task.task_type,
+          });
+          const reliabilityScore = reliabilityFromAgent(agent ?? undefined);
+          const acceptanceRate = clamp01(
+            reputationSummary.tasks > 0
+              ? reputationSummary.acceptance_rate
+              : reliabilityScore,
+          );
+          const availabilityScore =
+            toolAvailability.status === "available"
+              ? 1
+              : toolAvailability.status === "manual"
+                ? 0.82
+                : toolAvailability.status === "mock"
+                  ? 0.62
+                  : 0;
+          const value = computeAuctionValue({
+            taskFitScore,
+            historicalQuality: clamp01(
+              reputationSummary.tasks > 0 ? reputationSummary.quality : reputation,
+            ),
+            acceptanceRate,
+            reliabilityScore,
+            speedScore: clamp01(reputationSummary.speed),
+            estimateAccuracy: clamp01(reputationSummary.estimate),
+            availabilityScore,
+            bidPrice: bid.bid_price,
+            estimatedSeconds: bid.estimated_seconds,
+            taskType: task.task_type,
+          });
+          const score = value.valueScore;
           const bid_id = await ctx.runMutation(internal.bids._insert, {
             task_id: args.task_id,
             agent_id: spec.agent_id,
@@ -168,6 +346,23 @@ export const solicitBids = internalAction({
             capability_claim: bid.capability_claim,
             estimated_seconds: bid.estimated_seconds,
             score,
+            task_fit_score: taskFitScore,
+            historical_quality: clamp01(
+              reputationSummary.tasks > 0 ? reputationSummary.quality : reputation,
+            ),
+            acceptance_rate: acceptanceRate,
+            reliability_score: reliabilityScore,
+            speed_score: clamp01(reputationSummary.speed),
+            estimate_accuracy: clamp01(reputationSummary.estimate),
+            availability_score: availabilityScore,
+            expected_quality: value.expectedQuality,
+            latency_penalty: value.latencyPenalty,
+            effective_price: value.effectivePrice,
+            value_score: value.valueScore,
+            execution_preview:
+              bid.execution_preview ??
+              `Plan preview: ${bid.capability_claim} Estimated ${bid.estimated_seconds}s before delivery.`,
+            tool_availability: bid.tool_availability ?? toolAvailability,
           });
           await ctx.runMutation(internal.lifecycle.log, {
             task_id: args.task_id,
@@ -180,6 +375,7 @@ export const solicitBids = internalAction({
               // until the resolver writes the auction_resolved event.
               capability_claim: bid.capability_claim,
               estimated_seconds: bid.estimated_seconds,
+              tool_availability: bid.tool_availability ?? toolAvailability,
             },
           });
         } catch (err) {
@@ -209,9 +405,19 @@ export const resolve = internalAction({
       task_id: args.task_id,
     });
 
-    const validBids = allBids.filter((b) => b.bid_price <= task.max_budget);
+    const validBids = allBids.filter(
+      (b) =>
+        b.bid_price <= task.max_budget &&
+        (b.tool_availability?.status ?? "available") !== "missing",
+    );
 
     if (validBids.length === 0) {
+      await ctx.runMutation(internal.payments._refundTaskReservation, {
+        task_id: args.task_id,
+        buyer_id: task.posted_by || BUYER_ID,
+        amount: task.max_budget,
+        reason: "auction failed: no valid bids under budget",
+      });
       await ctx.runMutation(internal.tasks._setStatus, {
         task_id: args.task_id,
         status: "failed",
@@ -224,61 +430,281 @@ export const resolve = internalAction({
       return;
     }
 
-    // Sort by score (reputation / bid_price) descending. Winner = bids[0].
-    const sorted = [...validBids].sort((a, b) => b.score - a.score);
+    // Sort by expected value, not raw cheapness. `score` remains populated for
+    // backwards compatibility, but new bids use value_score as the canonical
+    // ranking signal.
+    const sorted = [...validBids].sort(
+      (a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score),
+    );
     const winner = sorted[0];
-    // Vickrey rule per spec: price_paid = bids[1].bid_price (the runner-up's
-    // bid price). With only 1 valid bid this degenerates to the winner's own
-    // bid (documented).
-    const price_paid =
-      sorted.length >= 2 ? sorted[1].bid_price : winner.bid_price;
-
-    await ctx.runMutation(internal.escrow._lock, {
-      task_id: args.task_id,
-      buyer_id: task.posted_by || BUYER_ID,
-      seller_id: winner.agent_id,
-      locked_amount: price_paid,
+    const runnerUp = sorted[1];
+    const price_paid = qualityAdjustedVickreyPrice({
+      winnerExpectedQuality: winner.expected_quality ?? winner.score * winner.bid_price,
+      runnerUpValueScore: runnerUp?.value_score ?? runnerUp?.score,
+      winnerBidPrice: winner.bid_price,
+      maxBudget: task.max_budget,
+    });
+    const serializeBid = (b: typeof winner) => ({
+      bid_id: b._id,
+      agent_id: b.agent_id,
+      bid_price: b.bid_price,
+      score: b.value_score ?? b.score,
+      value_score: b.value_score ?? b.score,
+      capability_claim: b.capability_claim,
+      estimated_seconds: b.estimated_seconds,
+      task_fit_score: b.task_fit_score,
+      historical_quality: b.historical_quality,
+      acceptance_rate: b.acceptance_rate,
+      reliability_score: b.reliability_score,
+      speed_score: b.speed_score,
+      estimate_accuracy: b.estimate_accuracy,
+      availability_score: b.availability_score,
+      expected_quality: b.expected_quality,
+      latency_penalty: b.latency_penalty,
+      effective_price: b.effective_price,
+      execution_preview: b.execution_preview,
+      tool_availability: b.tool_availability,
     });
 
-    await ctx.runMutation(internal.tasks._setWinner, {
+    await ctx.runMutation(internal.tasks._setStatus, {
       task_id: args.task_id,
-      winning_bid_id: winner._id,
-      price_paid,
+      status: "awarded",
     });
 
     await ctx.runMutation(internal.lifecycle.log, {
       task_id: args.task_id,
       event_type: "auction_resolved",
       payload: {
-        bids: sorted.map((b) => ({
-          bid_id: b._id,
-          agent_id: b.agent_id,
-          bid_price: b.bid_price,
-          score: b.score,
-          capability_claim: b.capability_claim,
-          estimated_seconds: b.estimated_seconds,
-        })),
-        winner: {
-          bid_id: winner._id,
-          agent_id: winner.agent_id,
-          bid_price: winner.bid_price,
-          score: winner.score,
-          estimated_seconds: winner.estimated_seconds,
-        },
+        bids: sorted.map(serializeBid),
+        top_3: sorted.slice(0, 3).map(serializeBid),
+        winner: serializeBid(winner),
         vickrey: {
           winner_bid_price: winner.bid_price,
+          runner_up_value_score: runnerUp?.value_score ?? runnerUp?.score,
+          clearing_price: price_paid,
           price_paid,
           rule:
             sorted.length >= 2
-              ? "second_highest_bid_price"
+              ? "quality_adjusted_second_price"
               : "degenerate_single_bid",
         },
       },
     });
+  },
+});
 
-    // Phase 4 — execution.
-    await ctx.scheduler.runAfter(0, internal.auctions.execute, {
+// ─── Phase 4a: buyer-review execution plan ───────────────────────────────
+
+interface PlanLLMResponse {
+  title?: string;
+  summary?: string;
+  deliverables?: Array<{
+    title?: string;
+    description?: string;
+    artifact_type?: string;
+  }>;
+  context_required?: Array<{
+    owner?: "hyperspell" | "nia" | "user" | "auction-house";
+    item?: string;
+    why?: string;
+  }>;
+  risks?: string[];
+  acceptance_criteria?: string[];
+  approval_prompt?: string;
+}
+
+function fallbackExecutionPlan(args: {
+  agent_id: string;
+  prompt: string;
+  estimated_seconds: number;
+  revisionFeedback?: string;
+}): ExecutionPlanArtifact {
+  return {
+    kind: "execution_plan",
+    title: "Execution plan for approval",
+    summary:
+      "The winning specialist will use the attached Hyperspell/Nia context to produce the requested deliverable after buyer approval.",
+    agent_id: args.agent_id,
+    user_goal: args.prompt,
+    deliverables: [
+      {
+        title: "Final work product",
+        description:
+          "A concrete artifact that directly addresses the user's original request and preserves the attached business/repo context.",
+        artifact_type: "markdown_report",
+      },
+      {
+        title: "Evidence and assumptions",
+        description:
+          "A concise explanation of sources used, assumptions made, and follow-up actions needed.",
+        artifact_type: "structured_json",
+      },
+    ],
+    context_required: [
+      {
+        owner: "hyperspell",
+        item: "Business context, goals, and constraints",
+        why: "Keeps the specialist aligned with the buyer's product and operating reality.",
+      },
+      {
+        owner: "nia",
+        item: "Repo/docs/source context",
+        why: "Prevents invented implementation details and protects existing system behavior.",
+      },
+      {
+        owner: "auction-house",
+        item: "Winning bid, budget, and acceptance criteria",
+        why: "Defines the paid execution contract before external work begins.",
+      },
+    ],
+    risks: [
+      "Live external tools may require credentials or return partial data.",
+      "The buyer should approve the plan before any externally visible action.",
+      ...(args.revisionFeedback ? [`Revision feedback to address: ${args.revisionFeedback}`] : []),
+    ],
+    acceptance_criteria: [
+      "Output stays on the user's actual task and does not drift into an unrelated domain.",
+      "Output cites or preserves the attached context packet where relevant.",
+      "Output is concrete enough for the buyer or a downstream agent to act on.",
+    ],
+    estimated_seconds: args.estimated_seconds,
+    approval_prompt:
+      "Approve this plan to release the winning specialist into execution, or request a revision with concrete feedback.",
+  };
+}
+
+function normalizeExecutionPlan(args: {
+  agent_id: string;
+  prompt: string;
+  estimated_seconds: number;
+  raw: PlanLLMResponse;
+  revisionFeedback?: string;
+}): ExecutionPlanArtifact {
+  const fallback = fallbackExecutionPlan(args);
+  return {
+    ...fallback,
+    title: args.raw.title?.trim() || fallback.title,
+    summary: args.raw.summary?.trim() || fallback.summary,
+    deliverables:
+      args.raw.deliverables
+        ?.filter((item) => item.title && item.description)
+        .map((item) => ({
+          title: item.title ?? "Deliverable",
+          description: item.description ?? "",
+          artifact_type: item.artifact_type ?? "markdown_report",
+        })) ?? fallback.deliverables,
+    context_required:
+      args.raw.context_required
+        ?.filter((item) => item.owner && item.item && item.why)
+        .map((item) => ({
+          owner: item.owner as "hyperspell" | "nia" | "user" | "auction-house",
+          item: item.item ?? "",
+          why: item.why ?? "",
+        })) ?? fallback.context_required,
+    risks:
+      args.raw.risks?.filter(
+        (item): item is string => typeof item === "string" && item.trim().length > 0,
+      ) ?? fallback.risks,
+    acceptance_criteria:
+      args.raw.acceptance_criteria?.filter(
+        (item): item is string => typeof item === "string" && item.trim().length > 0,
+      ) ?? fallback.acceptance_criteria,
+    approval_prompt: args.raw.approval_prompt?.trim() || fallback.approval_prompt,
+  };
+}
+
+export const prepareExecutionPlan = internalAction({
+  args: {
+    task_id: v.id("tasks"),
+    revision_feedback: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const task = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
+    });
+    if (!task.winning_bid_id) {
+      throw new Error("prepareExecutionPlan called without a winning bid");
+    }
+    const winner = await ctx.runQuery(internal.bids._get, {
+      bid_id: task.winning_bid_id,
+    });
+    const taskContext = await ctx.runQuery(internal.taskContexts._latestForTask, {
+      task_id: args.task_id,
+    });
+
+    await ctx.runMutation(internal.lifecycle.log, {
+      task_id: args.task_id,
+      event_type: "execution_plan_started",
+      payload: {
+        agent_id: winner.agent_id,
+        revision: Boolean(args.revision_feedback),
+      },
+    });
+
+    const userPrompt = [
+      `User goal:\n${task.prompt}`,
+      taskContext ? `Context packet:\n${taskContext.prompt_addendum}` : null,
+      args.revision_feedback
+        ? `Buyer requested revision. Address this feedback:\n${args.revision_feedback}`
+        : null,
+      `Winning agent: ${winner.agent_id}`,
+      `Winning bid: $${winner.bid_price.toFixed(2)}`,
+      `Estimated execution seconds: ${winner.estimated_seconds}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n---\n\n");
+
+    let plan: ExecutionPlanArtifact;
+    try {
+      const raw = await Promise.race([
+        callOpenAIJSON<PlanLLMResponse>({
+          systemPrompt:
+            "You are Arbor's execution-plan writer. Before any specialist does paid/external work, produce a concise buyer-approval plan. Output JSON only with title, summary, deliverables, context_required, risks, acceptance_criteria, and approval_prompt. Do not claim execution has happened.",
+          userPrompt,
+          maxTokens: 900,
+          timeoutMs: 25_000,
+          retries: 0,
+        }),
+        new Promise<PlanLLMResponse>((_, reject) =>
+          setTimeout(() => reject(new Error("execution plan timeout (25s)")), 25_000),
+        ),
+      ]);
+      plan = normalizeExecutionPlan({
+        agent_id: winner.agent_id,
+        prompt: task.prompt,
+        estimated_seconds: winner.estimated_seconds,
+        raw,
+        revisionFeedback: args.revision_feedback,
+      });
+    } catch {
+      plan = fallbackExecutionPlan({
+        agent_id: winner.agent_id,
+        prompt: task.prompt,
+        estimated_seconds: winner.estimated_seconds,
+        revisionFeedback: args.revision_feedback,
+      });
+    }
+
+    const plan_id = await ctx.runMutation(internal.executionPlans._upsert, {
+      task_id: args.task_id,
+      agent_id: winner.agent_id,
+      status: "pending",
+      plan,
+      feedback: args.revision_feedback,
+    });
+    await ctx.runMutation(internal.tasks._setStatus, {
+      task_id: args.task_id,
+      status: "plan_review",
+    });
+    await ctx.runMutation(internal.lifecycle.log, {
+      task_id: args.task_id,
+      event_type: "execution_plan_ready",
+      payload: {
+        plan_id,
+        agent_id: winner.agent_id,
+        revision: Boolean(args.revision_feedback),
+        title: plan.title,
+      },
     });
   },
 });

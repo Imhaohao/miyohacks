@@ -14,6 +14,9 @@ interface Props {
 }
 
 export function BidWindow({ task, events }: Props) {
+  if (task.status === "planning" || task.status === "shortlisting") {
+    return null;
+  }
   const [now, setNow] = useState<number>(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 200);

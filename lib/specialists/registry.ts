@@ -21,6 +21,7 @@ import {
   CONVEX_REALTIME_CONFIG,
 } from "./convex-realtime";
 import { makeMcpForwardingSpecialist } from "./mcp-forwarding";
+import { makeA2AForwardingSpecialist } from "./a2a-forwarding";
 import { makeMockSpecialist } from "./base";
 import type { SpecialistConfig, SpecialistRunner, AgentId } from "../types";
 
@@ -74,6 +75,9 @@ export function getAllSpecialists(): SpecialistConfig[] {
 }
 
 function buildRunner(cfg: SpecialistConfig): SpecialistRunner {
+  if (cfg.protocol === "a2a" || cfg.a2a_agent_card_url || cfg.a2a_endpoint) {
+    return makeA2AForwardingSpecialist(cfg);
+  }
   if (cfg.mcp_endpoint) return makeMcpForwardingSpecialist(cfg);
   return makeMockSpecialist(cfg);
 }

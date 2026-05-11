@@ -6,7 +6,6 @@ import { api, internal } from "./_generated/api";
 import { SPECIALISTS } from "../lib/specialists/registry";
 import { MCP_CATALOG } from "../lib/specialists/catalog";
 import { callOpenAI, callOpenAIJSON } from "../lib/openai";
-import { BID_WINDOW_SECONDS } from "./tasks";
 
 const PLANNER_SYSTEM_PROMPT = `You are the planner for a general-purpose marketplace where specialist AI agents bid on tasks. The user has described a goal in plain language. Decide whether the goal is atomic (one specialist can deliver it end-to-end) or compound (it needs 2-4 distinct sub-tasks, each handled by a different specialist).
 
@@ -63,14 +62,9 @@ export const decompose = internalAction({
 
     if (task.parent_task_id) {
       // Already a sub-task; run its auction directly.
-      await ctx.scheduler.runAfter(0, internal.auctions.solicitBids, {
+      await ctx.scheduler.runAfter(0, internal.broker.shortlist, {
         task_id: args.task_id,
       });
-      await ctx.scheduler.runAfter(
-        BID_WINDOW_SECONDS * 1000,
-        internal.auctions.resolve,
-        { task_id: args.task_id },
-      );
       return;
     }
 

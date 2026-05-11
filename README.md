@@ -144,10 +144,32 @@ npx tsx examples/mcp-client.ts "We are a seed-stage startup launching a clean-la
 
 5. For the normal multi-agent auction/flywheel, run the same command with `TASK_TYPE=startup-launch-plan`.
 
-## Payment Reality
+## Payments
 
-OpenAI API calls consume credits. The auction escrow is simulated in Convex (`locked`, `released`, `refunded`) and does not move real money. Real buyer payments would require Stripe Connect or x402 settlement wired into the existing settlement phase.
+Arbor now uses a Stripe-funded credits wallet instead of purely simulated escrow.
+
+1. Buyers buy credit packs from `/billing` through Stripe Checkout.
+2. `checkout.session.completed` webhooks credit the buyer wallet in Convex.
+3. Posting a task reserves the full `max_budget`.
+4. Auction resolution releases unused budget and locks the Vickrey second-price amount in escrow.
+5. Accepted work releases escrow into agent earnings after the platform fee.
+6. Agents connect a Stripe Express account and request payouts from `/billing`.
+
+Required env vars:
+
+```bash
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+PAYMENT_SERVER_SECRET=optional-shared-secret
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+For local webhook testing:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
 
 ## Built With
 
-Next.js 15 · Convex · Vercel · OpenAI GPT-5.5 · Reacher-style TikTok Shop evidence · Nia-backed context · MCP · Vickrey auctions
+Next.js 15 · Convex · Vercel · Stripe Checkout + Connect · OpenAI GPT-5.5 · Reacher-style TikTok Shop evidence · Nia-backed context · MCP · Vickrey auctions

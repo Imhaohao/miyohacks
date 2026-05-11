@@ -10,7 +10,9 @@ import type {
   AgentId,
   EscrowStatus,
   ExecutionArtifact,
+  ExecutionPlanArtifact,
   JudgeVerdict,
+  PaymentStatus,
   TaskStatus,
 } from "./types";
 
@@ -27,6 +29,7 @@ export interface TaskDoc {
   task_type: string;
   prompt: string;
   max_budget: number;
+  payment_status?: PaymentStatus;
   status: TaskStatus;
   bid_window_seconds: number;
   bid_window_closes_at: number;
@@ -40,6 +43,32 @@ export interface TaskDoc {
   task_plan?: TaskPlanStep[];
 }
 
+export interface AgentShortlistDoc {
+  _id: string;
+  _creationTime: number;
+  task_id: string;
+  agent_id: string;
+  rank: number;
+  score: number;
+  reputation_score: number;
+  reasons: string[];
+  industry: string;
+  protocol: string;
+}
+
+export interface ExecutionPlanDoc {
+  _id: string;
+  _creationTime: number;
+  task_id: string;
+  agent_id: string;
+  status: "pending" | "approved" | "revision_requested" | "cancelled";
+  plan: ExecutionPlanArtifact;
+  revision_count: number;
+  feedback?: string;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface BidDoc {
   _id: string;
   _creationTime: number;
@@ -49,6 +78,24 @@ export interface BidDoc {
   capability_claim: string;
   estimated_seconds: number;
   score: number;
+  task_fit_score?: number;
+  historical_quality?: number;
+  acceptance_rate?: number;
+  reliability_score?: number;
+  speed_score?: number;
+  estimate_accuracy?: number;
+  availability_score?: number;
+  expected_quality?: number;
+  latency_penalty?: number;
+  effective_price?: number;
+  value_score?: number;
+  execution_preview?: string;
+  tool_availability?: {
+    status: "available" | "manual" | "mock" | "missing";
+    checked: string[];
+    missing?: string[];
+    reason?: string;
+  };
 }
 
 export interface EscrowDoc {
@@ -58,6 +105,8 @@ export interface EscrowDoc {
   buyer_id: string;
   seller_id: string;
   locked_amount: number;
+  platform_fee?: number;
+  agent_net_amount?: number;
   status: EscrowStatus;
 }
 
@@ -81,25 +130,45 @@ export interface BidReceivedPayload {
 }
 
 export interface AuctionResolvedPayload {
-  bids: Array<{
-    bid_id: string;
-    agent_id: AgentId;
-    bid_price: number;
-    score: number;
-    capability_claim: string;
-    estimated_seconds: number;
-  }>;
-  winner: {
-    bid_id: string;
-    agent_id: AgentId;
-    bid_price: number;
-    score: number;
-    estimated_seconds: number;
-  };
+  bids: Array<AuctionBidSummary>;
+  top_3?: Array<AuctionBidSummary>;
+  winner: AuctionBidSummary;
   vickrey: {
     winner_bid_price: number;
+    runner_up_value_score?: number;
+    clearing_price?: number;
     price_paid: number;
-    rule: "second_highest_bid_price" | "degenerate_single_bid";
+    rule:
+      | "quality_adjusted_second_price"
+      | "second_highest_bid_price"
+      | "degenerate_single_bid";
+  };
+}
+
+export interface AuctionBidSummary {
+  bid_id: string;
+  agent_id: AgentId;
+  bid_price: number;
+  score: number;
+  capability_claim: string;
+  estimated_seconds: number;
+  task_fit_score?: number;
+  historical_quality?: number;
+  acceptance_rate?: number;
+  reliability_score?: number;
+  speed_score?: number;
+  estimate_accuracy?: number;
+  availability_score?: number;
+  expected_quality?: number;
+  latency_penalty?: number;
+  effective_price?: number;
+  value_score?: number;
+  execution_preview?: string;
+  tool_availability?: {
+    status: "available" | "manual" | "mock" | "missing";
+    checked: string[];
+    missing?: string[];
+    reason?: string;
   };
 }
 

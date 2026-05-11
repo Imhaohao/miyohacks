@@ -1,20 +1,30 @@
 "use client";
 
+import { useState } from "react";
+import { useMutation } from "convex/react";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { formatMoney, formatScore, cn } from "@/lib/utils";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { Trophy, ArrowRight } from "@phosphor-icons/react";
 import { Pill } from "@/components/ui/Pill";
 import { LoadingProgress, useElapsedSeconds } from "./LoadingProgress";
 import type {
+  AuctionBidSummary,
   AuctionResolvedPayload,
   LifecycleEventDoc,
+  TaskDoc,
 } from "@/lib/task-view";
 
 interface Props {
+  task: TaskDoc;
   events: LifecycleEventDoc[];
 }
 
-export function AuctionResolution({ events }: Props) {
+export function AuctionResolution({ task, events }: Props) {
+  const chooseTopBid = useMutation(api.auctionSelection.chooseTopBid);
+  const [busyBidId, setBusyBidId] = useState<string | null>(null);
   const resolved = events.find((e) => e.event_type === "auction_resolved");
   const failed = events.find((e) => e.event_type === "auction_failed");
   const bidCount = events.filter((e) => e.event_type === "bid_received").length;
@@ -59,7 +69,7 @@ export function AuctionResolution({ events }: Props) {
           status={status}
           details={[
             "Quotes stay hidden — even from this view — until the window closes.",
-            "When the window closes, the highest score wins and pays the runner-up's price (Vickrey).",
+            "When the window closes, Arbor ranks expected quality divided by effective price.",
           ]}
           elapsedSeconds={elapsed}
           tone="warning"
@@ -71,7 +81,22 @@ export function AuctionResolution({ events }: Props) {
   const payload = resolved.payload as unknown as AuctionResolvedPayload;
   const { bids, winner, vickrey } = payload;
   const isDegenerate = vickrey.rule === "degenerate_single_bid";
-  const maxScore = Math.max(...bids.map((b) => b.score), 0.01);
+  const maxScore = Math.max(...bids.map((b) => b.value_score ?? b.score), 0.01);
+  const topChoices = payload.top_3 ?? bids.slice(0, 3);
+  const canChoose = task.status === "awarded" && !task.winning_bid_id;
+
+  async function choose(bid: AuctionBidSummary) {
+    setBusyBidId(bid.bid_id);
+    try {
+      await chooseTopBid({
+        task_id: task._id as Id<"tasks">,
+        bid_id: bid.bid_id as Id<"bids">,
+        actor: "buyer:web",
+      });
+    } finally {
+      setBusyBidId(null);
+    }
+  }
 
   return (
     <Card className="animate-fade-up">
@@ -87,7 +112,7 @@ export function AuctionResolution({ events }: Props) {
 
       <div className="mb-6 rounded-2xl bg-brand-50 p-5">
         <div className="text-xs font-medium text-brand-700">
-          Honest pricing · Vickrey second-price
+          Best value · quality-adjusted Vickrey
         </div>
         <div className="mt-3 flex flex-wrap items-baseline gap-3">
           <span className="text-sm text-ink-muted">
@@ -104,15 +129,54 @@ export function AuctionResolution({ events }: Props) {
         <p className="mt-2 text-xs text-ink-muted">
           {isDegenerate
             ? "Only one valid offer — they pay their own price."
-            : "They pay the runner-up's price, so the honest move is to quote your true cost."}
+            : "Clearing price is derived from the runner-up's value score, so specialists compete on quality per dollar, not cheapness alone."}
         </p>
+        <div className="mt-4 grid gap-2 text-[11px] sm:grid-cols-4">
+          <Metric label="Expected quality" value={formatPct(winner.expected_quality)} />
+          <Metric label="Effective price" value={formatMoney(winner.effective_price ?? winner.bid_price)} />
+          <Metric label="Value score" value={formatScore(winner.value_score ?? winner.score)} />
+          <Metric
+            label="Runner benchmark"
+            value={
+              vickrey.runner_up_value_score
+                ? formatScore(vickrey.runner_up_value_score)
+                : "n/a"
+            }
+          />
+        </div>
       </div>
 
-      {/* Bid ladder — winner is emphasized; everyone else gets a score bar viz */}
+      <div className="mb-4">
+        <div className="mb-2 text-xs font-medium text-ink-muted">
+          Buyer choice set · top 3 proposals
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          {topChoices.map((b, i) => (
+            <TopChoice
+              key={b.bid_id}
+              bid={b}
+              rank={i + 1}
+              selected={b.bid_id === task.winning_bid_id}
+              defaultWinner={b.bid_id === winner.bid_id}
+              canChoose={canChoose}
+              busy={busyBidId === b.bid_id}
+              onChoose={() => choose(b)}
+            />
+          ))}
+        </div>
+        {canChoose && (
+          <p className="mt-2 text-xs text-ink-muted">
+            Pick a proposal to lock escrow and ask that specialist for an execution plan.
+          </p>
+        )}
+      </div>
+
+      {/* Bid ladder — winner is emphasized; everyone else gets a value bar viz */}
       <div className="space-y-2">
         {bids.map((b, i) => {
           const isWinner = i === 0;
-          const widthPct = Math.max(8, Math.round((b.score / maxScore) * 100));
+          const valueScore = b.value_score ?? b.score;
+          const widthPct = Math.max(8, Math.round((valueScore / maxScore) * 100));
           return (
             <div
               key={b.bid_id}
@@ -154,13 +218,24 @@ export function AuctionResolution({ events }: Props) {
                   >
                     {b.capability_claim}
                   </p>
+                  {b.execution_preview && (
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-ink-subtle">
+                      {b.execution_preview}
+                    </p>
+                  )}
                   <div className="mt-2 flex items-center gap-3">
                     <div className="score-bar flex-1">
                       <span style={{ width: `${widthPct}%` }} />
                     </div>
                     <span className="shrink-0 font-mono text-[11px] text-ink-muted">
-                      score {formatScore(b.score)}
+                      value {formatScore(valueScore)}
                     </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-ink-muted">
+                    <span>quality {formatPct(b.expected_quality)}</span>
+                    <span>fit {formatPct(b.task_fit_score)}</span>
+                    <span>speed {formatPct(b.speed_score)}</span>
+                    <span>tools {b.tool_availability?.status ?? "available"}</span>
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
@@ -175,5 +250,82 @@ export function AuctionResolution({ events }: Props) {
         })}
       </div>
     </Card>
+  );
+}
+
+function formatPct(n?: number) {
+  if (typeof n !== "number" || !Number.isFinite(n)) return "n/a";
+  return `${Math.round(n * 100)}%`;
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-white/70 px-3 py-2">
+      <div className="text-ink-subtle">{label}</div>
+      <div className="mt-0.5 font-mono text-ink">{value}</div>
+    </div>
+  );
+}
+
+function TopChoice({
+  bid,
+  rank,
+  selected,
+  defaultWinner,
+  canChoose,
+  busy,
+  onChoose,
+}: {
+  bid: AuctionBidSummary;
+  rank: number;
+  selected: boolean;
+  defaultWinner: boolean;
+  canChoose: boolean;
+  busy: boolean;
+  onChoose: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border p-3 text-xs",
+        selected ? "border-brand-200 bg-brand-50" : "border-border bg-surface-subtle",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="font-mono text-ink">
+            {rank}. {bid.agent_id}
+          </div>
+          <div className="mt-1 text-ink-muted">
+            {selected
+              ? "Selected"
+              : defaultWinner
+                ? "Default winner"
+                : "Alternative"}
+          </div>
+        </div>
+        <div className="text-right font-mono text-ink">
+          {formatMoney(bid.bid_price)}
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-ink-muted">
+        <span>quality {formatPct(bid.expected_quality)}</span>
+        <span>value {formatScore(bid.value_score ?? bid.score)}</span>
+        <span>fit {formatPct(bid.task_fit_score)}</span>
+        <span>tools {bid.tool_availability?.status ?? "available"}</span>
+      </div>
+      {canChoose && (
+        <Button
+          type="button"
+          size="sm"
+          variant={defaultWinner ? "primary" : "secondary"}
+          className="mt-3 w-full"
+          disabled={busy}
+          onClick={onChoose}
+        >
+          {busy ? "Selecting..." : defaultWinner ? "Accept default" : "Choose proposal"}
+        </Button>
+      )}
+    </div>
   );
 }
