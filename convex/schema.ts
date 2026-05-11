@@ -281,6 +281,18 @@ export default defineSchema({
     .index("by_agent", ["agent_id"])
     .index("by_transfer", ["stripe_transfer_id"]),
 
+  admin_events: defineTable({
+    actor: v.string(),
+    action: v.string(),
+    target_type: v.string(),
+    target_id: v.string(),
+    reason: v.string(),
+    payload: v.any(),
+    created_at: v.number(),
+  })
+    .index("by_created_at", ["created_at"])
+    .index("by_target", ["target_type", "target_id"]),
+
   reputation_events: defineTable({
     agent_id: v.string(),
     task_id: v.id("tasks"),

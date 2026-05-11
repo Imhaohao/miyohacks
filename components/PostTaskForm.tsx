@@ -7,9 +7,19 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { AgentSuggestions } from "@/components/AgentSuggestions";
-import { ArrowRight, CircleNotch } from "@phosphor-icons/react";
-import Link from "next/link";
-import { formatCredits } from "@/lib/payments";
+import {
+  ArrowRight,
+  CheckCircle,
+  CircleNotch,
+  GitBranch,
+  WarningCircle,
+} from "@phosphor-icons/react";
+import { CURRENT_BUYER_ID } from "@/lib/current-user";
+import {
+  isSoftwareEngineeringTask,
+  requiredContextForPrompt,
+  type RequiredContext,
+} from "@/lib/context-readiness";
 
 // task_type is still used by some legacy code paths (the reacher-live-launch
 // demo and the campaign-context evidence injection). For the human form we
@@ -48,10 +58,7 @@ export function PostTaskForm() {
   const router = useRouter();
   const post = useMutation(api.tasks.post);
   const productContext = useQuery(api.productContext.latest, {
-    owner_id: "buyer:web",
-  });
-  const wallet = useQuery(api.payments.walletForBuyer, {
-    buyer_id: "buyer:web",
+    owner_id: CURRENT_BUYER_ID,
   });
   const [prompt, setPrompt] = useState("");
   const [budget, setBudget] = useState("2.00");
@@ -64,7 +71,7 @@ export function PostTaskForm() {
     setError(null);
     try {
       const { task_id } = await post({
-        posted_by: "buyer:web",
+        posted_by: CURRENT_BUYER_ID,
         task_type: DEFAULT_TASK_TYPE,
         prompt,
         max_budget: Number(budget),
@@ -80,12 +87,25 @@ export function PostTaskForm() {
     setPrompt(ex.prompt);
   }
 
-  const budgetNumber = Number(budget);
-  const availableCredits = wallet?.available_credits ?? 0;
-  const insufficientCredits =
-    wallet !== undefined &&
-    Number.isFinite(budgetNumber) &&
-    budgetNumber > availableCredits;
+  const contextReadiness =
+    productContext === undefined
+      ? undefined
+      : getContextReadiness(productContext ?? null);
+  const requiredContext = requiredContextForPrompt(prompt);
+  const needsRepoContext = requiredContext.includes("nia_repo");
+  const likelySoftwareTask = isSoftwareEngineeringTask(prompt);
+  const missingBusinessContext =
+    contextReadiness !== undefined && !contextReadiness.has_business_context;
+  const missingRepoContext =
+    needsRepoContext &&
+    contextReadiness !== undefined &&
+    !contextReadiness.has_repo_context;
+  const missingContext = missingBusinessContext || missingRepoContext;
+  const disableSubmit =
+    submitting ||
+    !prompt.trim() ||
+    contextReadiness === undefined ||
+    missingContext;
 
   return (
     <div className="space-y-4">
@@ -128,6 +148,11 @@ export function PostTaskForm() {
               ))}
             </div>
           </div>
+          <RequiredContextPanel
+            readiness={contextReadiness}
+            requiredContext={requiredContext}
+            likelySoftwareTask={likelySoftwareTask}
+          />
           <div>
             <label htmlFor="budget" className={fieldLabel}>
               Budget
@@ -148,28 +173,13 @@ export function PostTaskForm() {
                 />
               </div>
               <div className="pb-2 text-xs text-ink-muted">
-                Wallet:{" "}
-                <span className="font-mono text-ink">
-                  {formatCredits(availableCredits)}
-                </span>
-                {insufficientCredits && (
-                  <>
-                    {" "}
-                    ·{" "}
-                    <Link
-                      href="/billing"
-                      className="font-medium text-brand-700 hover:text-brand-800"
-                    >
-                      buy credits
-                    </Link>
-                  </>
-                )}
+                Credits are checked when the task starts.
               </div>
             </div>
           </div>
           <Button
             type="submit"
-            disabled={submitting || !prompt.trim() || insufficientCredits}
+            disabled={disableSubmit}
             className="w-full"
             size="lg"
           >
@@ -190,9 +200,152 @@ export function PostTaskForm() {
               {error}
             </p>
           )}
+          {missingContext && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Connect Hyperspell/Nia context first so agents can diagnose with
+              your project context.
+            </p>
+          )}
         </form>
       </Card>
       <AgentSuggestions prompt={prompt} taskType={DEFAULT_TASK_TYPE} />
+    </div>
+  );
+}
+
+type ContextReadiness = {
+  has_profile: boolean;
+  has_business_context: boolean;
+  has_repo_context: boolean;
+  hyperspell_status: string;
+  nia_status: string;
+  missing_required_context: string[];
+};
+
+type ProductContextProfile = {
+  company_name?: string;
+  business_context?: string;
+  github_repo_url?: string;
+  repo_context?: string;
+  source_hints?: string[];
+  hyperspell_status?: string;
+} | null;
+
+function getContextReadiness(profile: ProductContextProfile): ContextReadiness {
+  const hasBusinessContext = Boolean(
+    profile?.company_name?.trim() && profile?.business_context?.trim(),
+  );
+  const hasRepoContext = Boolean(
+    profile?.github_repo_url?.trim() ||
+      profile?.repo_context?.trim() ||
+      (profile?.source_hints ?? []).some((hint) => hint.trim()),
+  );
+
+  return {
+    has_profile: Boolean(profile),
+    has_business_context: hasBusinessContext,
+    has_repo_context: hasRepoContext,
+    hyperspell_status: profile?.hyperspell_status ?? "not_configured",
+    nia_status: hasRepoContext ? "ready" : "missing",
+    missing_required_context: [
+      ...(hasBusinessContext ? [] : ["hyperspell"]),
+      ...(hasRepoContext ? [] : ["nia_repo"]),
+    ],
+  };
+}
+
+function RequiredContextPanel({
+  readiness,
+  requiredContext,
+  likelySoftwareTask,
+}: {
+  readiness: ContextReadiness | undefined;
+  requiredContext: RequiredContext[];
+  likelySoftwareTask: boolean;
+}) {
+  const businessReady = Boolean(readiness?.has_business_context);
+  const repoReady = Boolean(readiness?.has_repo_context);
+  const repoRequired = requiredContext.includes("nia_repo");
+
+  return (
+    <div className="rounded-xl border border-line bg-surface-subtle p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-subtle">
+            Required context
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+            {likelySoftwareTask
+              ? "Software tasks need project memory and repo/source context before diagnosis."
+              : "Project memory helps agents route and diagnose the task correctly."}
+          </p>
+        </div>
+        <GitBranch size={18} weight="bold" className="mt-0.5 text-brand-700" />
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <ContextStatusRow
+          label="Hyperspell business memory"
+          status={
+            readiness === undefined
+              ? "Checking"
+              : businessReady
+                ? readiness.hyperspell_status === "pending"
+                  ? "Syncing"
+                  : "Ready"
+                : "Missing"
+          }
+          ready={businessReady}
+          required
+        />
+        <ContextStatusRow
+          label="Nia/GitHub repo context"
+          status={
+            readiness === undefined ? "Checking" : repoReady ? "Ready" : "Missing"
+          }
+          ready={repoReady}
+          required={repoRequired}
+        />
+      </div>
+      {!readiness?.has_profile && readiness !== undefined && (
+        <p className="mt-3 rounded-lg bg-white px-3 py-2 text-xs text-ink-muted">
+          Start by saving the product context card on the left.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ContextStatusRow({
+  label,
+  status,
+  ready,
+  required,
+}: {
+  label: string;
+  status: string;
+  ready: boolean;
+  required: boolean;
+}) {
+  const tone = ready
+    ? "bg-emerald-50 text-emerald-700"
+    : required
+      ? "bg-amber-50 text-amber-700"
+      : "bg-white text-ink-muted";
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
+      <span className="text-xs text-ink-muted">{label}</span>
+      <span
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium ${tone}`}
+      >
+        {ready ? (
+          <CheckCircle size={12} weight="bold" />
+        ) : required ? (
+          <WarningCircle size={12} weight="bold" />
+        ) : (
+          <CircleNotch size={12} weight="bold" />
+        )}
+        {status}
+      </span>
     </div>
   );
 }

@@ -34,6 +34,38 @@ export const latest = query({
   },
 });
 
+export const readiness = query({
+  args: { owner_id: v.string() },
+  handler: async (ctx, args) => {
+    const profile = await ctx.db
+      .query("product_context_profiles")
+      .withIndex("by_owner", (q) => q.eq("owner_id", args.owner_id))
+      .order("desc")
+      .first();
+
+    const hasBusinessContext = Boolean(
+      profile?.company_name.trim() && profile?.business_context.trim(),
+    );
+    const hasRepoContext = Boolean(
+      profile?.github_repo_url?.trim() ||
+        profile?.repo_context?.trim() ||
+        (profile?.source_hints ?? []).some((hint) => hint.trim()),
+    );
+    const missingRequiredContext: string[] = [];
+    if (!hasBusinessContext) missingRequiredContext.push("hyperspell");
+    if (!hasRepoContext) missingRequiredContext.push("nia_repo");
+
+    return {
+      has_profile: Boolean(profile),
+      has_business_context: hasBusinessContext,
+      has_repo_context: hasRepoContext,
+      hyperspell_status: profile?.hyperspell_status ?? "not_configured",
+      nia_status: hasRepoContext ? "ready" : "missing",
+      missing_required_context: missingRequiredContext,
+    };
+  },
+});
+
 export const save = mutation({
   args: profileArgs,
   handler: async (ctx, args) => {

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { CREDIT_PACKS, formatCredits } from "@/lib/payments";
+import { CURRENT_BUYER_ID } from "@/lib/current-user";
 import { formatMoney } from "@/lib/utils";
 import {
   ArrowSquareOut,
@@ -18,7 +19,7 @@ import {
   Wallet,
 } from "@phosphor-icons/react";
 
-const BUYER_ID = "buyer:web";
+const BUYER_ID = CURRENT_BUYER_ID;
 
 interface CheckoutResponse {
   url?: string;

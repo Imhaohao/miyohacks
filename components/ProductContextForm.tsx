@@ -11,8 +11,9 @@ import {
   Database,
   WarningCircle,
 } from "@phosphor-icons/react";
+import { CURRENT_BUYER_ID } from "@/lib/current-user";
 
-const OWNER_ID = "buyer:web";
+const OWNER_ID = CURRENT_BUYER_ID;
 
 const fieldLabel = "mb-1.5 block text-sm font-medium text-ink";
 const inputBase =

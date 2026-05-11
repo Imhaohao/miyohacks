@@ -17,6 +17,12 @@ export default function HomePage() {
             Billing
           </Link>
           <Link
+            href="/admin"
+            className="text-sm font-medium text-ink-muted hover:text-brand-700"
+          >
+            Admin
+          </Link>
+          <Link
             href="/agents"
             className="group inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-brand-700"
           >

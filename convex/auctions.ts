@@ -1,6 +1,7 @@
 "use node";
 
 import { internalAction } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import {
@@ -153,7 +154,10 @@ export const solicitBids = internalAction({
       ? `${task.prompt}\n\n---\n\n${taskContext.prompt_addendum}`
       : task.prompt;
 
-    const discovered = await ctx.runQuery(api.discoveredSpecialists.list, {});
+    const discovered = (await ctx.runQuery(
+      api.discoveredSpecialists.list,
+      {},
+    )) as Doc<"discovered_specialists">[];
     const discoveredConfigs: SpecialistConfig[] = discovered.map((d) => {
       const cfg: SpecialistConfig = {
         agent_id: d.agent_id,
@@ -224,11 +228,11 @@ export const solicitBids = internalAction({
     // the Hyperspell/Nia routing packet. This prevents a creator-commerce
     // specialist from winning a SaaS engineering task just because it can
     // produce a polished but unrelated artifact.
-    const shortlist = await ctx.runQuery(api.agentShortlists.forTask, {
+    const shortlist = (await ctx.runQuery(api.agentShortlists.forTask, {
       task_id: args.task_id,
-    });
+    })) as Doc<"agent_shortlists">[];
     const shortlistedIds = new Set(shortlist.map((item) => item.agent_id));
-    const shortlistScores = new Map(
+    const shortlistScores = new Map<string, number>(
       shortlist.map((item) => [item.agent_id, item.score] as const),
     );
     const contactConfigs: SpecialistConfig[] = AGENT_CONTACT_CATALOG.filter((contact) =>

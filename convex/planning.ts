@@ -1,6 +1,7 @@
 "use node";
 
 import { internalAction } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { SPECIALISTS } from "../lib/specialists/registry";
@@ -266,9 +267,9 @@ export const synthesize = internalAction({
     const parent = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
     });
-    const children = await ctx.runQuery(api.tasks.childrenOf, {
+    const children = (await ctx.runQuery(api.tasks.childrenOf, {
       parent_task_id: args.task_id,
-    });
+    })) as Doc<"tasks">[];
     const plan = parent.task_plan ?? [];
 
     await ctx.runMutation(internal.tasks._setStatus, {

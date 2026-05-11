@@ -1,6 +1,7 @@
 "use node";
 
 import { internalAction } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { AGENT_CONTACT_CATALOG, contactToSpecialistConfig } from "../lib/agent-contacts";
@@ -60,7 +61,7 @@ export const shortlist = internalAction({
       contacts: AGENT_CONTACT_CATALOG.map(toConvexContact),
     });
 
-    const liveAgents = await ctx.runQuery(api.agents.list, {});
+    const liveAgents = (await ctx.runQuery(api.agents.list, {})) as Doc<"agents">[];
     const reputations = Object.fromEntries(
       liveAgents.map((agent) => [agent.agent_id, agent.reputation_score]),
     );

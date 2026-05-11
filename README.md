@@ -170,6 +170,20 @@ For local webhook testing:
 stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
+## Admin Dashboard
+
+`/admin` is an internal operator console for task health, payment risk,
+agent payout readiness, incidents, and audit events. Until real auth is added,
+it is protected by an env-backed admin secret and an httpOnly session cookie.
+
+```bash
+ADMIN_DASHBOARD_SECRET=change-me
+ADMIN_SESSION_TTL_HOURS=12
+```
+
+Admin routes call Convex through server-verified API routes and write
+`admin_events` for every safe operational action.
+
 ## Built With
 
 Next.js 15 · Convex · Vercel · Stripe Checkout + Connect · OpenAI GPT-5.5 · Reacher-style TikTok Shop evidence · Nia-backed context · MCP · Vickrey auctions
