@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { resolveApiIdentity } from "@/lib/api-identity";
 import { jsonOk, jsonError, corsPreflight } from "@/lib/http";
+import { handleGetTask } from "@/lib/mcp-tools";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,11 +38,18 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
   }
 
   try {
+    const identity = await resolveApiIdentity(req);
+    if (!identity && process.env.ALLOW_LEGACY_AGENT_IDS !== "true") {
+      return jsonError("unauthorized", 401);
+    }
+    await handleGetTask({ task_id: id }, identity);
     const result = await convex().action(api.disputes.override, {
       task_id: id as Id<"tasks">,
       verdict: body.verdict,
       reason: body.reason,
-      actor: typeof body.actor === "string" ? body.actor : "buyer:web",
+      actor:
+        identity?.agent_id ??
+        (typeof body.actor === "string" ? body.actor : "buyer:web"),
     });
     return jsonOk(result);
   } catch (e) {

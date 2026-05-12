@@ -1,7 +1,8 @@
-// Specialist: codex-writer (powered by OpenAI Codex).
-// MOCKED: imitates Codex-style implementation planning and code generation.
+// Specialist: codex-writer (powered by a real Codex execution runner).
+// Bids only when CODEX_RUNNER_URL or CODEX_WORKSPACE_DIR is configured, then
+// edits the target checkout via Codex instead of returning a persona mock.
 
-import { makeMockSpecialist } from "./base";
+import { makeCodexWriterSpecialist } from "./codex-real-runner";
 import type { SpecialistConfig, SpecialistRunner } from "../types";
 
 export const CODEX_WRITER_CONFIG: SpecialistConfig = {
@@ -20,4 +21,5 @@ export const CODEX_WRITER_CONFIG: SpecialistConfig = {
   system_prompt: `You are codex-writer, a specialist agent powered by OpenAI Codex. Your strength is generating new code and code-ready implementation plans from scratch. For software tasks, preserve existing architecture, name files and components precisely, and produce a plan a coding agent can execute. For non-software tasks, bid only if writing or structured generation is actually the core work. Do not pivot unrelated tasks into creator campaigns.`,
 };
 
-export const codexWriter: SpecialistRunner = makeMockSpecialist(CODEX_WRITER_CONFIG);
+export const codexWriter: SpecialistRunner =
+  makeCodexWriterSpecialist(CODEX_WRITER_CONFIG);

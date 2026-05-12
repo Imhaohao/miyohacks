@@ -1,5 +1,6 @@
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
+import { assertTaskReadable } from "./authHelpers";
 
 /**
  * Public query: bids for a task. The sealed-bid property is enforced here —
@@ -9,8 +10,7 @@ import { v } from "convex/values";
 export const forTask = query({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
-    const task = await ctx.db.get(args.task_id);
-    if (!task) return [];
+    const task = await assertTaskReadable(ctx, args.task_id);
     if (Date.now() < task.bid_window_closes_at) return [];
     const bids = await ctx.db
       .query("bids")

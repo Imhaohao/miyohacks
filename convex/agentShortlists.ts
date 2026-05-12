@@ -1,5 +1,6 @@
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
+import { assertTaskReadable } from "./authHelpers";
 
 const shortlistItemValidator = v.object({
   agent_id: v.string(),
@@ -12,6 +13,18 @@ const shortlistItemValidator = v.object({
 });
 
 export const forTask = query({
+  args: { task_id: v.id("tasks") },
+  handler: async (ctx, args) => {
+    await assertTaskReadable(ctx, args.task_id);
+    const rows = await ctx.db
+      .query("agent_shortlists")
+      .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+      .collect();
+    return rows.sort((a, b) => a.rank - b.rank);
+  },
+});
+
+export const _forTask = internalQuery({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
     const rows = await ctx.db
@@ -44,4 +57,3 @@ export const _replaceForTask = internalMutation({
     return { count: args.items.length };
   },
 });
-

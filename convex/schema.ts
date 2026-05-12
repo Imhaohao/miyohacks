@@ -2,6 +2,28 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  user_accounts: defineTable({
+    account_id: v.string(),
+    clerk_user_id: v.string(),
+    email: v.optional(v.string()),
+    display_name: v.optional(v.string()),
+    avatar_url: v.optional(v.string()),
+    trial_credits_granted_at: v.optional(v.number()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_account", ["account_id"])
+    .index("by_clerk_user", ["clerk_user_id"]),
+
+  projects: defineTable({
+    owner_account_id: v.string(),
+    name: v.string(),
+    product_url: v.optional(v.string()),
+    github_repo_url: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  }).index("by_owner", ["owner_account_id"]),
+
   agents: defineTable({
     agent_id: v.string(),
     display_name: v.string(),
@@ -52,6 +74,7 @@ export default defineSchema({
     price_paid: v.optional(v.number()),
     result: v.optional(v.any()),
     judge_verdict: v.optional(v.any()),
+    project_id: v.optional(v.id("projects")),
     /**
      * If set, this task is a sub-step in a larger plan. The auction lifecycle
      * runs identically; on settle, control returns to the parent task to
@@ -77,6 +100,7 @@ export default defineSchema({
 
   product_context_profiles: defineTable({
     owner_id: v.string(),
+    project_id: v.optional(v.id("projects")),
     company_name: v.string(),
     product_url: v.optional(v.string()),
     github_repo_url: v.optional(v.string()),
@@ -181,6 +205,7 @@ export default defineSchema({
     available_credits: v.number(),
     reserved_credits: v.number(),
     lifetime_purchased: v.number(),
+    lifetime_granted: v.optional(v.number()),
     lifetime_spent: v.number(),
     updated_at: v.number(),
   }).index("by_buyer", ["buyer_id"]),
@@ -204,6 +229,7 @@ export default defineSchema({
     ),
     entry_type: v.union(
       v.literal("credit_purchase"),
+      v.literal("trial_credit_grant"),
       v.literal("credit_reserve"),
       v.literal("credit_release"),
       v.literal("credit_refund"),
@@ -441,4 +467,16 @@ export default defineSchema({
     homepage_url: v.optional(v.string()),
     rationale: v.optional(v.string()),
   }).index("by_agent_id", ["agent_id"]),
+
+  user_api_keys: defineTable({
+    account_id: v.string(),
+    project_id: v.optional(v.id("projects")),
+    name: v.string(),
+    token_hash: v.string(),
+    created_at: v.number(),
+    last_used_at: v.optional(v.number()),
+    revoked_at: v.optional(v.number()),
+  })
+    .index("by_account", ["account_id"])
+    .index("by_token_hash", ["token_hash"]),
 });

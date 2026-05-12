@@ -75,10 +75,10 @@ export function getAllSpecialists(): SpecialistConfig[] {
 }
 
 function buildRunner(cfg: SpecialistConfig): SpecialistRunner {
+  if (cfg.mcp_endpoint) return makeMcpForwardingSpecialist(cfg);
   if (cfg.protocol === "a2a" || cfg.a2a_agent_card_url || cfg.a2a_endpoint) {
     return makeA2AForwardingSpecialist(cfg);
   }
-  if (cfg.mcp_endpoint) return makeMcpForwardingSpecialist(cfg);
   return makeMockSpecialist(cfg);
 }
 

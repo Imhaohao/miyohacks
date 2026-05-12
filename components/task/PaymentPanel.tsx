@@ -11,12 +11,21 @@ import type { EscrowDoc, TaskDoc } from "@/lib/task-view";
 interface Props {
   task: TaskDoc;
   escrow: EscrowDoc | null | undefined;
+  ledgerFallback?: Doc<"ledger_entries">[];
+  useLiveQueries?: boolean;
 }
 
-export function PaymentPanel({ task, escrow }: Props) {
-  const ledger = useQuery(api.payments.ledgerForTask, {
-    task_id: task._id as Id<"tasks">,
-  }) as Doc<"ledger_entries">[] | undefined;
+export function PaymentPanel({
+  task,
+  escrow,
+  ledgerFallback,
+  useLiveQueries = true,
+}: Props) {
+  const liveLedger = useQuery(
+    api.payments.ledgerForTask,
+    useLiveQueries ? { task_id: task._id as Id<"tasks"> } : "skip",
+  ) as Doc<"ledger_entries">[] | undefined;
+  const ledger = useLiveQueries ? liveLedger : ledgerFallback;
 
   const status = task.payment_status ?? "unfunded";
   const tone =

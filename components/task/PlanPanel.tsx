@@ -30,13 +30,23 @@ interface ChildTask {
 
 interface Props {
   task: TaskDoc;
+  childrenFallback?: ChildTask[];
+  useLiveQueries?: boolean;
 }
 
-export function PlanPanel({ task }: Props) {
+export function PlanPanel({
+  task,
+  childrenFallback,
+  useLiveQueries = true,
+}: Props) {
   const plan = (task.task_plan ?? []) as PlanStep[];
-  const children = (useQuery(api.tasks.childrenOf, {
-    parent_task_id: task._id as Id<"tasks">,
-  }) ?? []) as ChildTask[];
+  const liveChildren = useQuery(
+    api.tasks.childrenOf,
+    useLiveQueries ? { parent_task_id: task._id as Id<"tasks"> } : "skip",
+  ) as ChildTask[] | undefined;
+  const children = (useLiveQueries
+    ? liveChildren ?? []
+    : childrenFallback ?? []) as ChildTask[];
 
   if (plan.length === 0) return null;
 

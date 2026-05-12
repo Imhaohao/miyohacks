@@ -1,5 +1,6 @@
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
+import { assertTaskReadable } from "./authHelpers";
 
 export const log = internalMutation({
   args: {
@@ -20,6 +21,7 @@ export const log = internalMutation({
 export const forTask = query({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
+    await assertTaskReadable(ctx, args.task_id);
     const events = await ctx.db
       .query("lifecycle_events")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))

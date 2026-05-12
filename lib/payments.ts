@@ -1,6 +1,7 @@
 export const PLATFORM_FEE_RATE = 0.1;
 
 export const CREDIT_CURRENCY = "USD";
+export const FREE_TRIAL_CREDITS = 5;
 
 export const CREDIT_PACKS = [
   { credits: 10, amountUsd: 10, label: "Starter" },
@@ -56,9 +57,12 @@ export function calculateEscrowSettlement(amount: number): {
 export function checkoutMetadata(args: {
   buyerId: string;
   credits: number;
+  clerkUserId?: string;
 }): Record<string, string> {
   return {
     buyer_id: args.buyerId,
+    account_id: args.buyerId,
+    ...(args.clerkUserId ? { clerk_user_id: args.clerkUserId } : {}),
     credits: String(args.credits),
     product: "arbor_credits",
   };

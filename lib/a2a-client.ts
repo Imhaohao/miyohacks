@@ -26,6 +26,21 @@ export interface A2ATaskResponse {
   artifacts?: A2AArtifact[];
 }
 
+interface JsonRpcEnvelope<T> {
+  result?: T;
+  error?: { message?: string };
+}
+
+function isJsonRpcEnvelope<T>(
+  response: T | JsonRpcEnvelope<T>,
+): response is JsonRpcEnvelope<T> {
+  return (
+    typeof response === "object" &&
+    response !== null &&
+    ("result" in response || "error" in response)
+  );
+}
+
 async function fetchJson<T>(
   url: string,
   body?: Record<string, unknown>,
@@ -64,8 +79,9 @@ export async function sendA2ATask(args: {
   endpointUrl: string;
   prompt: string;
   apiKey?: string;
+  metadata?: Record<string, unknown>;
 }): Promise<A2ATaskResponse> {
-  return await fetchJson<A2ATaskResponse>(
+  const response = await fetchJson<A2ATaskResponse | JsonRpcEnvelope<A2ATaskResponse>>(
     args.endpointUrl,
     {
       jsonrpc: "2.0",
@@ -76,11 +92,17 @@ export async function sendA2ATask(args: {
           role: "user",
           parts: [{ kind: "text", text: args.prompt }],
         },
+        ...(args.metadata ? { metadata: args.metadata } : {}),
       },
     },
     args.apiKey,
     45_000,
   );
+  if (isJsonRpcEnvelope(response) && response.result) return response.result;
+  if (isJsonRpcEnvelope(response) && response.error) {
+    throw new Error(response.error.message ?? "A2A task failed");
+  }
+  return response as A2ATaskResponse;
 }
 
 export function normalizeA2AResult(response: A2ATaskResponse): string {
@@ -103,4 +125,3 @@ export function normalizeA2AResult(response: A2ATaskResponse): string {
 
   return JSON.stringify(response, null, 2);
 }
-

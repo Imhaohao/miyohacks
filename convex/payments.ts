@@ -7,8 +7,10 @@ import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { assertTaskReadable, requireAccountId } from "./authHelpers";
 import {
   CREDIT_CURRENCY,
+  FREE_TRIAL_CREDITS,
   calculateEscrowSettlement,
   roundMoney,
 } from "../lib/payments";
@@ -55,6 +57,7 @@ async function ensureBuyerWallet(ctx: MutationCtx, buyerId: string) {
     available_credits: 0,
     reserved_credits: 0,
     lifetime_purchased: 0,
+    lifetime_granted: 0,
     lifetime_spent: 0,
     updated_at: now,
   });
@@ -90,6 +93,7 @@ async function insertLedger(
     account_type: "buyer" | "agent" | "platform" | "escrow";
     entry_type:
       | "credit_purchase"
+      | "trial_credit_grant"
       | "credit_reserve"
       | "credit_release"
       | "credit_refund"
@@ -140,6 +144,7 @@ export const walletForBuyer = query({
         available_credits: 0,
         reserved_credits: 0,
         lifetime_purchased: 0,
+        lifetime_granted: 0,
         lifetime_spent: 0,
         updated_at: 0,
       }
@@ -181,9 +186,46 @@ export const ledgerForBuyer = query({
   },
 });
 
+export const myWallet = query({
+  args: {},
+  handler: async (ctx) => {
+    const accountId = await requireAccountId(ctx);
+    const wallet = await ctx.db
+      .query("buyer_wallets")
+      .withIndex("by_buyer", (q) => q.eq("buyer_id", accountId))
+      .first();
+    return (
+      wallet ?? {
+        buyer_id: accountId,
+        available_credits: 0,
+        reserved_credits: 0,
+        lifetime_purchased: 0,
+        lifetime_granted: 0,
+        lifetime_spent: 0,
+        updated_at: 0,
+      }
+    );
+  },
+});
+
+export const myLedger = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const accountId = await requireAccountId(ctx);
+    return await ctx.db
+      .query("ledger_entries")
+      .withIndex("by_account", (q) =>
+        q.eq("account_type", "buyer").eq("account_id", accountId),
+      )
+      .order("desc")
+      .take(args.limit ?? 25);
+  },
+});
+
 export const ledgerForTask = query({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
+    await assertTaskReadable(ctx, args.task_id);
     const rows = await ctx.db
       .query("ledger_entries")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
@@ -312,6 +354,54 @@ export const fulfillCheckoutSession = mutation({
     });
 
     return { ok: true, idempotent: false };
+  },
+});
+
+export const _grantTrialCreditsIfNeeded = internalMutation({
+  args: {
+    account_id: v.string(),
+    amount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const amount = roundMoney(args.amount);
+    if (amount <= 0) throw new Error("trial grant must be positive");
+    const idempotencyKey = `trial:${args.account_id}:${amount.toFixed(2)}`;
+    if (await existingLedger(ctx, idempotencyKey)) {
+      return { granted: false, idempotent: true };
+    }
+
+    const wallet = await ensureBuyerWallet(ctx, args.account_id);
+    await ctx.db.patch(wallet._id, {
+      available_credits: roundMoney(wallet.available_credits + amount),
+      lifetime_granted: roundMoney((wallet.lifetime_granted ?? 0) + amount),
+      updated_at: Date.now(),
+    });
+    await insertLedger(ctx, {
+      account_id: args.account_id,
+      account_type: "buyer",
+      entry_type: "trial_credit_grant",
+      amount,
+      idempotency_key: idempotencyKey,
+    });
+    return { granted: true, idempotent: false };
+  },
+});
+
+export const grantTrialCreditsIfNeeded = mutation({
+  args: {},
+  handler: async (ctx): Promise<{ granted: boolean; idempotent: boolean }> => {
+    const accountId = await requireAccountId(ctx);
+    const wallet = await ensureBuyerWallet(ctx, accountId);
+    const missingTrialCredits = roundMoney(
+      FREE_TRIAL_CREDITS - (wallet.lifetime_granted ?? 0),
+    );
+    if (missingTrialCredits <= 0) {
+      return { granted: false, idempotent: true };
+    }
+    return (await ctx.runMutation(internal.payments._grantTrialCreditsIfNeeded, {
+      account_id: accountId,
+      amount: missingTrialCredits,
+    })) as { granted: boolean; idempotent: boolean };
   },
 });
 

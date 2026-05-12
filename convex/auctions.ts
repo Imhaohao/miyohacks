@@ -34,6 +34,7 @@ import {
   computeAuctionValue,
   qualityAdjustedVickreyPrice,
 } from "../lib/auction-value";
+import { configuredConnectionAvailability } from "../lib/specialists/connection-runtime";
 
 const BUYER_ID = "buyer:default";
 
@@ -59,46 +60,7 @@ function formatResultForJudge(result: unknown): string {
 type ToolAvailability = NonNullable<BidPayload["tool_availability"]>;
 
 function checkToolAvailability(spec: SpecialistConfig): ToolAvailability {
-  const checked: string[] = [];
-  const missing: string[] = [];
-
-  if (spec.mcp_api_key_env) {
-    checked.push(spec.mcp_api_key_env);
-    if (!process.env[spec.mcp_api_key_env]?.trim()) {
-      missing.push(spec.mcp_api_key_env);
-    }
-  }
-
-  if (missing.length > 0) {
-    return {
-      status: "missing",
-      checked,
-      missing,
-      reason: `missing required credential${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`,
-    };
-  }
-
-  if (spec.protocol === "manual") {
-    return {
-      status: "manual",
-      checked,
-      reason: "manual specialist; no live API credential required",
-    };
-  }
-
-  if (spec.verification_status === "mock" || spec.protocol === "mock") {
-    return {
-      status: "mock",
-      checked,
-      reason: "demo/mock specialist; output must be treated as synthetic",
-    };
-  }
-
-  return {
-    status: "available",
-    checked,
-    reason: checked.length > 0 ? "required credentials are configured" : "no credential required",
-  };
+  return configuredConnectionAvailability(spec);
 }
 
 function isHardUnavailable(spec: SpecialistConfig, availability: ToolAvailability) {
@@ -228,7 +190,7 @@ export const solicitBids = internalAction({
     // the Hyperspell/Nia routing packet. This prevents a creator-commerce
     // specialist from winning a SaaS engineering task just because it can
     // produce a polished but unrelated artifact.
-    const shortlist = (await ctx.runQuery(api.agentShortlists.forTask, {
+    const shortlist = (await ctx.runQuery(internal.agentShortlists._forTask, {
       task_id: args.task_id,
     })) as Doc<"agent_shortlists">[];
     const shortlistedIds = new Set(shortlist.map((item) => item.agent_id));
@@ -256,7 +218,9 @@ export const solicitBids = internalAction({
       ),
     );
 
-    const recommended = new Set(taskContext?.routing.recommended_specialists ?? []);
+    const recommended = new Set<string>(
+      taskContext?.routing.recommended_specialists ?? [],
+    );
     const roster = [...SPECIALISTS, ...discoveredConfigs, ...catalogConfigs];
     const fullRoster = [...roster, ...contactConfigs].filter(
       (spec, index, list) =>
@@ -304,6 +268,7 @@ export const solicitBids = internalAction({
             return;
           }
           const bid = decision satisfies BidPayload;
+          const bidAvailability = bid.tool_availability ?? toolAvailability;
           const reputationSummary = await ctx.runQuery(
             internal.reputationDimensions._summaryForAgent,
             { agent_id: spec.agent_id },
@@ -321,11 +286,11 @@ export const solicitBids = internalAction({
               : reliabilityScore,
           );
           const availabilityScore =
-            toolAvailability.status === "available"
+            bidAvailability.status === "available"
               ? 1
-              : toolAvailability.status === "manual"
+              : bidAvailability.status === "manual"
                 ? 0.82
-                : toolAvailability.status === "mock"
+                : bidAvailability.status === "mock"
                   ? 0.62
                   : 0;
           const value = computeAuctionValue({
@@ -366,7 +331,7 @@ export const solicitBids = internalAction({
             execution_preview:
               bid.execution_preview ??
               `Plan preview: ${bid.capability_claim} Estimated ${bid.estimated_seconds}s before delivery.`,
-            tool_availability: bid.tool_availability ?? toolAvailability,
+            tool_availability: bidAvailability,
           });
           await ctx.runMutation(internal.lifecycle.log, {
             task_id: args.task_id,
@@ -379,7 +344,7 @@ export const solicitBids = internalAction({
               // until the resolver writes the auction_resolved event.
               capability_claim: bid.capability_claim,
               estimated_seconds: bid.estimated_seconds,
-              tool_availability: bid.tool_availability ?? toolAvailability,
+              tool_availability: bidAvailability,
             },
           });
         } catch (err) {
@@ -405,9 +370,9 @@ export const resolve = internalAction({
     const task = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
     });
-    const allBids = await ctx.runQuery(internal.bids._allForTask, {
+    const allBids = (await ctx.runQuery(internal.bids._allForTask, {
       task_id: args.task_id,
-    });
+    })) as Doc<"bids">[];
 
     const validBids = allBids.filter(
       (b) =>
@@ -836,10 +801,14 @@ const JUDGE_CAMPAIGN_PROMPT = `You are an impartial judge for a creator-campaign
 
 Be strict but fair. Reject if the output lacks a creator shortlist, outreach drafts, sample-request notes, risk evaluation, or evidence tied to Reacher/Nia context. Accept if it satisfies the campaign workflow even if imperfect.`;
 
-const JUDGE_IMPLEMENTATION_PLAN_PROMPT = `You are an impartial judge for the planning phase of a software/product execution marketplace. The winning agent is expected to return an implementation_plan artifact for user approval before payment/execution, not finished code. Output JSON only:
+const JUDGE_IMPLEMENTATION_PLAN_PROMPT = `You are an impartial judge for a software/product execution marketplace. The task may have two valid artifact shapes:
+1. A pre-execution implementation_plan artifact for buyer approval.
+2. A post-approval execution result that reports actual repo edits, changed files, verification commands, and blockers.
+
+Output JSON only:
 { "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
 
-Be strict but fair. Accept if the plan directly addresses the requested product/software change, identifies relevant context relay needs (Hyperspell business context and Nia repo/source context), names concrete implementation surfaces, preserves critical constraints such as Stripe checkout or existing UI, asks useful refinement questions, and defines acceptance criteria. Reject if it drifts into an unrelated domain, ignores the user's actual request, or pretends work is complete without a plan.`;
+Be strict but fair. If the output is a plan, accept only if it directly addresses the requested product/software change, identifies relevant context relay needs, names concrete implementation surfaces, preserves critical constraints, asks useful refinement questions, and defines acceptance criteria. If the output is an execution result, accept only if it is specific to the user's requested repo change, names actual changed files or explicitly explains why no edit was safe, includes verification evidence, and avoids unrelated template drift. Reject if it drifts into an unrelated domain, ignores the user's actual request, invents repo facts, or claims code was changed without file/diff evidence.`;
 
 export const judge = internalAction({
   args: {
@@ -965,9 +934,9 @@ export const settle = internalAction({
     });
 
     // Capture actual runtime from lifecycle events for the dimensions record.
-    const lifecycle = await ctx.runQuery(internal.lifecycle._forTask, {
+    const lifecycle = (await ctx.runQuery(internal.lifecycle._forTask, {
       task_id: args.task_id,
-    });
+    })) as Doc<"lifecycle_events">[];
     const startedAt = lifecycle.find(
       (e) => e.event_type === "execution_started",
     )?.timestamp;

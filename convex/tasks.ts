@@ -7,6 +7,13 @@ import {
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { buildOrchestrationContext } from "../lib/orchestration-context";
+import type { Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
+import {
+  assertProjectOwned,
+  assertTaskReadable,
+  requireAccountId,
+} from "./authHelpers";
 
 export const BID_WINDOW_SECONDS = 15;
 
@@ -38,6 +45,147 @@ function cleanList(values: Array<string | undefined>): string[] {
   );
 }
 
+function requireServerSecret(secret: string | undefined) {
+  const expected = process.env.PAYMENT_SERVER_SECRET;
+  if (expected && secret !== expected) {
+    throw new Error("invalid server secret");
+  }
+}
+
+interface CreateTaskArgs {
+  posted_by: string;
+  project_id?: Id<"projects">;
+  task_type?: string;
+  prompt: string;
+  max_budget: number;
+  output_schema?: unknown;
+  business_context?: string;
+  repo_context?: string;
+  source_hints?: string[];
+}
+
+async function latestProfileForTask(ctx: MutationCtx, args: CreateTaskArgs) {
+  const profiles = await ctx.db
+    .query("product_context_profiles")
+    .withIndex("by_owner", (q) => q.eq("owner_id", args.posted_by))
+    .collect();
+  const matching = args.project_id
+    ? profiles.filter((profile) => profile.project_id === args.project_id)
+    : profiles;
+  return matching.sort((a, b) => b.updated_at - a.updated_at)[0] ?? null;
+}
+
+async function createTask(ctx: MutationCtx, args: CreateTaskArgs) {
+  const now = Date.now();
+  const closesAt = now + BID_WINDOW_SECONDS * 1000;
+  const profile = await latestProfileForTask(ctx, args);
+
+  const profileBusiness = profile
+    ? [
+        `Company/product: ${profile.company_name}`,
+        profile.product_url ? `Product URL: ${profile.product_url}` : undefined,
+        profile.business_context,
+      ]
+        .filter((line): line is string => Boolean(line))
+        .join("\n")
+    : undefined;
+  const profileRepo = profile
+    ? [
+        profile.github_repo_url ? `GitHub repo: ${profile.github_repo_url}` : undefined,
+        profile.repo_context,
+      ]
+        .filter((line): line is string => Boolean(line))
+        .join("\n")
+    : undefined;
+  const sourceHints = cleanList([
+    profile?.github_repo_url,
+    profile?.product_url,
+    ...(profile?.source_hints ?? []),
+    ...(args.source_hints ?? []),
+  ]);
+  const businessContext = cleanOptional(args.business_context) ?? profileBusiness;
+  const repoContext = cleanOptional(args.repo_context) ?? profileRepo;
+
+  const task_id = await ctx.db.insert("tasks", {
+    posted_by: args.posted_by,
+    task_type: args.task_type ?? "general",
+    prompt: args.prompt,
+    max_budget: args.max_budget,
+    payment_status: "unfunded",
+    output_schema: args.output_schema,
+    status: "planning",
+    bid_window_seconds: BID_WINDOW_SECONDS,
+    bid_window_closes_at: closesAt,
+    project_id: args.project_id,
+    product_context_profile_id: profile?._id,
+  });
+
+  await ctx.runMutation(internal.payments._reserveTaskBudget, {
+    task_id,
+    buyer_id: args.posted_by,
+    amount: args.max_budget,
+  });
+
+  const orchestrationContext = buildOrchestrationContext({
+    prompt: args.prompt,
+    taskType: args.task_type ?? "general",
+    businessContext,
+    repoContext,
+    sourceHints,
+  });
+
+  await ctx.db.insert("task_contexts", {
+    task_id,
+    version: orchestrationContext.version,
+    business: orchestrationContext.business,
+    repo: orchestrationContext.repo,
+    routing: orchestrationContext.routing,
+    prompt_addendum: orchestrationContext.prompt_addendum,
+    created_at: now,
+  });
+
+  await ctx.runMutation(internal.lifecycle.log, {
+    task_id,
+    event_type: "task_posted",
+    payload: {
+      posted_by: args.posted_by,
+      project_id: args.project_id,
+      prompt: args.prompt,
+      max_budget: args.max_budget,
+    },
+  });
+
+  await ctx.runMutation(internal.lifecycle.log, {
+    task_id,
+    event_type: "context_enriched",
+    payload: orchestrationContext,
+  });
+
+  if (profile) {
+    await ctx.runMutation(internal.lifecycle.log, {
+      task_id,
+      event_type: "product_context_attached",
+      payload: {
+        profile_id: profile._id,
+        project_id: profile.project_id,
+        company_name: profile.company_name,
+        has_product_url: Boolean(profile.product_url),
+        has_github_repo: Boolean(profile.github_repo_url),
+        source_hint_count: sourceHints.length,
+        hyperspell_status: profile.hyperspell_status,
+      },
+    });
+  }
+
+  await ctx.scheduler.runAfter(0, internal.planning.decompose, { task_id });
+
+  return {
+    task_id,
+    status: "planning" as const,
+    bid_window_closes_at: closesAt,
+  };
+}
+
 /**
  * Post a new task. Creates the row in `bidding`, schedules bid solicitation
  * immediately and the auction resolution at window close.
@@ -54,118 +202,68 @@ export const post = mutation({
     source_hints: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const closesAt = now + BID_WINDOW_SECONDS * 1000;
-    const profile = await ctx.db
-      .query("product_context_profiles")
-      .withIndex("by_owner", (q) => q.eq("owner_id", args.posted_by))
-      .order("desc")
-      .first();
+    return await createTask(ctx, args);
+  },
+});
 
-    const profileBusiness = profile
-      ? [
-          `Company/product: ${profile.company_name}`,
-          profile.product_url ? `Product URL: ${profile.product_url}` : undefined,
-          profile.business_context,
-        ]
-          .filter((line): line is string => Boolean(line))
-          .join("\n")
-      : undefined;
-    const profileRepo = profile
-      ? [
-          profile.github_repo_url ? `GitHub repo: ${profile.github_repo_url}` : undefined,
-          profile.repo_context,
-        ]
-          .filter((line): line is string => Boolean(line))
-          .join("\n")
-      : undefined;
-    const sourceHints = cleanList([
-      profile?.github_repo_url,
-      profile?.product_url,
-      ...(profile?.source_hints ?? []),
-      ...(args.source_hints ?? []),
-    ]);
-    const businessContext = cleanOptional(args.business_context) ?? profileBusiness;
-    const repoContext = cleanOptional(args.repo_context) ?? profileRepo;
+export const postAuthenticated = mutation({
+  args: {
+    project_id: v.id("projects"),
+    task_type: v.optional(v.string()),
+    prompt: v.string(),
+    max_budget: v.number(),
+    output_schema: v.optional(v.any()),
+    business_context: v.optional(v.string()),
+    repo_context: v.optional(v.string()),
+    source_hints: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const accountId = await requireAccountId(ctx);
+    await assertProjectOwned(ctx, args.project_id, accountId);
+    return await createTask(ctx, {
+      posted_by: accountId,
+      ...args,
+    });
+  },
+});
 
-    const task_id = await ctx.db.insert("tasks", {
-      posted_by: args.posted_by,
-      task_type: args.task_type ?? "general",
+export const postForAccount = mutation({
+  args: {
+    server_secret: v.optional(v.string()),
+    account_id: v.string(),
+    project_id: v.optional(v.id("projects")),
+    task_type: v.optional(v.string()),
+    prompt: v.string(),
+    max_budget: v.number(),
+    output_schema: v.optional(v.any()),
+    business_context: v.optional(v.string()),
+    repo_context: v.optional(v.string()),
+    source_hints: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    requireServerSecret(args.server_secret);
+    const project =
+      args.project_id !== undefined
+        ? await assertProjectOwned(ctx, args.project_id, args.account_id)
+        : await ctx.db
+            .query("projects")
+            .withIndex("by_owner", (q) =>
+              q.eq("owner_account_id", args.account_id),
+            )
+            .order("asc")
+            .first();
+    if (!project) throw new Error("project not found");
+    return await createTask(ctx, {
+      posted_by: args.account_id,
+      project_id: project._id,
+      task_type: args.task_type,
       prompt: args.prompt,
       max_budget: args.max_budget,
-      payment_status: "unfunded",
       output_schema: args.output_schema,
-      status: "planning",
-      bid_window_seconds: BID_WINDOW_SECONDS,
-      bid_window_closes_at: closesAt,
-      product_context_profile_id: profile?._id,
+      business_context: args.business_context,
+      repo_context: args.repo_context,
+      source_hints: args.source_hints,
     });
-
-    await ctx.runMutation(internal.payments._reserveTaskBudget, {
-      task_id,
-      buyer_id: args.posted_by,
-      amount: args.max_budget,
-    });
-
-    const orchestrationContext = buildOrchestrationContext({
-      prompt: args.prompt,
-      taskType: args.task_type ?? "general",
-      businessContext,
-      repoContext,
-      sourceHints,
-    });
-
-    await ctx.db.insert("task_contexts", {
-      task_id,
-      version: orchestrationContext.version,
-      business: orchestrationContext.business,
-      repo: orchestrationContext.repo,
-      routing: orchestrationContext.routing,
-      prompt_addendum: orchestrationContext.prompt_addendum,
-      created_at: now,
-    });
-
-    await ctx.runMutation(internal.lifecycle.log, {
-      task_id,
-      event_type: "task_posted",
-      payload: {
-        posted_by: args.posted_by,
-        prompt: args.prompt,
-        max_budget: args.max_budget,
-      },
-    });
-
-    await ctx.runMutation(internal.lifecycle.log, {
-      task_id,
-      event_type: "context_enriched",
-      payload: orchestrationContext,
-    });
-
-    if (profile) {
-      await ctx.runMutation(internal.lifecycle.log, {
-        task_id,
-        event_type: "product_context_attached",
-        payload: {
-          profile_id: profile._id,
-          company_name: profile.company_name,
-          has_product_url: Boolean(profile.product_url),
-          has_github_repo: Boolean(profile.github_repo_url),
-          source_hint_count: sourceHints.length,
-          hyperspell_status: profile.hyperspell_status,
-        },
-      });
-    }
-
-    // Planner: atomic → enrichment + auction on this task; compound → multi-
-    // step children (each routed through enrichment; children without a stub
-    // skip quickly to solicitBids inside enrichAndStartAuction).
-    await ctx.scheduler.runAfter(0, internal.planning.decompose, { task_id });
-
-    return {
-      task_id,
-      status: "planning" as const,
-      bid_window_closes_at: closesAt,
-    };
   },
 });
 
@@ -198,6 +296,7 @@ export const _createChild = internalMutation({
       bid_window_closes_at: closesAt,
       parent_task_id: args.parent_task_id,
       step_index: args.step_index,
+      project_id: parent.project_id,
       product_context_profile_id: parent.product_context_profile_id,
     });
     await ctx.runMutation(internal.payments._allocateChildBudget, {
@@ -280,6 +379,7 @@ export const _childrenOf = internalQuery({
 export const childrenOf = query({
   args: { parent_task_id: v.id("tasks") },
   handler: async (ctx, args) => {
+    await assertTaskReadable(ctx, args.parent_task_id);
     const children = await ctx.db
       .query("tasks")
       .withIndex("by_parent", (q) =>
@@ -299,8 +399,99 @@ export const childrenOf = query({
 export const get = query({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
+    return await assertTaskReadable(ctx, args.task_id);
+  },
+});
+
+export const getBundleForAccount = query({
+  args: {
+    server_secret: v.optional(v.string()),
+    account_id: v.string(),
+    task_id: v.id("tasks"),
+  },
+  handler: async (ctx, args) => {
+    requireServerSecret(args.server_secret);
     const task = await ctx.db.get(args.task_id);
-    return task;
+    if (!task || task.posted_by !== args.account_id) {
+      throw new Error("task not found");
+    }
+    const [
+      bids,
+      escrow,
+      lifecycle,
+      context,
+      shortlist,
+      executionPlan,
+      approvalEvents,
+      paymentLedger,
+      children,
+    ] = await Promise.all([
+      Date.now() < task.bid_window_closes_at
+        ? Promise.resolve([])
+        : ctx.db
+            .query("bids")
+            .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+            .collect()
+            .then((rows) =>
+              rows.sort(
+                (a, b) =>
+                  (b.value_score ?? b.score) - (a.value_score ?? a.score),
+              ),
+            ),
+      ctx.db
+        .query("escrow")
+        .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+        .first(),
+      ctx.db
+        .query("lifecycle_events")
+        .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+        .collect()
+        .then((rows) => rows.sort((a, b) => a.timestamp - b.timestamp)),
+      ctx.db
+        .query("task_contexts")
+        .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+        .order("desc")
+        .first(),
+      ctx.db
+        .query("agent_shortlists")
+        .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+        .collect()
+        .then((rows) => rows.sort((a, b) => a.rank - b.rank)),
+      ctx.db
+        .query("execution_plans")
+        .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+        .order("desc")
+        .first(),
+      ctx.db
+        .query("approval_events")
+        .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+        .collect()
+        .then((rows) => rows.sort((a, b) => a.timestamp - b.timestamp)),
+      ctx.db
+        .query("ledger_entries")
+        .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+        .collect()
+        .then((rows) => rows.sort((a, b) => a.created_at - b.created_at)),
+      ctx.db
+        .query("tasks")
+        .withIndex("by_parent", (q) => q.eq("parent_task_id", args.task_id))
+        .collect()
+        .then((rows) =>
+          rows.sort((a, b) => (a.step_index ?? 0) - (b.step_index ?? 0)),
+        ),
+    ]);
+    return {
+      task,
+      bids,
+      escrow,
+      lifecycle,
+      context,
+      shortlist,
+      execution_plan: executionPlan,
+      approval_events: approvalEvents,
+      payment_ledger: paymentLedger,
+      children,
+    };
   },
 });
 

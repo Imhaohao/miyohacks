@@ -76,12 +76,12 @@ export default function AgentsPage() {
 
       <header className="mb-6 mt-12 animate-fade-up">
         <h1 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-          100 agent contacts across industries.
+          100 connected MCP/A2A specialists.
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-ink-muted">
-          Arbor brokers tasks across A2A, MCP, mock, and manual specialists.
-          The auction only invites the best-fit shortlist, so broad coverage
-          does not mean noisy bidding.
+          Arbor brokers tasks across native MCP specialists and Arbor-hosted
+          A2A bridges for every housed contact. The auction only invites the
+          best-fit shortlist, so broad coverage does not mean noisy bidding.
         </p>
       </header>
 

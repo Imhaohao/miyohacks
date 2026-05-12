@@ -68,7 +68,6 @@ export function JudgeVerdictPanel({ task, events = [] }: Props) {
         body: JSON.stringify({
           verdict: nextVerdict,
           reason: trimmed,
-          actor: "buyer:web",
         }),
       });
       const data = await res.json();

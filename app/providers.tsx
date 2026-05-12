@@ -1,7 +1,12 @@
 "use client";
 
 import { ReactNode, useMemo } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { AuthBootstrap } from "@/components/AuthBootstrap";
+
+const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 export function Providers({ children }: { children: ReactNode }) {
   const client = useMemo(() => {
@@ -14,5 +19,14 @@ export function Providers({ children }: { children: ReactNode }) {
   }, []);
 
   if (!client) return <>{children}</>;
-  return <ConvexProvider client={client}>{children}</ConvexProvider>;
+  if (!clerkEnabled) {
+    return <ConvexProvider client={client}>{children}</ConvexProvider>;
+  }
+
+  return (
+    <ConvexProviderWithClerk client={client} useAuth={useAuth}>
+      <AuthBootstrap />
+      {children}
+    </ConvexProviderWithClerk>
+  );
 }

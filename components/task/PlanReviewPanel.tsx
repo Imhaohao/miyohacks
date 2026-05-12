@@ -14,13 +14,19 @@ import type { ExecutionPlanDoc, LifecycleEventDoc, TaskDoc } from "@/lib/task-vi
 export function PlanReviewPanel({
   task,
   events,
+  planFallback,
+  useLiveQueries = true,
 }: {
   task: TaskDoc;
   events: LifecycleEventDoc[];
+  planFallback?: ExecutionPlanDoc | null;
+  useLiveQueries?: boolean;
 }) {
-  const plan = useQuery(api.executionPlans.forTask, {
-    task_id: task._id as Id<"tasks">,
-  }) as ExecutionPlanDoc | null | undefined;
+  const livePlan = useQuery(
+    api.executionPlans.forTask,
+    useLiveQueries ? { task_id: task._id as Id<"tasks"> } : "skip",
+  ) as ExecutionPlanDoc | null | undefined;
+  const plan = useLiveQueries ? livePlan : planFallback;
   const approve = useMutation(api.executionPlans.approve);
   const requestRevision = useMutation(api.executionPlans.requestRevision);
   const cancel = useMutation(api.executionPlans.cancel);
@@ -66,6 +72,22 @@ export function PlanReviewPanel({
     } finally {
       setBusy(null);
     }
+  }
+
+  async function runServerPlanAction(
+    action: "approve" | "request_revision" | "cancel",
+    payload: Record<string, unknown> = {},
+  ) {
+    const res = await fetch(`/api/v1/tasks/${task._id}/plan`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json?.error?.message ?? "Unable to update plan");
+    }
+    return json;
   }
 
   return (
@@ -132,7 +154,9 @@ export function PlanReviewPanel({
               disabled={Boolean(busy)}
               onClick={() =>
                 run("approve", () =>
-                  approve({ task_id: task._id as Id<"tasks">, actor: "buyer:web" }),
+                  useLiveQueries
+                    ? approve({ task_id: task._id as Id<"tasks"> })
+                    : runServerPlanAction("approve"),
                 )
               }
             >
@@ -144,11 +168,12 @@ export function PlanReviewPanel({
               disabled={Boolean(busy) || feedback.trim().length === 0}
               onClick={() =>
                 run("revise", () =>
-                  requestRevision({
-                    task_id: task._id as Id<"tasks">,
-                    actor: "buyer:web",
-                    feedback,
-                  }),
+                  useLiveQueries
+                    ? requestRevision({
+                        task_id: task._id as Id<"tasks">,
+                        feedback,
+                      })
+                    : runServerPlanAction("request_revision", { feedback }),
                 )
               }
             >
@@ -160,11 +185,14 @@ export function PlanReviewPanel({
               disabled={Boolean(busy)}
               onClick={() =>
                 run("cancel", () =>
-                  cancel({
-                    task_id: task._id as Id<"tasks">,
-                    actor: "buyer:web",
-                    reason: "Buyer cancelled before execution approval.",
-                  }),
+                  useLiveQueries
+                    ? cancel({
+                        task_id: task._id as Id<"tasks">,
+                        reason: "Buyer cancelled before execution approval.",
+                      })
+                    : runServerPlanAction("cancel", {
+                        reason: "Buyer cancelled before execution approval.",
+                      }),
                 )
               }
             >

@@ -2,6 +2,7 @@ import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { calculateAgentNet, calculatePlatformFee } from "../lib/payments";
+import { assertTaskReadable } from "./authHelpers";
 
 const escrowStatusValidator = v.union(
   v.literal("locked"),
@@ -12,6 +13,7 @@ const escrowStatusValidator = v.union(
 export const forTask = query({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
+    await assertTaskReadable(ctx, args.task_id);
     const row = await ctx.db
       .query("escrow")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))

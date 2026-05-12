@@ -2,14 +2,13 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { useQuery } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { CREDIT_PACKS, formatCredits } from "@/lib/payments";
-import { CURRENT_BUYER_ID } from "@/lib/current-user";
 import { formatMoney } from "@/lib/utils";
 import {
   ArrowSquareOut,
@@ -19,21 +18,18 @@ import {
   Wallet,
 } from "@phosphor-icons/react";
 
-const BUYER_ID = CURRENT_BUYER_ID;
-
 interface CheckoutResponse {
   url?: string;
   error?: string;
 }
 
 export function BillingClient() {
-  const wallet = useQuery(api.payments.walletForBuyer, {
-    buyer_id: BUYER_ID,
-  });
-  const ledger = useQuery(api.payments.ledgerForBuyer, {
-    buyer_id: BUYER_ID,
-    limit: 12,
-  }) as Doc<"ledger_entries">[] | undefined;
+  const { isAuthenticated } = useConvexAuth();
+  const wallet = useQuery(api.payments.myWallet, isAuthenticated ? {} : "skip");
+  const ledger = useQuery(
+    api.payments.myLedger,
+    isAuthenticated ? { limit: 12 } : "skip",
+  ) as Doc<"ledger_entries">[] | undefined;
   const [busyPack, setBusyPack] = useState<number | null>(null);
   const [agentId, setAgentId] = useState("stripe-payments");
   const agentWallet = useQuery(api.payments.agentWallet, {
@@ -56,7 +52,7 @@ export function BillingClient() {
       const res = await fetch("/api/stripe/checkout/credits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ buyer_id: BUYER_ID, credits }),
+        body: JSON.stringify({ credits }),
       });
       const json = (await res.json()) as CheckoutResponse;
       if (!res.ok || !json.url) {
@@ -133,8 +129,8 @@ export function BillingClient() {
           />
           <Metric
             icon={<Bank size={18} weight="bold" />}
-            label="Lifetime spent"
-            value={formatCredits(wallet?.lifetime_spent ?? 0)}
+            label="Trial granted"
+            value={formatCredits(wallet?.lifetime_granted ?? 0)}
           />
         </div>
       </Card>

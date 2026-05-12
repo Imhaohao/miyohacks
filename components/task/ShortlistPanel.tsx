@@ -12,13 +12,19 @@ import { formatScore } from "@/lib/utils";
 export function ShortlistPanel({
   task,
   events,
+  rowsFallback,
+  useLiveQueries = true,
 }: {
   task: TaskDoc;
   events: LifecycleEventDoc[];
+  rowsFallback?: AgentShortlistDoc[];
+  useLiveQueries?: boolean;
 }) {
-  const rows = (useQuery(api.agentShortlists.forTask, {
-    task_id: task._id as Id<"tasks">,
-  }) ?? []) as AgentShortlistDoc[];
+  const liveRows = useQuery(
+    api.agentShortlists.forTask,
+    useLiveQueries ? { task_id: task._id as Id<"tasks"> } : "skip",
+  ) as AgentShortlistDoc[] | undefined;
+  const rows = (useLiveQueries ? liveRows ?? [] : rowsFallback ?? []) as AgentShortlistDoc[];
   const started = events.find((event) => event.event_type === "shortlist_started");
   const ready = events.find((event) => event.event_type === "shortlist_ready");
   const elapsed = useElapsedSeconds(started && !ready ? started.timestamp : undefined);
@@ -83,4 +89,3 @@ export function ShortlistPanel({
     </Card>
   );
 }
-

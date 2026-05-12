@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { handleRaiseDispute } from "@/lib/mcp-tools";
+import { handleGetTask, handleRaiseDispute } from "@/lib/mcp-tools";
+import { resolveApiIdentity } from "@/lib/api-identity";
 import { jsonOk, jsonError, corsPreflight } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -22,6 +23,11 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     return jsonError("reason (string) is required", 400);
   }
   try {
+    const identity = await resolveApiIdentity(req);
+    if (!identity && process.env.ALLOW_LEGACY_AGENT_IDS !== "true") {
+      return jsonError("unauthorized", 401);
+    }
+    await handleGetTask({ task_id: id }, identity);
     const result = await handleRaiseDispute({ task_id: id, reason: body.reason });
     return jsonOk(result);
   } catch (e) {

@@ -33,6 +33,13 @@ interface IndustryCluster {
 }
 
 const DEFAULT_INPUT_MODES = ["text/plain", "application/json"];
+const ARBOR_A2A_ORIGIN = (
+  process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+).replace(/\/+$/, "");
+
+function arborA2AEndpoint(agentId: string) {
+  return `${ARBOR_A2A_ORIGIN}/api/a2a/agents/${agentId}`;
+}
 
 const CLUSTERS: IndustryCluster[] = [
   {
@@ -954,9 +961,39 @@ const CLUSTERS: IndustryCluster[] = [
 export const AGENT_CONTACT_CATALOG: AgentContact[] = CLUSTERS.flatMap(
   (cluster) =>
     cluster.contacts.map((contact): AgentContact => {
-      const protocol = contact.protocol ?? "mock";
+      const hasNativeMcp = contact.protocol === "mcp" && Boolean(contact.endpoint_url);
+      const hasNativeA2A =
+        contact.protocol === "a2a" &&
+        Boolean(contact.endpoint_url) &&
+        Boolean(contact.agent_card_url);
+      const protocol: AgentProtocol = hasNativeMcp ? "mcp" : "a2a";
+      const bridgedA2A = protocol === "a2a" && !hasNativeA2A;
+      const internalA2AEndpoint = arborA2AEndpoint(contact.id);
+      const endpointUrl = hasNativeMcp
+        ? contact.endpoint_url
+        : contact.endpoint_url ?? internalA2AEndpoint;
+      const agentCardUrl =
+        protocol === "a2a"
+          ? hasNativeA2A
+            ? contact.agent_card_url
+            : internalA2AEndpoint
+          : undefined;
       const authType =
-        contact.auth_type ?? (contact.auth_env ? "api_key" : protocol === "manual" ? "manual" : "none");
+        bridgedA2A
+          ? "none"
+          : (contact.auth_type ?? (contact.auth_env ? "api_key" : "none"));
+      const verificationStatus =
+        hasNativeMcp
+          ? (contact.verification_status ?? "configured")
+          : hasNativeA2A
+            ? (contact.verification_status ?? "configured")
+            : "verified";
+      const healthStatus =
+        hasNativeMcp
+          ? (contact.health_status ?? (contact.auth_env ? "auth_required" : "unknown"))
+          : hasNativeA2A
+            ? (contact.health_status ?? "unknown")
+            : "healthy";
       return {
         agent_id: contact.id,
         display_name: contact.name,
@@ -973,14 +1010,12 @@ export const AGENT_CONTACT_CATALOG: AgentContact[] = CLUSTERS.flatMap(
             contact.sponsor.toLowerCase(),
           ]),
         ),
-        endpoint_url: contact.endpoint_url,
-        agent_card_url: contact.agent_card_url,
+        endpoint_url: endpointUrl,
+        agent_card_url: agentCardUrl,
         auth_type: authType,
-        auth_env: contact.auth_env,
-        verification_status:
-          contact.verification_status ?? (protocol === "mock" ? "mock" : "unverified"),
-        health_status:
-          contact.health_status ?? (protocol === "mock" ? "healthy" : "unknown"),
+        auth_env: bridgedA2A ? undefined : contact.auth_env,
+        verification_status: verificationStatus,
+        health_status: healthStatus,
         supported_input_modes: DEFAULT_INPUT_MODES,
         supported_output_modes: ["text/markdown", "application/json"],
         artifact_types: contact.artifact_types ?? [

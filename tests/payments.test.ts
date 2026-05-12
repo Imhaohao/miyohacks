@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   CREDIT_PACKS,
+  FREE_TRIAL_CREDITS,
   amountToCents,
   calculateEscrowSettlement,
   centsToAmount,
+  checkoutMetadata,
   creditPackForCredits,
   roundMoney,
 } from "../lib/payments";
+import { generateApiKey, hashApiKey } from "../lib/api-keys";
 
 test("credit packs are fixed purchase units", () => {
   assert.deepEqual(
@@ -16,6 +19,10 @@ test("credit packs are fixed purchase units", () => {
   );
   assert.equal(creditPackForCredits(25)?.amountUsd, 25);
   assert.equal(creditPackForCredits(11), null);
+});
+
+test("free trial starts every account with five credits", () => {
+  assert.equal(FREE_TRIAL_CREDITS, 5);
 });
 
 test("money conversion stays in two-decimal precision", () => {
@@ -40,4 +47,28 @@ test("settlement never creates or destroys credits through rounding", () => {
       settlement.gross,
     );
   }
+});
+
+test("checkout metadata binds Stripe credits to authenticated accounts", () => {
+  assert.deepEqual(
+    checkoutMetadata({
+      buyerId: "clerk:user_123",
+      clerkUserId: "user_123",
+      credits: 10,
+    }),
+    {
+      buyer_id: "clerk:user_123",
+      account_id: "clerk:user_123",
+      clerk_user_id: "user_123",
+      credits: "10",
+      product: "arbor_credits",
+    },
+  );
+});
+
+test("agent API keys are bearer-safe and hash deterministically", () => {
+  const token = generateApiKey();
+  assert.match(token, /^arbor_[A-Za-z0-9_-]+$/);
+  assert.equal(hashApiKey(token), hashApiKey(token));
+  assert.notEqual(hashApiKey(token), token);
 });

@@ -1,23 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { SignInButton, useAuth } from "@clerk/nextjs";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
+import {
+  refreshAccountBootstrap,
+  useAccountBootstrap,
+} from "@/components/useAccountBootstrap";
 import {
   CheckCircle,
   CircleNotch,
   Database,
   WarningCircle,
 } from "@phosphor-icons/react";
-import { CURRENT_BUYER_ID } from "@/lib/current-user";
-
-const OWNER_ID = CURRENT_BUYER_ID;
 
 const fieldLabel = "mb-1.5 block text-sm font-medium text-ink";
 const inputBase =
   "w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-subtle focus:border-brand-600 focus:outline-none focus:shadow-ring";
+const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 function splitSourceHints(value: string): string[] {
   return value
@@ -55,9 +59,27 @@ function hyperspellStatus(status: string | undefined) {
   };
 }
 
-export function ProductContextForm() {
-  const latest = useQuery(api.productContext.latest, { owner_id: OWNER_ID });
-  const save = useMutation(api.productContext.save);
+export function ProductContextForm({
+  projectId: projectIdOverride,
+}: {
+  projectId?: Id<"projects">;
+}) {
+  const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const hasClerkSession = Boolean(clerkLoaded && isSignedIn);
+  const signedIn = isAuthenticated || hasClerkSession;
+  const bootstrap = useAccountBootstrap(hasClerkSession);
+  const projects = useQuery(
+    api.projects.listMine,
+    isAuthenticated && !projectIdOverride ? {} : "skip",
+  );
+  const projectId = projectIdOverride ?? projects?.[0]?._id ?? bootstrap.data?.project_id;
+  const convexLatest = useQuery(
+    api.productContext.latestForProject,
+    isAuthenticated && projectId ? { project_id: projectId } : "skip",
+  );
+  const latest = convexLatest ?? bootstrap.data?.product_context ?? null;
+  const save = useMutation(api.productContext.saveForProject);
   const [loadedProfileId, setLoadedProfileId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [productUrl, setProductUrl] = useState("");
@@ -79,20 +101,69 @@ export function ProductContextForm() {
     setSourceHints(latest.source_hints.join("\n"));
   }, [latest, loadedProfileId]);
 
+  if ((isLoading || !clerkLoaded) && !signedIn) {
+    return (
+      <Card className="h-fit">
+        <CardHeader title="Connecting secure workspace" meta="Auction workspace" />
+        <p className="text-sm leading-relaxed text-ink-muted">
+          Checking your Clerk session and project context workspace.
+        </p>
+      </Card>
+    );
+  }
+
+  if (!signedIn) {
+    return (
+      <Card className="h-fit">
+        <CardHeader title="Sign in required" meta="Project context" />
+        <p className="text-sm leading-relaxed text-ink-muted">
+          {clerkEnabled
+            ? "Sign in to connect Hyperspell/Nia context to your private project."
+            : "Clerk auth is not configured, so project context cannot be saved yet."}
+        </p>
+        {clerkEnabled ? (
+          <div className="mt-4">
+            <SignInButton mode="modal">
+              <Button type="button">Sign in</Button>
+            </SignInButton>
+          </div>
+        ) : null}
+      </Card>
+    );
+  }
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
     setMessage(null);
     try {
-      await save({
-        owner_id: OWNER_ID,
+      if (!projectId) throw new Error("Project is still being created.");
+      const payload = {
+        project_id: projectId,
         company_name: companyName,
         product_url: productUrl || undefined,
         github_repo_url: githubRepoUrl || undefined,
         business_context: businessContext,
         repo_context: repoContext || undefined,
         source_hints: splitSourceHints(sourceHints),
-      });
+      };
+      if (isAuthenticated) {
+        await save(payload);
+      } else if (hasClerkSession) {
+        const res = await fetch("/api/account/product-context", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json?.error?.message ?? "Unable to save context");
+        }
+        await bootstrap.refresh();
+      } else {
+        throw new Error("Sign in before saving project context.");
+      }
+      refreshAccountBootstrap();
       setMessage("Saved. Future tasks will carry this context automatically.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -102,6 +173,7 @@ export function ProductContextForm() {
   }
 
   const status = hyperspellStatus(latest?.hyperspell_status);
+  const projectReady = Boolean(projectId);
 
   return (
     <Card className="h-fit">
@@ -116,6 +188,17 @@ export function ProductContextForm() {
           </span>
         }
       />
+      {!isAuthenticated && hasClerkSession ? (
+        <p className="mb-4 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700">
+          Clerk is signed in. Saving through the server-auth context path while
+          Convex browser auth catches up.
+        </p>
+      ) : null}
+      {bootstrap.error && !isAuthenticated ? (
+        <p className="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {bootstrap.error}
+        </p>
+      ) : null}
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -209,7 +292,12 @@ export function ProductContextForm() {
 
         <Button
           type="submit"
-          disabled={saving || !companyName.trim() || !businessContext.trim()}
+          disabled={
+            !projectReady ||
+            saving ||
+            !companyName.trim() ||
+            !businessContext.trim()
+          }
           className="w-full"
         >
           {saving ? (

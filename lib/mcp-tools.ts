@@ -12,6 +12,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import type { ApiCallerIdentity } from "@/lib/api-identity";
 import {
   SPECIALISTS,
   registerDiscoveredSpecialist,
@@ -22,7 +23,12 @@ import {
 } from "@/lib/specialists/suggest";
 import { discoverSpecialist } from "@/lib/specialists/discover";
 import {
+  configuredConnectionAvailability,
+  getSpecialistConnection,
+} from "@/lib/specialists/connection-runtime";
+import {
   AGENT_CONTACT_CATALOG,
+  contactToSpecialistConfig,
 } from "@/lib/agent-contacts";
 import { rankAgentContacts } from "@/lib/agent-broker";
 import type { AgentIndustry, AgentProtocol, SpecialistConfig } from "@/lib/types";
@@ -54,6 +60,7 @@ export interface PostTaskArgs {
   business_context?: string;
   repo_context?: string;
   source_hints?: string[];
+  project_id?: string;
 }
 
 export interface GetWalletArgs {
@@ -123,6 +130,7 @@ export interface SuggestAgentContactsArgs {
 
 export interface UpsertProductContextArgs {
   agent_id?: string;
+  project_id?: string;
   company_name: string;
   product_url?: string;
   github_repo_url?: string;
@@ -142,6 +150,16 @@ export interface PlanRevisionArgs extends PlanActionArgs {
 
 export interface CancelTaskArgs extends PlanActionArgs {
   reason?: string;
+}
+
+function legacyMcpAllowed() {
+  return process.env.ALLOW_LEGACY_AGENT_IDS === "true";
+}
+
+function requireIdentity(identity: ApiCallerIdentity | null | undefined) {
+  if (identity) return identity;
+  if (legacyMcpAllowed()) return null;
+  throw new Error("Authorization required. Create an Arbor API key and send Authorization: Bearer arbor_...");
 }
 
 // ─── tool definitions ─────────────────────────────────────────────────────
@@ -201,7 +219,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "list_agent_contacts",
     description:
-      "List the 100-agent cross-industry A2A/MCP/contact registry with protocol, health, verification, capabilities, and live reputation.",
+      "List the 100-agent cross-industry registry. Every contact is connected through either a native MCP endpoint or Arbor-hosted A2A bridge, with protocol, health, verification, capabilities, and live reputation.",
     inputSchema: {
       type: "object",
       properties: {
@@ -224,7 +242,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "suggest_agent_contacts",
     description:
-      "Run the deterministic broker ranker over the 100-agent registry and return the best-fit contacts for a task.",
+      "Run the deterministic broker ranker over the 100 connected MCP/A2A agents and return the best-fit contacts for a task.",
     inputSchema: {
       type: "object",
       required: ["prompt"],
@@ -346,7 +364,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "list_specialists",
     description:
-      "List specialist agents with reputation, capabilities, MCP connection status, and cost baselines.",
+      "List specialist agents with reputation, capabilities, MCP/A2A connection status, and cost baselines.",
     inputSchema: {
       type: "object",
       properties: {
@@ -484,8 +502,12 @@ export const TOOLS: ToolDefinition[] = [
 
 // ─── tool handlers ────────────────────────────────────────────────────────
 
-export async function handleGetWallet(args: GetWalletArgs) {
-  const buyerId = args.buyer_id ?? "agent:mcp";
+export async function handleGetWallet(
+  args: GetWalletArgs,
+  identity?: ApiCallerIdentity | null,
+) {
+  const resolved = requireIdentity(identity);
+  const buyerId = resolved?.account_id ?? args.buyer_id ?? "agent:mcp";
   const c = convex();
   const [wallet, ledger] = await Promise.all([
     c.query(api.payments.walletForBuyer, { buyer_id: buyerId }),
@@ -494,8 +516,12 @@ export async function handleGetWallet(args: GetWalletArgs) {
   return { buyer_id: buyerId, wallet, ledger };
 }
 
-export async function handleCreateCreditCheckout(args: CreateCreditCheckoutArgs) {
-  const buyerId = args.buyer_id ?? "agent:mcp";
+export async function handleCreateCreditCheckout(
+  args: CreateCreditCheckoutArgs,
+  identity?: ApiCallerIdentity | null,
+) {
+  const resolved = requireIdentity(identity);
+  const buyerId = resolved?.account_id ?? args.buyer_id ?? "agent:mcp";
   const pack = creditPackForCredits(Number(args.credits));
   if (!pack) throw new Error("credits must be one of 10, 25, 100, or 250");
 
@@ -553,21 +579,40 @@ export async function handleGetAgentEarnings(args: GetAgentEarningsArgs) {
   return { agent_id: args.agent_id, wallet, payout_account };
 }
 
-export async function handlePostTask(args: PostTaskArgs) {
+export async function handlePostTask(
+  args: PostTaskArgs,
+  identity?: ApiCallerIdentity | null,
+) {
   if (!args.prompt) throw new Error("prompt is required");
   if (typeof args.max_budget !== "number")
     throw new Error("max_budget must be a number");
 
-  const result = await convex().mutation(api.tasks.post, {
-    posted_by: args.agent_id ?? "agent:mcp",
-    task_type: args.task_type,
-    prompt: args.prompt,
-    max_budget: args.max_budget,
-    output_schema: args.output_schema,
-    business_context: args.business_context,
-    repo_context: args.repo_context,
-    source_hints: args.source_hints,
-  });
+  const resolved = requireIdentity(identity);
+  const result = resolved
+    ? await convex().mutation(api.tasks.postForAccount, {
+        server_secret: paymentServerSecret(),
+        account_id: resolved.account_id,
+        project_id:
+          (args.project_id as Id<"projects"> | undefined) ??
+          resolved.project_id,
+        task_type: args.task_type,
+        prompt: args.prompt,
+        max_budget: args.max_budget,
+        output_schema: args.output_schema,
+        business_context: args.business_context,
+        repo_context: args.repo_context,
+        source_hints: args.source_hints,
+      })
+    : await convex().mutation(api.tasks.post, {
+        posted_by: args.agent_id ?? "agent:mcp",
+        task_type: args.task_type,
+        prompt: args.prompt,
+        max_budget: args.max_budget,
+        output_schema: args.output_schema,
+        business_context: args.business_context,
+        repo_context: args.repo_context,
+        source_hints: args.source_hints,
+      });
 
   return {
     task_id: result.task_id,
@@ -579,11 +624,23 @@ export async function handlePostTask(args: PostTaskArgs) {
   };
 }
 
-export async function handleGetTask(args: GetTaskArgs) {
+export async function handleGetTask(
+  args: GetTaskArgs,
+  identity?: ApiCallerIdentity | null,
+) {
   if (!args.task_id) throw new Error("task_id is required");
   // task_id arrives as a string over the wire; the Convex query validators
   // narrow it to Id<"tasks"> at runtime — cast at the boundary.
   const task_id = args.task_id as Id<"tasks">;
+  const resolved = requireIdentity(identity);
+  if (resolved) {
+    return await convex().query(api.tasks.getBundleForAccount, {
+      server_secret: paymentServerSecret(),
+      account_id: resolved.account_id,
+      task_id,
+    });
+  }
+
   const c = convex();
   const [
     task,
@@ -595,6 +652,7 @@ export async function handleGetTask(args: GetTaskArgs) {
     execution_plan,
     approval_events,
     payment_ledger,
+    children,
   ] = await Promise.all([
     c.query(api.tasks.get, { task_id }),
     c.query(api.bids.forTask, { task_id }),
@@ -605,6 +663,7 @@ export async function handleGetTask(args: GetTaskArgs) {
     c.query(api.executionPlans.forTask, { task_id }),
     c.query(api.executionPlans.approvalEventsForTask, { task_id }),
     c.query(api.payments.ledgerForTask, { task_id }),
+    c.query(api.tasks.childrenOf, { parent_task_id: task_id }),
   ]);
   return {
     task,
@@ -616,6 +675,7 @@ export async function handleGetTask(args: GetTaskArgs) {
     execution_plan,
     approval_events,
     payment_ledger,
+    children,
   };
 }
 
@@ -658,7 +718,8 @@ export async function handleSuggestAgentContacts(args: SuggestAgentContactsArgs)
 }
 
 export async function handleListSpecialists(_args: ListSpecialistsArgs) {
-  // Combine the static registry (capabilities, sponsor) with live reputation.
+  // Combine the housed contact registry (100 MCP/A2A specialists), static
+  // sponsors, discovered specialists, and live reputation.
   const c = convex();
   const [live, all] = await Promise.all([
     c.query(api.agents.list, {}),
@@ -671,6 +732,8 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
   );
   return all.map((s) => {
     const l = liveById.get(s.agent_id);
+    const connection = getSpecialistConnection(s);
+    const availability = configuredConnectionAvailability(s);
     return {
       agent_id: s.agent_id,
       sponsor: s.sponsor,
@@ -679,18 +742,36 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
       one_liner: s.one_liner,
       reputation_score: l?.reputation_score ?? s.starting_reputation,
       total_tasks_completed: l?.total_tasks_completed ?? 0,
+      protocol: s.protocol,
+      execution_connection: {
+        protocol: connection.protocol,
+        native: connection.native,
+        endpoint_url: connection.endpointUrl,
+        agent_card_url: connection.agentCardUrl,
+        status: availability.status,
+        checked: availability.checked,
+        missing: availability.missing,
+        reason: availability.reason,
+      },
       mcp_endpoint: s.mcp_endpoint,
-      mcp_connected: !!s.mcp_endpoint && !!s.is_verified,
+      mcp_connected:
+        connection.protocol === "mcp" && availability.status === "available",
       mcp_status: s.mcp_endpoint
-        ? s.is_verified
-          ? "verified"
-          : s.mcp_api_key_env
-            ? "auth_required"
+        ? availability.status === "missing"
+          ? "auth_required"
+          : s.is_verified
+            ? "verified"
             : "configured"
         : s.discovered
           ? "discovered"
           : "mocked",
       mcp_api_key_env: s.mcp_api_key_env,
+      a2a_endpoint: s.a2a_endpoint,
+      a2a_agent_card_url: s.a2a_agent_card_url,
+      a2a_connected:
+        (connection.protocol === "a2a" ||
+          connection.protocol === "arbor_a2a_bridge") &&
+        availability.status === "available",
       is_verified: s.is_verified ?? false,
       homepage_url: s.homepage_url,
       discovered: !!s.discovered,
@@ -733,7 +814,12 @@ async function loadAllSpecialists(): Promise<SpecialistConfig[]> {
     discovered_for: d.discovered_for,
   }));
   for (const cfg of discoveredConfigs) registerDiscoveredSpecialist(cfg);
-  return [...SPECIALISTS, ...discoveredConfigs];
+  const contacts = AGENT_CONTACT_CATALOG.map(contactToSpecialistConfig);
+  const merged = [...SPECIALISTS, ...contacts, ...discoveredConfigs];
+  return merged.filter(
+    (specialist, index, list) =>
+      list.findIndex((candidate) => candidate.agent_id === specialist.agent_id) === index,
+  );
 }
 
 export async function handleSuggestSpecialists(
@@ -746,7 +832,7 @@ export async function handleSuggestSpecialists(
     typeof args.top_n === "number" && args.top_n > 0
       ? Math.min(10, Math.floor(args.top_n))
       : 3;
-  const all = await loadAllSpecialists();
+  const all = (await loadAllSpecialists()) as SpecialistConfig[];
   return await suggestSpecialists(args.prompt, args.task_type, all, topN);
 }
 
@@ -816,25 +902,43 @@ export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
   };
 }
 
-export async function handleUpsertProductContext(args: UpsertProductContextArgs) {
+export async function handleUpsertProductContext(
+  args: UpsertProductContextArgs,
+  identity?: ApiCallerIdentity | null,
+) {
   if (!args.company_name?.trim()) throw new Error("company_name is required");
   if (!args.business_context?.trim()) {
     throw new Error("business_context is required");
   }
 
-  const result = await convex().mutation(api.productContext.save, {
-    owner_id: args.agent_id ?? "agent:mcp",
-    company_name: args.company_name,
-    product_url: args.product_url,
-    github_repo_url: args.github_repo_url,
-    business_context: args.business_context,
-    repo_context: args.repo_context,
-    source_hints: args.source_hints,
-  });
+  const resolved = requireIdentity(identity);
+  const result = resolved
+    ? await convex().mutation(api.productContext.saveForAccount, {
+        server_secret: paymentServerSecret(),
+        account_id: resolved.account_id,
+        project_id:
+          (args.project_id as Id<"projects"> | undefined) ??
+          resolved.project_id,
+        company_name: args.company_name,
+        product_url: args.product_url,
+        github_repo_url: args.github_repo_url,
+        business_context: args.business_context,
+        repo_context: args.repo_context,
+        source_hints: args.source_hints,
+      })
+    : await convex().mutation(api.productContext.save, {
+        owner_id: args.agent_id ?? "agent:mcp",
+        company_name: args.company_name,
+        product_url: args.product_url,
+        github_repo_url: args.github_repo_url,
+        business_context: args.business_context,
+        repo_context: args.repo_context,
+        source_hints: args.source_hints,
+      });
 
   return {
     ...result,
-    attached_to_agent_id: args.agent_id ?? "agent:mcp",
+    attached_to_agent_id: resolved?.account_id ?? args.agent_id ?? "agent:mcp",
     note: "Future post_task calls from this agent_id will automatically attach this product context.",
   };
 }
@@ -897,13 +1001,15 @@ export async function handleCancelTask(args: CancelTaskArgs) {
 export async function dispatchTool(
   name: string,
   args: Record<string, unknown>,
+  identity?: ApiCallerIdentity | null,
 ): Promise<unknown> {
   switch (name) {
     case "get_wallet":
-      return await handleGetWallet(args as unknown as GetWalletArgs);
+      return await handleGetWallet(args as unknown as GetWalletArgs, identity);
     case "create_credit_checkout":
       return await handleCreateCreditCheckout(
         args as unknown as CreateCreditCheckoutArgs,
+        identity,
       );
     case "get_agent_earnings":
       return await handleGetAgentEarnings(
@@ -918,11 +1024,12 @@ export async function dispatchTool(
     case "upsert_product_context":
       return await handleUpsertProductContext(
         args as unknown as UpsertProductContextArgs,
+        identity,
       );
     case "post_task":
-      return await handlePostTask(args as unknown as PostTaskArgs);
+      return await handlePostTask(args as unknown as PostTaskArgs, identity);
     case "get_task":
-      return await handleGetTask(args as unknown as GetTaskArgs);
+      return await handleGetTask(args as unknown as GetTaskArgs, identity);
     case "list_specialists":
       return await handleListSpecialists(args as ListSpecialistsArgs);
     case "suggest_specialists":

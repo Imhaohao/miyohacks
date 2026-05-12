@@ -1,9 +1,11 @@
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
+import { assertTaskReadable } from "./authHelpers";
 
 export const forTask = query({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
+    await assertTaskReadable(ctx, args.task_id);
     return await ctx.db
       .query("task_contexts")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))

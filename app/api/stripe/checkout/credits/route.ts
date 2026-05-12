@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+import { currentClerkAccount } from "@/lib/clerk-account";
 import { publicBaseUrl } from "@/lib/http";
 import {
   amountToCents,
@@ -13,7 +14,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface CheckoutRequest {
-  buyer_id?: string;
   credits?: number;
 }
 
@@ -24,8 +24,12 @@ function convex() {
 }
 
 export async function POST(req: NextRequest) {
+  const account = await currentClerkAccount();
+  if (!account) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const body = (await req.json()) as CheckoutRequest;
-  const buyerId = body.buyer_id?.trim() || "buyer:web";
   const credits = Number(body.credits);
   const pack = creditPackForCredits(credits);
   if (!pack) {
@@ -35,9 +39,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  await convex().mutation(api.accounts.ensureByClerkUser, {
+    server_secret: paymentServerSecret(),
+    clerk_user_id: account.clerk_user_id,
+    email: account.email,
+    display_name: account.display_name,
+    avatar_url: account.avatar_url,
+  });
+
   const baseUrl = publicBaseUrl(req);
   const stripe = getStripe();
-  const metadata = checkoutMetadata({ buyerId, credits: pack.credits });
+  const metadata = checkoutMetadata({
+    buyerId: account.account_id,
+    clerkUserId: account.clerk_user_id,
+    credits: pack.credits,
+  });
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
@@ -70,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   await convex().mutation(api.payments.recordCheckoutSessionCreated, {
     server_secret: paymentServerSecret(),
-    buyer_id: buyerId,
+    buyer_id: account.account_id,
     session_id: session.id,
     amount_usd: pack.amountUsd,
     credits: pack.credits,

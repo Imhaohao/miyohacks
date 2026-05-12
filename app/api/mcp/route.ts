@@ -12,6 +12,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { TOOLS, dispatchTool } from "@/lib/mcp-tools";
+import type { ApiCallerIdentity } from "@/lib/api-identity";
+import { resolveApiIdentity } from "@/lib/api-identity";
 import { CORS_HEADERS, corsPreflight } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -52,7 +54,10 @@ function err(
   return { jsonrpc: "2.0", id: id ?? null, error: { code, message, data } };
 }
 
-async function handle(msg: JsonRpcRequest): Promise<JsonRpcEnvelope | null> {
+async function handle(
+  msg: JsonRpcRequest,
+  identity?: ApiCallerIdentity | null,
+): Promise<JsonRpcEnvelope | null> {
   const { id, method, params } = msg;
 
   switch (method) {
@@ -75,7 +80,7 @@ async function handle(msg: JsonRpcRequest): Promise<JsonRpcEnvelope | null> {
       const args = (params?.arguments as Record<string, unknown> | undefined) ?? {};
       if (!name) return err(id, -32602, "missing tool name");
       try {
-        const result = await dispatchTool(name, args);
+        const result = await dispatchTool(name, args, identity);
         return ok(id, {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
           isError: false,
@@ -102,6 +107,13 @@ function jsonRpc(body: unknown, status = 200) {
 }
 
 export async function POST(req: NextRequest) {
+  let identity: ApiCallerIdentity | null = null;
+  try {
+    identity = await resolveApiIdentity(req);
+  } catch {
+    identity = null;
+  }
+
   let body: JsonRpcRequest | JsonRpcRequest[];
   try {
     body = await req.json();
@@ -111,7 +123,7 @@ export async function POST(req: NextRequest) {
 
   if (Array.isArray(body)) {
     const responses: JsonRpcEnvelope[] = [];
-    for (const r of await Promise.all(body.map(handle))) {
+    for (const r of await Promise.all(body.map((msg) => handle(msg, identity)))) {
       if (r) responses.push(r);
     }
     if (responses.length === 0) {
@@ -120,7 +132,7 @@ export async function POST(req: NextRequest) {
     return jsonRpc(responses);
   }
 
-  const res = await handle(body);
+  const res = await handle(body, identity);
   if (!res) return new NextResponse(null, { status: 202, headers: CORS_HEADERS });
   return jsonRpc(res);
 }

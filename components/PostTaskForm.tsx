@@ -3,10 +3,13 @@
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { SignInButton, useAuth } from "@clerk/nextjs";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { AgentSuggestions } from "@/components/AgentSuggestions";
+import { useAccountBootstrap } from "@/components/useAccountBootstrap";
 import {
   ArrowRight,
   CheckCircle,
@@ -14,7 +17,6 @@ import {
   GitBranch,
   WarningCircle,
 } from "@phosphor-icons/react";
-import { CURRENT_BUYER_ID } from "@/lib/current-user";
 import {
   isSoftwareEngineeringTask,
   requiredContextForPrompt,
@@ -53,13 +55,25 @@ const EXAMPLES: Array<{ label: string; prompt: string }> = [
 const fieldLabel = "mb-1.5 block text-sm font-medium text-ink";
 const inputBase =
   "w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-subtle focus:border-brand-600 focus:outline-none focus:shadow-ring";
+const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 export function PostTaskForm() {
   const router = useRouter();
-  const post = useMutation(api.tasks.post);
-  const productContext = useQuery(api.productContext.latest, {
-    owner_id: CURRENT_BUYER_ID,
-  });
+  const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const hasClerkSession = Boolean(clerkLoaded && isSignedIn);
+  const signedIn = isAuthenticated || hasClerkSession;
+  const bootstrap = useAccountBootstrap(hasClerkSession);
+  const post = useMutation(api.tasks.postAuthenticated);
+  const projects = useQuery(
+    api.projects.listMine,
+    isAuthenticated ? {} : "skip",
+  );
+  const projectId = projects?.[0]?._id ?? bootstrap.data?.project_id;
+  const productContext = useQuery(
+    api.productContext.latestForProject,
+    isAuthenticated && projectId ? { project_id: projectId } : "skip",
+  );
   const [prompt, setPrompt] = useState("");
   const [budget, setBudget] = useState("2.00");
   const [submitting, setSubmitting] = useState(false);
@@ -70,15 +84,41 @@ export function PostTaskForm() {
     setSubmitting(true);
     setError(null);
     try {
-      const { task_id } = await post({
-        posted_by: CURRENT_BUYER_ID,
-        task_type: DEFAULT_TASK_TYPE,
-        prompt,
-        max_budget: Number(budget),
-      });
-      router.push(`/task/${task_id}`);
+      if (!projectId) throw new Error("Project is still being created.");
+      if (isAuthenticated) {
+        const { task_id } = await post({
+          project_id: projectId,
+          task_type: DEFAULT_TASK_TYPE,
+          prompt,
+          max_budget: Number(budget),
+        });
+        router.push(`/task/${task_id}`);
+      } else if (hasClerkSession) {
+        const res = await fetch("/api/v1/tasks", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            project_id: projectId,
+            task_type: DEFAULT_TASK_TYPE,
+            prompt,
+            max_budget: Number(budget),
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json?.error?.message ?? "Unable to start auction");
+        }
+        router.push(`/task/${json.task_id}`);
+      } else {
+        throw new Error("Sign in before starting an auction.");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(
+        message.includes("insufficient credits")
+          ? "Insufficient credits. Add credits in Billing, then start the diagnosis again."
+          : message,
+      );
       setSubmitting(false);
     }
   }
@@ -88,9 +128,9 @@ export function PostTaskForm() {
   }
 
   const contextReadiness =
-    productContext === undefined
+    (productContext ?? bootstrap.data?.product_context) === undefined
       ? undefined
-      : getContextReadiness(productContext ?? null);
+      : getContextReadiness(productContext ?? bootstrap.data?.product_context ?? null);
   const requiredContext = requiredContextForPrompt(prompt);
   const needsRepoContext = requiredContext.includes("nia_repo");
   const likelySoftwareTask = isSoftwareEngineeringTask(prompt);
@@ -104,8 +144,43 @@ export function PostTaskForm() {
   const disableSubmit =
     submitting ||
     !prompt.trim() ||
+    !projectId ||
     contextReadiness === undefined ||
     missingContext;
+
+  if ((isLoading || !clerkLoaded) && !signedIn) {
+    return (
+      <Card>
+        <CardHeader
+          title="Preparing task workspace"
+          meta="Convex auth"
+        />
+        <p className="text-sm leading-relaxed text-ink-muted">
+          Checking your Clerk session and auction workspace.
+        </p>
+      </Card>
+    );
+  }
+
+  if (!signedIn) {
+    return (
+      <Card>
+        <CardHeader title="Sign in required" meta="Auction workspace" />
+        <p className="text-sm leading-relaxed text-ink-muted">
+          {clerkEnabled
+            ? "Sign in so agents can use your project context, credits, and task history."
+            : "Clerk auth is not configured, so authenticated task posting is disabled."}
+        </p>
+        {clerkEnabled ? (
+          <div className="mt-4">
+            <SignInButton mode="modal">
+              <Button type="button">Sign in</Button>
+            </SignInButton>
+          </div>
+        ) : null}
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -113,11 +188,24 @@ export function PostTaskForm() {
         <CardHeader
           title="What do you need done?"
           meta={
-            productContext
-              ? `Using ${productContext.company_name} context`
-              : "Specialists respond in seconds"
+            productContext ?? bootstrap.data?.product_context
+              ? `Using ${(productContext ?? bootstrap.data?.product_context)?.company_name} context`
+              : isAuthenticated
+                ? "Specialists respond in seconds"
+                : "Server-auth auction path"
           }
         />
+        {!isAuthenticated && hasClerkSession ? (
+          <p className="mb-4 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700">
+            Clerk is signed in. Using the server-auth auction path while Convex
+            browser auth catches up.
+          </p>
+        ) : null}
+        {bootstrap.error && !isAuthenticated ? (
+          <p className="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            {bootstrap.error}
+          </p>
+        ) : null}
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label htmlFor="brief" className={fieldLabel}>
@@ -198,6 +286,17 @@ export function PostTaskForm() {
           {error && (
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
               {error}
+              {error.startsWith("Insufficient credits") && (
+                <>
+                  {" "}
+                  <Link
+                    href="/billing"
+                    className="font-medium text-rose-800 underline decoration-rose-300 underline-offset-2"
+                  >
+                    Open Billing
+                  </Link>
+                </>
+              )}
             </p>
           )}
           {missingContext && (

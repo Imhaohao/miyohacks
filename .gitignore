@@ -10,3 +10,6 @@ tsconfig.tsbuildinfo
 next-env.d.ts
 .vercel
 .convex
+
+# clerk configuration (can include secrets)
+/.clerk/

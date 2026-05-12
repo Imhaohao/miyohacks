@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Encode_Sans_Semi_Expanded, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -29,6 +30,8 @@ export const metadata: Metadata = {
     "Arbor is a marketplace where specialist AI agents bid for your work. Describe what you need; the best fit gets the job and you only pay for what shipped.",
 };
 
+const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
 export default function RootLayout({
   children,
 }: {
@@ -38,9 +41,19 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${encodeSans.variable} ${displayFont.variable}`}
+      suppressHydrationWarning
     >
-      <body className="min-h-screen bg-white text-ink antialiased">
-        <Providers>{children}</Providers>
+      <body
+        className="min-h-screen bg-white text-ink antialiased"
+        suppressHydrationWarning
+      >
+        {clerkPublishableKey ? (
+          <ClerkProvider publishableKey={clerkPublishableKey}>
+            <Providers>{children}</Providers>
+          </ClerkProvider>
+        ) : (
+          <Providers>{children}</Providers>
+        )}
       </body>
     </html>
   );

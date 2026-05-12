@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { handlePostTask, type PostTaskArgs } from "@/lib/mcp-tools";
+import { resolveApiIdentity } from "@/lib/api-identity";
 import { jsonOk, jsonError, corsPreflight } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -19,7 +20,11 @@ export async function POST(req: NextRequest) {
     return jsonError("max_budget (number) is required", 400);
   }
   try {
-    const result = await handlePostTask(body as PostTaskArgs);
+    const identity = await resolveApiIdentity(req);
+    if (!identity && process.env.ALLOW_LEGACY_AGENT_IDS !== "true") {
+      return jsonError("unauthorized", 401);
+    }
+    const result = await handlePostTask(body as PostTaskArgs, identity);
     return jsonOk(result, 201);
   } catch (e) {
     return jsonError(e instanceof Error ? e.message : String(e), 500);

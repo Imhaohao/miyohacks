@@ -20,9 +20,14 @@ import type {
 interface Props {
   task: TaskDoc;
   events: LifecycleEventDoc[];
+  useLiveQueries?: boolean;
 }
 
-export function AuctionResolution({ task, events }: Props) {
+export function AuctionResolution({
+  task,
+  events,
+  useLiveQueries = true,
+}: Props) {
   const chooseTopBid = useMutation(api.auctionSelection.chooseTopBid);
   const [busyBidId, setBusyBidId] = useState<string | null>(null);
   const resolved = events.find((e) => e.event_type === "auction_resolved");
@@ -88,11 +93,22 @@ export function AuctionResolution({ task, events }: Props) {
   async function choose(bid: AuctionBidSummary) {
     setBusyBidId(bid.bid_id);
     try {
-      await chooseTopBid({
-        task_id: task._id as Id<"tasks">,
-        bid_id: bid.bid_id as Id<"bids">,
-        actor: "buyer:web",
-      });
+      if (useLiveQueries) {
+        await chooseTopBid({
+          task_id: task._id as Id<"tasks">,
+          bid_id: bid.bid_id as Id<"bids">,
+        });
+      } else {
+        const res = await fetch(`/api/v1/tasks/${task._id}/selection`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ bid_id: bid.bid_id }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json?.error?.message ?? "Unable to select proposal");
+        }
+      }
     } finally {
       setBusyBidId(null);
     }

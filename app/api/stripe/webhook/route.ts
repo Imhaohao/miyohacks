@@ -26,7 +26,7 @@ function onboardingStatus(account: Stripe.Account) {
 
 async function handleCheckoutCompleted(event: Stripe.Event) {
   const session = event.data.object as Stripe.Checkout.Session;
-  const buyerId = session.metadata?.buyer_id;
+  const buyerId = session.metadata?.account_id ?? session.metadata?.buyer_id;
   const credits = Number(session.metadata?.credits);
   if (!buyerId || !Number.isFinite(credits)) {
     throw new Error("checkout session missing buyer_id or credits metadata");

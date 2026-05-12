@@ -50,24 +50,24 @@ Surfaces:
 - MCP tools `suggest_specialists` and `discover_specialist`
 - UI: type a brief, watch ranked agents appear under the form; click *Discover a new specialist* when match is weak
 
-## Specialists — all 10 Nozomio sponsors
+## Specialists — 100 connected MCP/A2A agents
 
-Every sponsor on the hackathon roster is a specialist agent in this marketplace. The demo frames a 100+ MCP specialist market, then invites only the most relevant growth agents to each startup launch auction. Sponsors with **MCP ✓** have a verified endpoint configured; sponsors marked `soft` run as in-persona LLM agents pending an official MCP URL.
+Every housed contact is reachable through either a native MCP endpoint or an Arbor-hosted A2A bridge. Native MCP contacts keep their production MCP URL; contacts without a public MCP/A2A server get a local A2A agent card and `tasks/send` endpoint at `/api/a2a/agents/:agentId`. The auction still invites only the most relevant shortlist, so broad coverage does not create noisy bidding. Sponsors with **MCP ✓** have a native MCP endpoint configured; A2A bridge contacts are honest internal adapters, not fake vendor-native endpoints.
 
-| Agent | Sponsor | MCP | Campaign role |
+| Agent | Sponsor | Connection | Campaign role |
 |---|---|---|---|
 | `reacher-social` | **Reacher** | ✓ `api.reacherapp.com/mcp` | TikTok Shop creators, GMV history, sandboxed write endpoints. The data source of truth. |
-| `nia-context` | **Nia (Nozomio)** | soft | Adds campaign memory, indexed briefs, brand-context constraints, cross-session context. |
-| `hyperspell-brain` | **Hyperspell** | soft | Synthesizes brand persona and audience-fit rationale across scattered campaign context. |
-| `tensorlake-exec` | **Tensorlake** | soft | Verifies GMV evidence, sample feasibility, brand-safety risk before launch. |
-| `codex-writer` | **OpenAI Codex** | soft | Generates creator-specific outreach drafts, follow-ups, sample-request payloads. |
-| `devin-engineer` | **Devin** | soft | Runs the end-to-end campaign operator workflow from discovery through launch plan. |
-| `vercel-v0` | **Vercel (v0)** | soft | Generates campaign landing pages, hero copy, creator-brief docs from the brand brief. |
-| `insforge-backend` | **InsForge** | soft | Spins up Postgres + auth + storage + edge functions sized for an agent-driven campaign. |
-| `aside-browser` | **Aside** | soft | Drives outreach inside the browser where TikTok DMs and creator profiles already live. |
-| `convex-realtime` | **Convex** | soft | Keeps campaign state in real-time sync across every agent and dashboard touching it. |
+| `nia-context` | **Nia (Nozomio)** | A2A bridge | Adds campaign memory, indexed briefs, brand-context constraints, cross-session context. |
+| `hyperspell-brain` | **Hyperspell** | A2A bridge | Synthesizes brand persona and audience-fit rationale across scattered campaign context. |
+| `tensorlake-exec` | **Tensorlake** | A2A bridge | Verifies GMV evidence, sample feasibility, brand-safety risk before launch. |
+| `codex-writer` | **OpenAI Codex** | A2A bridge | Generates creator-specific outreach drafts, follow-ups, sample-request payloads. |
+| `devin-engineer` | **Devin** | A2A bridge | Runs the end-to-end campaign operator workflow from discovery through launch plan. |
+| `vercel-v0` | **Vercel (v0)** | A2A bridge | Generates campaign landing pages, hero copy, creator-brief docs from the brand brief. |
+| `insforge-backend` | **InsForge** | A2A bridge | Spins up Postgres + auth + storage + edge functions sized for an agent-driven campaign. |
+| `aside-browser` | **Aside** | A2A bridge | Drives outreach inside the browser where TikTok DMs and creator profiles already live. |
+| `convex-realtime` | **Convex** | A2A bridge | Keeps campaign state in real-time sync across every agent and dashboard touching it. |
 
-### How MCP-connected specialists actually work
+### How MCP/A2A-connected specialists actually work
 
 When a specialist has `mcp_endpoint` set:
 
@@ -76,6 +76,21 @@ When a specialist has `mcp_endpoint` set:
 3. **Graceful degradation** — if `tools/list` fails or the remote returns an error, the specialist falls back to a plain-completion answer in persona and clearly notes that live tool calls weren't made.
 
 See [lib/mcp-outbound.ts](lib/mcp-outbound.ts) and [lib/specialists/mcp-forwarding.ts](lib/specialists/mcp-forwarding.ts).
+
+When a housed specialist does not expose a native MCP server, Arbor exposes an A2A-compatible agent card and JSON-RPC `tasks/send` bridge at `/api/a2a/agents/:agentId`. The bridge runs the existing specialist persona/plan runner and returns A2A task artifacts, so external A2A clients can still contract that specialist without pretending the third-party vendor has a native A2A backend.
+
+`codex-writer` is different from the A2A bridge persona agents: it only bids when a real Codex execution runner is configured. Set `CODEX_RUNNER_URL` on the Convex deployment to a reachable runner endpoint, and set `CODEX_RUNNER_SECRET` plus `CODEX_WORKSPACE_DIR` on the runner host. The built-in local runner lives at `/api/codex/run`; it shells out to `codex exec`, edits the configured checkout, and returns changed files, diff stats, and verification output. If no runner is configured, `codex-writer` declines instead of pretending it edited the repo.
+
+### Connected execution framework
+
+All MCP/A2A specialists now pass through a shared connection runtime before they can win execution work:
+
+- Native MCP specialists must have required credentials, pass `tools/list`, and execute through MCP `tools/call`.
+- Native A2A specialists must expose a reachable agent card / `tasks/send` endpoint and execute through JSON-RPC `tasks/send`.
+- Arbor-hosted A2A bridge specialists are labeled separately from vendor-native A2A; the bridge returns A2A task status/artifacts and reports failures instead of silently substituting placeholder work.
+- Runner-specific integrations such as `codex-writer` can attach their own `tool_availability` so the auction values real execution paths above LLM-only planning.
+
+The runtime lives in [lib/specialists/connection-runtime.ts](lib/specialists/connection-runtime.ts). The A2A bridge route at `/api/a2a/agents/:agentId` now advertises its execution mode and returns `failed` A2A task states when the underlying runner cannot execute.
 
 ### Adding a sponsor's MCP endpoint
 
@@ -169,6 +184,25 @@ For local webhook testing:
 ```bash
 stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
+
+## Auth and Trial Credits
+
+Arbor uses Clerk OAuth for buyer accounts. Enable Google, GitHub, and X/Twitter
+in Clerk, then set these env vars in Vercel/Next and set `CLERK_FRONTEND_API_URL`
+on the Convex deployment:
+
+```bash
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+CLERK_FRONTEND_API_URL=https://your-clerk-frontend-api.clerk.accounts.dev
+```
+
+Every new Clerk user gets one default project and a one-time 5-credit trial
+grant. Web users spend credits from their authenticated wallet; external agents
+should create an Arbor API key from `/account` and call MCP/API routes with
+`Authorization: Bearer arbor_...`.
 
 ## Admin Dashboard
 

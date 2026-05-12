@@ -1,6 +1,9 @@
 import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { actorForCurrentUser, assertTaskReadable } from "./authHelpers";
+import type { Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 
 const planStatusValidator = v.union(
   v.literal("pending"),
@@ -9,9 +12,40 @@ const planStatusValidator = v.union(
   v.literal("cancelled"),
 );
 
+function requireServerSecret(secret: string | undefined) {
+  const expected = process.env.PAYMENT_SERVER_SECRET;
+  if (expected && secret !== expected) {
+    throw new Error("invalid server secret");
+  }
+}
+
+async function taskAndActor(
+  ctx: MutationCtx,
+  args: {
+    task_id: Id<"tasks">;
+    actor?: string;
+    account_id?: string;
+    server_secret?: string;
+  },
+) {
+  if (args.account_id) {
+    requireServerSecret(args.server_secret);
+    const task = await ctx.db.get(args.task_id);
+    if (!task || task.posted_by !== args.account_id) {
+      throw new Error("task not found");
+    }
+    return { task, actor: args.actor ?? args.account_id };
+  }
+  return {
+    task: await assertTaskReadable(ctx, args.task_id),
+    actor: args.actor ?? (await actorForCurrentUser(ctx)),
+  };
+}
+
 export const forTask = query({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
+    await assertTaskReadable(ctx, args.task_id);
     return await ctx.db
       .query("execution_plans")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
@@ -23,6 +57,7 @@ export const forTask = query({
 export const approvalEventsForTask = query({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
+    await assertTaskReadable(ctx, args.task_id);
     const events = await ctx.db
       .query("approval_events")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
@@ -77,10 +112,11 @@ export const approve = mutation({
   args: {
     task_id: v.id("tasks"),
     actor: v.optional(v.string()),
+    account_id: v.optional(v.string()),
+    server_secret: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const task = await ctx.db.get(args.task_id);
-    if (!task) throw new Error("task not found");
+    const { task, actor } = await taskAndActor(ctx, args);
     if (task.status !== "plan_review") {
       throw new Error(`task is ${task.status}, not plan_review`);
     }
@@ -103,7 +139,7 @@ export const approve = mutation({
     await ctx.db.insert("approval_events", {
       task_id: args.task_id,
       event_type: "approved",
-      actor: args.actor ?? "buyer:web",
+      actor,
       timestamp: Date.now(),
     });
     await ctx.runMutation(internal.tasks._setStatus, {
@@ -113,7 +149,7 @@ export const approve = mutation({
     await ctx.runMutation(internal.lifecycle.log, {
       task_id: args.task_id,
       event_type: "execution_plan_approved",
-      payload: { actor: args.actor ?? "buyer:web", agent_id: plan.agent_id },
+      payload: { actor, agent_id: plan.agent_id },
     });
     await ctx.scheduler.runAfter(0, internal.auctions.execute, {
       task_id: args.task_id,
@@ -127,10 +163,11 @@ export const requestRevision = mutation({
     task_id: v.id("tasks"),
     feedback: v.string(),
     actor: v.optional(v.string()),
+    account_id: v.optional(v.string()),
+    server_secret: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const task = await ctx.db.get(args.task_id);
-    if (!task) throw new Error("task not found");
+    const { task, actor } = await taskAndActor(ctx, args);
     if (task.status !== "plan_review") {
       throw new Error(`task is ${task.status}, not plan_review`);
     }
@@ -148,7 +185,7 @@ export const requestRevision = mutation({
     await ctx.db.insert("approval_events", {
       task_id: args.task_id,
       event_type: "revision_requested",
-      actor: args.actor ?? "buyer:web",
+      actor,
       reason: args.feedback,
       timestamp: Date.now(),
     });
@@ -156,7 +193,7 @@ export const requestRevision = mutation({
       task_id: args.task_id,
       event_type: "execution_plan_revision_requested",
       payload: {
-        actor: args.actor ?? "buyer:web",
+        actor,
         feedback: args.feedback,
       },
     });
@@ -173,8 +210,11 @@ export const cancel = mutation({
     task_id: v.id("tasks"),
     reason: v.optional(v.string()),
     actor: v.optional(v.string()),
+    account_id: v.optional(v.string()),
+    server_secret: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { actor } = await taskAndActor(ctx, args);
     const plan = await ctx.db
       .query("execution_plans")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
@@ -198,14 +238,14 @@ export const cancel = mutation({
     await ctx.db.insert("approval_events", {
       task_id: args.task_id,
       event_type: "cancelled",
-      actor: args.actor ?? "buyer:web",
+      actor,
       ...(args.reason !== undefined ? { reason: args.reason } : {}),
       timestamp: Date.now(),
     });
     await ctx.runMutation(internal.lifecycle.log, {
       task_id: args.task_id,
       event_type: "task_cancelled",
-      payload: { actor: args.actor ?? "buyer:web", reason: args.reason },
+      payload: { actor, reason: args.reason },
     });
     return { ok: true };
   },
