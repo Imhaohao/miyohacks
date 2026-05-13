@@ -48,11 +48,11 @@ export function PlanReviewPanel({
           meta={<Pill tone="info" pulse>Drafting</Pill>}
         />
         <LoadingProgress
-          label="Winner is drafting the plan"
+          label="Executor is drafting the plan"
           status="No external work starts until the buyer approves this execution plan."
           details={[
             "The plan names deliverables, context requirements, risks, and acceptance criteria.",
-            "Approval releases the winning specialist into execution.",
+            "Approval releases the winning executor into execution.",
           ]}
           elapsedSeconds={elapsed}
           tone="brand"
@@ -203,14 +203,14 @@ export function PlanReviewPanel({
             value={feedback}
             onChange={(event) => setFeedback(event.target.value)}
             rows={3}
-            placeholder="Revision feedback for the winning agent..."
+            placeholder="Revision feedback for the winning executor..."
             className="w-full resize-none rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-subtle focus:border-brand-600 focus:outline-none focus:shadow-ring"
           />
         </div>
       ) : (
         <p className="mt-4 rounded-xl bg-surface-subtle px-3 py-2 text-sm text-ink-muted">
           {plan.status === "approved"
-            ? "Approved. The specialist can now execute."
+            ? "Approved. The executor can now run."
             : plan.status === "cancelled"
               ? "Cancelled before execution. Escrow was refunded."
               : "Revision requested. A new plan will appear here."}

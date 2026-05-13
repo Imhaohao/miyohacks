@@ -62,7 +62,7 @@ export function ValueImpactPanel({ task, events }: Props) {
         You saved {formatMoney(saved)} and improved efficiency by{" "}
         {efficiencyLift}% by using this specialized agent. Savings are computed
         from budget minus second-price payment; efficiency is an estimate from
-        the winning specialist&apos;s quoted time.
+        the winning executor&apos;s quoted time.
       </p>
     </Card>
   );

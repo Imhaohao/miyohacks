@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import type { BusinessContext } from "./orchestration-context";
 
 type MemorySource =
@@ -28,13 +26,6 @@ export interface AddMemoryParams {
   metadata?: Record<string, string | number | boolean | null>;
 }
 
-export interface UploadFileParams {
-  userId: string;
-  filePath: string;
-  collection?: string;
-  metadata?: Record<string, string | number | boolean | null>;
-}
-
 export interface ListMemoriesParams {
   userId: string;
   collection?: string;
@@ -48,6 +39,7 @@ export interface SearchMemoriesParams {
   answer?: boolean;
   maxResults?: number;
   sources?: MemorySource[];
+  effort?: "minimal" | "low" | "medium" | "high";
 }
 
 interface MemoryStatus {
@@ -130,27 +122,6 @@ export async function addMemory({
   });
 }
 
-export async function uploadFile({
-  userId,
-  filePath,
-  collection,
-  metadata,
-}: UploadFileParams) {
-  const form = new FormData();
-  form.append(
-    "file",
-    new Blob([fs.readFileSync(filePath)]),
-    path.basename(filePath),
-  );
-  if (collection) form.append("collection", collection);
-  if (metadata) form.append("metadata", JSON.stringify(metadata));
-
-  return await hyperspellJson<MemoryStatus>(userId, "/memories/upload", {
-    method: "POST",
-    body: form,
-  });
-}
-
 export async function listMemories({
   userId,
   collection,
@@ -185,12 +156,14 @@ export async function searchMemories({
   answer = true,
   maxResults = 5,
   sources,
+  effort,
 }: SearchMemoriesParams) {
   return await hyperspellJson<MemoryQueryResult>(userId, "/memories/query", {
     method: "POST",
     body: JSON.stringify({
       query,
       answer,
+      effort,
       options: { max_results: maxResults },
       sources,
     }),
@@ -217,6 +190,9 @@ export async function enrichBusinessContextFromHyperspell(args: {
   const query = [
     "What business context, customer knowledge, constraints, prior decisions,",
     "workspace facts, or user preferences are relevant to this agent task?",
+    "If GitHub/repo memories are available, prefer README-derived project",
+    "purpose, setup, architecture, routes/packages, and constraints before",
+    "asking the user to provide project context manually.",
     "",
     `Task type: ${args.taskType}`,
     `Task: ${args.prompt}`,

@@ -23,6 +23,7 @@ import {
 import { parseJSONLoose } from "../openai";
 import { buildTaskContext, isImplementationTask } from "../campaign-context";
 import { implementationPlanFromText } from "../implementation-plan";
+import { roleForSpecialist } from "../agent-roles";
 import type {
   SpecialistConfig,
   SpecialistDecision,
@@ -184,12 +185,14 @@ export function makeMcpForwardingSpecialist(
           bid_price: config.cost_baseline,
           capability_claim: config.one_liner,
           estimated_seconds: 30,
+          agent_role: roleForSpecialist(config),
         };
       }
       const bid: BidPayload = {
         bid_price: Math.max(0.01, Number(data.bid_price.toFixed(2))),
         capability_claim: data.capability_claim,
         estimated_seconds: Math.max(1, Math.floor(data.estimated_seconds)),
+        agent_role: roleForSpecialist(config),
       };
       return bid;
     },

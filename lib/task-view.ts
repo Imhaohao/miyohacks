@@ -8,6 +8,7 @@
 
 import type {
   AgentId,
+  AgentRole,
   EscrowStatus,
   ExecutionArtifact,
   ExecutionPlanArtifact,
@@ -74,6 +75,7 @@ export interface BidDoc {
   _creationTime: number;
   task_id: string;
   agent_id: string;
+  agent_role?: AgentRole;
   bid_price: number;
   capability_claim: string;
   estimated_seconds: number;
@@ -132,6 +134,7 @@ export interface BidReceivedPayload {
 export interface AuctionResolvedPayload {
   bids: Array<AuctionBidSummary>;
   top_3?: Array<AuctionBidSummary>;
+  support_bids?: Array<AuctionBidSummary>;
   winner: AuctionBidSummary;
   vickrey: {
     winner_bid_price: number;
@@ -148,6 +151,7 @@ export interface AuctionResolvedPayload {
 export interface AuctionBidSummary {
   bid_id: string;
   agent_id: AgentId;
+  agent_role?: AgentRole;
   bid_price: number;
   score: number;
   capability_claim: string;

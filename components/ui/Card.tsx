@@ -5,7 +5,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "rounded-2xl bg-white p-5 shadow-card transition-shadow hover:shadow-card-hover",
+        "min-w-0 rounded-2xl bg-white p-5 shadow-card transition-shadow hover:shadow-card-hover",
         className,
       )}
       {...props}
@@ -33,11 +33,14 @@ export function CardHeader({
       : "text-base font-semibold tracking-tight text-ink";
   return (
     <div
-      className={cn("mb-4 flex items-center justify-between gap-3", className)}
+      className={cn(
+        "mb-4 flex flex-col items-start justify-between gap-1.5 sm:flex-row sm:items-center sm:gap-3",
+        className,
+      )}
     >
-      <h3 className={titleClass}>{title}</h3>
+      <h3 className={cn("min-w-0", titleClass)}>{title}</h3>
       {meta !== undefined && (
-        <div className="text-xs text-ink-muted">{meta}</div>
+        <div className="min-w-0 text-xs text-ink-muted">{meta}</div>
       )}
     </div>
   );

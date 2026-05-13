@@ -11,6 +11,7 @@ import {
   roundMoney,
 } from "../lib/payments";
 import { generateApiKey, hashApiKey } from "../lib/api-keys";
+import { paymentServerSecret } from "../lib/stripe";
 
 test("credit packs are fixed purchase units", () => {
   assert.deepEqual(
@@ -71,4 +72,35 @@ test("agent API keys are bearer-safe and hash deterministically", () => {
   assert.match(token, /^arbor_[A-Za-z0-9_-]+$/);
   assert.equal(hashApiKey(token), hashApiKey(token));
   assert.notEqual(hashApiKey(token), token);
+});
+
+test("payment server secret fails closed when missing", () => {
+  const previous = process.env.PAYMENT_SERVER_SECRET;
+  delete process.env.PAYMENT_SERVER_SECRET;
+  try {
+    assert.throws(
+      () => paymentServerSecret(),
+      /PAYMENT_SERVER_SECRET is required/,
+    );
+  } finally {
+    if (previous === undefined) {
+      delete process.env.PAYMENT_SERVER_SECRET;
+    } else {
+      process.env.PAYMENT_SERVER_SECRET = previous;
+    }
+  }
+});
+
+test("payment server secret trims and returns configured value", () => {
+  const previous = process.env.PAYMENT_SERVER_SECRET;
+  process.env.PAYMENT_SERVER_SECRET = "  shared-secret  ";
+  try {
+    assert.equal(paymentServerSecret(), "shared-secret");
+  } finally {
+    if (previous === undefined) {
+      delete process.env.PAYMENT_SERVER_SECRET;
+    } else {
+      process.env.PAYMENT_SERVER_SECRET = previous;
+    }
+  }
 });

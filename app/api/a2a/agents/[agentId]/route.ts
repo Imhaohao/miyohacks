@@ -4,10 +4,20 @@ import {
   contactToSpecialistConfig,
   getAgentContact,
 } from "@/lib/agent-contacts";
-import { makeMockSpecialist } from "@/lib/specialists/base";
+import {
+  EXECUTION_STATUS_DESCRIPTIONS,
+  EXECUTION_STATUS_LABELS,
+  classifyAgentExecution,
+} from "@/lib/agent-execution-status";
 import { makeMcpForwardingSpecialist } from "@/lib/specialists/mcp-forwarding";
 import { SPECIALIST_RUNNERS } from "@/lib/specialists/registry";
-import type { AgentId, SpecialistConfig, SpecialistRunner } from "@/lib/types";
+import type {
+  AgentExecutionStatus,
+  AgentId,
+  SpecialistConfig,
+  SpecialistOutput,
+  SpecialistRunner,
+} from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +36,8 @@ interface A2ARequest {
     metadata?: Record<string, unknown>;
   };
 }
+
+type A2ASupportedMethod = "message/send" | "tasks/send";
 
 interface RouteContext {
   params: Promise<{ agentId: string }>;
@@ -53,41 +65,71 @@ function taskType(body: A2ARequest) {
   return typeof raw === "string" && raw.trim() ? raw : "general";
 }
 
+function supportedMethod(method: string | undefined): method is A2ASupportedMethod {
+  return method === "message/send" || method === "tasks/send";
+}
+
+function makeUnavailableRunner(
+  config: SpecialistConfig,
+  executionStatus: AgentExecutionStatus,
+): SpecialistRunner {
+  return {
+    config,
+    async bid() {
+      return {
+        decline: true,
+        reason: EXECUTION_STATUS_DESCRIPTIONS[executionStatus],
+      };
+    },
+    async execute(): Promise<SpecialistOutput> {
+      throw new Error(EXECUTION_STATUS_DESCRIPTIONS[executionStatus]);
+    },
+  };
+}
+
 function bridgeRunner(config: SpecialistConfig): {
   runner: SpecialistRunner;
-  mode: string;
+  executionStatus: AgentExecutionStatus;
   nativeConnection: boolean;
 } {
   const staticRunner = SPECIALIST_RUNNERS[config.agent_id as AgentId];
   if (staticRunner) {
     const realConfig = staticRunner.config;
+    const executionStatus = classifyAgentExecution(realConfig);
     return {
       runner: staticRunner,
-      mode:
-        realConfig.agent_id === "codex-writer"
-          ? "codex_runner"
-          : realConfig.mcp_endpoint
-            ? "native_mcp"
-            : realConfig.a2a_endpoint
-              ? "native_a2a"
-              : "arbor_llm_runtime",
-      nativeConnection: Boolean(realConfig.mcp_endpoint || realConfig.a2a_endpoint),
+      executionStatus,
+      nativeConnection:
+        executionStatus === "native_mcp" || executionStatus === "native_a2a",
     };
   }
 
+  const executionStatus = classifyAgentExecution(config);
   if (config.mcp_endpoint) {
     return {
       runner: makeMcpForwardingSpecialist(config),
-      mode: "native_mcp",
+      executionStatus,
       nativeConnection: true,
     };
   }
 
   return {
-    runner: makeMockSpecialist(config),
-    mode: "arbor_llm_runtime",
+    runner: makeUnavailableRunner(config, executionStatus),
+    executionStatus,
     nativeConnection: false,
   };
+}
+
+function backingSystem(
+  config: SpecialistConfig,
+  executionStatus: AgentExecutionStatus,
+) {
+  if (config.agent_id === "codex-writer") return "codex_runner";
+  if (config.agent_id === "hyperspell-brain") return "hyperspell_memory_api";
+  if (config.agent_id === "vercel-v0") return "v0_api";
+  if (executionStatus === "native_mcp") return "mcp";
+  if (executionStatus === "native_a2a") return "a2a";
+  return "not_connected";
 }
 
 function a2aTaskResult(args: {
@@ -134,9 +176,10 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   const contact = getAgentContact(agentId);
   if (!contact) return jsonError("agent not found", 404);
   const config = contactToSpecialistConfig(contact);
-  const { mode, nativeConnection } = bridgeRunner(config);
+  const { executionStatus, nativeConnection } = bridgeRunner(config);
 
   return jsonOk({
+    protocolVersion: "0.2.6",
     name: contact.display_name,
     description: contact.one_liner,
     url: agentUrl(req, agentId),
@@ -149,7 +192,11 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       streaming: false,
       pushNotifications: false,
       stateTransitionHistory: false,
-      executionMode: mode,
+      executionMode: executionStatus,
+      executionStatus,
+      executionLabel: EXECUTION_STATUS_LABELS[executionStatus],
+      executionDescription: EXECUTION_STATUS_DESCRIPTIONS[executionStatus],
+      backingSystem: backingSystem(config, executionStatus),
       nativeConnection,
     },
     defaultInputModes: contact.supported_input_modes,
@@ -175,7 +222,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return jsonError("invalid JSON body", 400);
   }
 
-  if (body.method !== "tasks/send") {
+  if (!supportedMethod(body.method)) {
     return jsonError(`unsupported A2A method: ${body.method ?? "missing"}`, 400);
   }
 
@@ -183,9 +230,34 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   if (!prompt) return jsonError("message.parts text is required", 400);
 
   const config = contactToSpecialistConfig(contact);
-  const { runner, mode, nativeConnection } = bridgeRunner(config);
+  const { runner, executionStatus, nativeConnection } = bridgeRunner(config);
   let text: string;
   let artifact: unknown;
+  if (
+    executionStatus === "mock_unconnected" ||
+    executionStatus === "needs_vendor_a2a_endpoint"
+  ) {
+    const errorText = [
+      `# ${contact.display_name} unavailable`,
+      "",
+      EXECUTION_STATUS_DESCRIPTIONS[executionStatus],
+      "",
+      `Execution status: ${executionStatus}`,
+      `Native connection: ${nativeConnection ? "yes" : "no"}`,
+      "",
+      "Arbor will not substitute a ChatGPT placeholder for this A2A request.",
+    ].join("\n");
+    return jsonOk(
+      a2aTaskResult({
+        id: body.id ?? null,
+        agentId,
+        state: "failed",
+        text: errorText,
+        description: contact.one_liner,
+      }),
+    );
+  }
+
   try {
     const output = await runner.execute(prompt, taskType(body));
     if (typeof output === "string") {
@@ -200,7 +272,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       "",
       "The Arbor-hosted A2A bridge accepted the task, but the configured execution runner could not complete it.",
       "",
-      `Execution mode: ${mode}`,
+      `Execution status: ${executionStatus}`,
       `Native connection: ${nativeConnection ? "yes" : "no"}`,
       "",
       "This failure is returned as an A2A failed task state instead of silently substituting placeholder work.",
@@ -225,9 +297,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       description: contact.one_liner,
       artifactData: {
         execution: {
-          mode,
+          mode: executionStatus,
+          execution_status: executionStatus,
           native_connection: nativeConnection,
           task_type: taskType(body),
+          request_method: body.method,
         },
         artifact,
       },

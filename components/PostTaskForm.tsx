@@ -301,8 +301,8 @@ export function PostTaskForm() {
           )}
           {missingContext && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Connect Hyperspell/Nia context first so agents can diagnose with
-              your project context.
+              Save company context first so specialists can diagnose with your
+              project details.
             </p>
           )}
         </form>
@@ -375,15 +375,15 @@ function RequiredContextPanel({
           </div>
           <p className="mt-1 text-xs leading-relaxed text-ink-muted">
             {likelySoftwareTask
-              ? "Software tasks need project memory and repo/source context before diagnosis."
-              : "Project memory helps agents route and diagnose the task correctly."}
+              ? "Software tasks need company context and repo/source context before diagnosis."
+              : "Company context helps specialists route and diagnose the task correctly."}
           </p>
         </div>
         <GitBranch size={18} weight="bold" className="mt-0.5 text-brand-700" />
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <ContextStatusRow
-          label="Hyperspell business memory"
+          label="Company context"
           status={
             readiness === undefined
               ? "Checking"
@@ -397,7 +397,7 @@ function RequiredContextPanel({
           required
         />
         <ContextStatusRow
-          label="Nia/GitHub repo context"
+          label="Repo/source context"
           status={
             readiness === undefined ? "Checking" : repoReady ? "Ready" : "Missing"
           }

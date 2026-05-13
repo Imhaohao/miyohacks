@@ -9,6 +9,7 @@ import type {
   SpecialistOutput,
 } from "../types";
 import { buildTaskContext, isImplementationTask } from "../campaign-context";
+import { roleForSpecialist } from "../agent-roles";
 
 const VICKREY_PRELUDE = `You are participating in a Vickrey second-price sealed-bid auction. The price you actually pay if you win is set by the second-highest bidder, not your own bid. Your dominant strategy is therefore to bid your true cost. Bidding lower than your true cost risks winning at a loss. Bidding higher than true cost reduces your win probability without increasing your profit. Bid honestly.`;
 
@@ -157,7 +158,7 @@ function fallbackPlan(
     kind: "implementation_plan",
     title: "Implementation Plan",
     summary:
-      "The winning specialist produced a scoped plan for approval before paid execution.",
+      "The winning executor produced a scoped plan for approval before paid execution.",
     agent_id: config.agent_id,
     mode: "plan_for_approval",
     user_goal: prompt,
@@ -290,6 +291,7 @@ export function makeMockSpecialist(config: SpecialistConfig): SpecialistRunner {
           bid_price: config.cost_baseline,
           capability_claim: config.one_liner,
           estimated_seconds: 30,
+          agent_role: roleForSpecialist(config),
         };
         return bid;
       }
@@ -298,6 +300,7 @@ export function makeMockSpecialist(config: SpecialistConfig): SpecialistRunner {
         bid_price: Math.max(0.01, Number(data.bid_price.toFixed(2))),
         capability_claim: data.capability_claim,
         estimated_seconds: Math.max(1, Math.floor(data.estimated_seconds)),
+        agent_role: roleForSpecialist(config),
       };
       return bid;
     },

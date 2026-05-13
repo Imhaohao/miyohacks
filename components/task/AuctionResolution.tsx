@@ -5,6 +5,7 @@ import { useMutation } from "convex/react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { formatMoney, formatScore, cn } from "@/lib/utils";
+import { isExecutableAgent, roleForAgent } from "@/lib/agent-roles";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Trophy, ArrowRight } from "@phosphor-icons/react";
@@ -88,6 +89,9 @@ export function AuctionResolution({
   const isDegenerate = vickrey.rule === "degenerate_single_bid";
   const maxScore = Math.max(...bids.map((b) => b.value_score ?? b.score), 0.01);
   const topChoices = payload.top_3 ?? bids.slice(0, 3);
+  const supportBids =
+    payload.support_bids ??
+    bids.filter((b) => !isExecutableAgent(b.agent_id, b.agent_role));
   const canChoose = task.status === "awarded" && !task.winning_bid_id;
 
   async function choose(bid: AuctionBidSummary) {
@@ -117,7 +121,7 @@ export function AuctionResolution({
   return (
     <Card className="animate-fade-up">
       <CardHeader
-        title="Specialist selected"
+        title="Executor selected"
         meta={
           <span className="inline-flex items-center gap-1.5 text-brand-700">
             <Trophy size={12} weight="fill" />
@@ -132,7 +136,7 @@ export function AuctionResolution({
         </div>
         <div className="mt-3 flex flex-wrap items-baseline gap-3">
           <span className="text-sm text-ink-muted">
-            <span className="font-mono">{winner.agent_id}</span> bid
+            <span className="font-mono">{winner.agent_id}</span> executor bid
           </span>
           <span className="text-2xl text-ink-subtle line-through decoration-rose-400 decoration-2">
             {formatMoney(vickrey.winner_bid_price)}
@@ -164,7 +168,7 @@ export function AuctionResolution({
 
       <div className="mb-4">
         <div className="mb-2 text-xs font-medium text-ink-muted">
-          Buyer choice set · top 3 proposals
+          Buyer choice set · top 3 executor proposals
         </div>
         <div className="grid gap-2 md:grid-cols-3">
           {topChoices.map((b, i) => (
@@ -182,15 +186,29 @@ export function AuctionResolution({
         </div>
         {canChoose && (
           <p className="mt-2 text-xs text-ink-muted">
-            Pick a proposal to lock escrow and ask that specialist for an execution plan.
+            Pick a proposal to lock escrow and ask that executor for an execution plan.
           </p>
         )}
       </div>
 
-      {/* Bid ladder — winner is emphasized; everyone else gets a value bar viz */}
+      {supportBids.length > 0 && (
+        <div className="mb-4 rounded-xl bg-surface-subtle p-3">
+          <div className="text-xs font-medium text-ink-muted">
+            Executive/context support
+          </div>
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
+            {supportBids.map((b) => (
+              <SupportBid key={b.bid_id} bid={b} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bid ladder: executor winner first, supporting roles remain visible. */}
       <div className="space-y-2">
         {bids.map((b, i) => {
           const isWinner = i === 0;
+          const role = roleForAgent(b.agent_id, b.agent_role);
           const valueScore = b.value_score ?? b.score;
           const widthPct = Math.max(8, Math.round((valueScore / maxScore) * 100));
           return (
@@ -218,6 +236,9 @@ export function AuctionResolution({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-sm text-ink">
                       {b.agent_id}
+                    </span>
+                    <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium text-ink-muted">
+                      {formatRole(role)}
                     </span>
                     {isWinner && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-semibold tracking-tight text-white">
@@ -274,6 +295,13 @@ function formatPct(n?: number) {
   return `${Math.round(n * 100)}%`;
 }
 
+function formatRole(role?: string) {
+  if (role === "executive") return "Executive";
+  if (role === "context") return "Context";
+  if (role === "judge") return "Judge";
+  return "Executor";
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-white/70 px-3 py-2">
@@ -312,6 +340,9 @@ function TopChoice({
           <div className="font-mono text-ink">
             {rank}. {bid.agent_id}
           </div>
+          <div className="mt-1 text-[10px] font-medium uppercase tracking-wide text-ink-subtle">
+            {formatRole(roleForAgent(bid.agent_id, bid.agent_role))}
+          </div>
           <div className="mt-1 text-ink-muted">
             {selected
               ? "Selected"
@@ -342,6 +373,29 @@ function TopChoice({
           {busy ? "Selecting..." : defaultWinner ? "Accept default" : "Choose proposal"}
         </Button>
       )}
+    </div>
+  );
+}
+
+function SupportBid({ bid }: { bid: AuctionBidSummary }) {
+  return (
+    <div className="rounded-lg border border-border bg-white/70 p-3 text-xs">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-ink">{bid.agent_id}</span>
+            <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-medium text-ink-muted">
+              {formatRole(roleForAgent(bid.agent_id, bid.agent_role))}
+            </span>
+          </div>
+          <p className="mt-1 line-clamp-2 leading-relaxed text-ink-muted">
+            {bid.capability_claim}
+          </p>
+        </div>
+        <div className="shrink-0 text-right font-mono text-ink">
+          {formatScore(bid.value_score ?? bid.score)}
+        </div>
+      </div>
     </div>
   );
 }

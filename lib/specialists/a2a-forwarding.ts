@@ -1,11 +1,12 @@
-import { makeMockSpecialist } from "./base";
 import {
   configuredConnectionAvailability,
   executeA2AConnectedSpecialist,
   probeSpecialistConnection,
   toolAvailabilityFromProbe,
 } from "./connection-runtime";
+import { roleForSpecialist } from "../agent-roles";
 import type {
+  BidPayload,
   SpecialistConfig,
   SpecialistDecision,
   SpecialistOutput,
@@ -13,13 +14,15 @@ import type {
 } from "../types";
 
 export function makeA2AForwardingSpecialist(config: SpecialistConfig): SpecialistRunner {
-  const fallback = makeMockSpecialist(config);
-
   return {
     config,
     async bid(prompt: string, taskType: string): Promise<SpecialistDecision> {
       if (!config.a2a_agent_card_url && !config.a2a_endpoint) {
-        return await fallback.bid(prompt, taskType);
+        return {
+          decline: true,
+          reason:
+            "No real A2A endpoint is configured for this specialist, so Arbor will not use a placeholder persona.",
+        };
       }
       const configured = configuredConnectionAvailability(config);
       if (configured.status === "missing") {
@@ -36,15 +39,16 @@ export function makeA2AForwardingSpecialist(config: SpecialistConfig): Specialis
         };
       }
 
-      const fit = await fallback.bid(prompt, taskType);
-      if ("decline" in fit) return fit;
-      return {
-        ...fit,
-        capability_claim: `${fit.capability_claim} Execution will be sent through ${probe.native ? "native A2A" : "Arbor's A2A bridge"}.`,
+      const bid: BidPayload = {
+        bid_price: config.cost_baseline,
+        capability_claim: `${config.one_liner} Execution will be sent through ${probe.native ? "native A2A" : "Arbor's A2A bridge"}.`,
+        estimated_seconds: Math.max(30, Math.round(config.cost_baseline * 180)),
+        agent_role: roleForSpecialist(config),
         execution_preview:
-          `Connected A2A run: tasks/send -> ${config.a2a_endpoint}; result must come back as A2A task status/artifacts.`,
+          `Connected A2A run: message/send -> ${config.a2a_endpoint}; result must come back as A2A task status/artifacts.`,
         tool_availability: toolAvailabilityFromProbe(probe),
       };
+      return bid;
     },
     async execute(prompt: string, taskType: string): Promise<SpecialistOutput> {
       const result = await executeA2AConnectedSpecialist({

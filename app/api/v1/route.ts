@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       "GET /api/a2a/agents/:agentId":
         "Fetch an Arbor-hosted A2A agent card for any housed specialist.",
       "POST /api/a2a/agents/:agentId":
-        "Send a JSON-RPC A2A tasks/send request to a housed specialist bridge.",
+        "Send a JSON-RPC A2A message/send request to a housed specialist bridge.",
     },
     discovery: {
       mcp: `${base}/.well-known/mcp.json`,

@@ -52,7 +52,7 @@ Surfaces:
 
 ## Specialists — 100 connected MCP/A2A agents
 
-Every housed contact is reachable through either a native MCP endpoint or an Arbor-hosted A2A bridge. Native MCP contacts keep their production MCP URL; contacts without a public MCP/A2A server get a local A2A agent card and `tasks/send` endpoint at `/api/a2a/agents/:agentId`. The auction still invites only the most relevant shortlist, so broad coverage does not create noisy bidding. Sponsors with **MCP ✓** have a native MCP endpoint configured; A2A bridge contacts are honest internal adapters, not fake vendor-native endpoints.
+Every housed contact is reachable through either a native MCP endpoint or an Arbor-hosted A2A bridge. Native MCP contacts keep their production MCP URL; contacts without a public MCP/A2A server get a local A2A agent card and `message/send` endpoint at `/api/a2a/agents/:agentId`. The auction still invites only the most relevant shortlist, so broad coverage does not create noisy bidding. Agent cards now expose an `executionStatus` so Arbor distinguishes real execution from endpoint-gated or mock catalog entries.
 
 | Agent | Sponsor | Connection | Campaign role |
 |---|---|---|---|
@@ -77,7 +77,7 @@ When a specialist has `mcp_endpoint` set:
 
 See [lib/mcp-outbound.ts](lib/mcp-outbound.ts) and [lib/specialists/mcp-forwarding.ts](lib/specialists/mcp-forwarding.ts).
 
-When a housed specialist does not expose a native MCP server, Arbor exposes an A2A-compatible agent card and JSON-RPC `tasks/send` bridge at `/api/a2a/agents/:agentId`. The bridge runs the existing specialist persona/plan runner and returns A2A task artifacts, so external A2A clients can still contract that specialist without pretending the third-party vendor has a native A2A backend.
+When a housed specialist does not expose a native MCP server, Arbor exposes an A2A-compatible agent card and JSON-RPC `message/send` bridge at `/api/a2a/agents/:agentId`. The bridge only executes if the agent has a real backing adapter, native MCP endpoint, native A2A endpoint, or configured runner. Mock catalog entries return a failed A2A task state instead of a ChatGPT placeholder.
 
 `codex-writer` is different from the A2A bridge persona agents: it only bids when a real Codex execution runner is configured. Set `CODEX_RUNNER_URL` on the Convex deployment to a reachable runner endpoint, and set `CODEX_RUNNER_SECRET` plus `CODEX_WORKSPACE_DIR` on the runner host. The built-in local runner lives at `/api/codex/run`; it shells out to `codex exec`, edits the configured checkout, and returns changed files, diff stats, and verification output. If no runner is configured, `codex-writer` declines instead of pretending it edited the repo.
 
@@ -86,7 +86,7 @@ When a housed specialist does not expose a native MCP server, Arbor exposes an A
 All MCP/A2A specialists now pass through a shared connection runtime before they can win execution work:
 
 - Native MCP specialists must have required credentials, pass `tools/list`, and execute through MCP `tools/call`.
-- Native A2A specialists must expose a reachable agent card / `tasks/send` endpoint and execute through JSON-RPC `tasks/send`.
+- Native A2A specialists must expose a reachable agent card / `message/send` endpoint and execute through JSON-RPC `message/send`.
 - Arbor-hosted A2A bridge specialists are labeled separately from vendor-native A2A; the bridge returns A2A task status/artifacts and reports failures instead of silently substituting placeholder work.
 - Runner-specific integrations such as `codex-writer` can attach their own `tool_availability` so the auction values real execution paths above LLM-only planning.
 
@@ -94,14 +94,14 @@ The runtime lives in [lib/specialists/connection-runtime.ts](lib/specialists/con
 
 ### Adding a sponsor's MCP endpoint
 
-The other nine sponsors flip from `soft` to a live MCP badge with a one-line change. Edit the relevant file in [lib/specialists/](lib/specialists/) and add:
+Sponsors flip from endpoint-gated to live once the specialist config points at a real MCP or A2A endpoint. Edit the relevant file in [lib/specialists/](lib/specialists/) and add:
 
 ```ts
 mcp_endpoint: "https://<sponsor-mcp-url>",
 is_verified: true,
 ```
 
-Then swap `makeMockSpecialist(CONFIG)` for `makeMcpForwardingSpecialist(CONFIG)`. No other code changes — the registry, leaderboard, and `/agents` page all auto-detect.
+For A2A vendors, set the matching `*_A2A_ENDPOINT` and `*_A2A_AGENT_CARD_URL` env vars instead. No placeholder runner should be added for missing endpoints.
 
 ## Why Vickrey
 
@@ -175,7 +175,7 @@ Required env vars:
 ```bash
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-PAYMENT_SERVER_SECRET=optional-shared-secret
+PAYMENT_SERVER_SECRET=required-shared-secret
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 

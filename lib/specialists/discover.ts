@@ -7,9 +7,9 @@
  *   2. **Live MCP registry search** (lib/specialists/mcp-registry.ts). Hits the
  *      open registry.modelcontextprotocol.io for HTTP-invocable servers.
  *      Optionally verified by fetching `tools/list` against the candidate.
- *   3. **LLM synthesis** (last resort). Designs an in-persona agent when no
- *      real specialist matches. Clearly marked `synthesized` in storage and
- *      UI so callers know it's a costumed LLM, not a real backend.
+ *   3. **LLM synthesis** (explicit opt-in only). Designs an unavailable
+ *      in-persona agent when requested by callers. It is clearly marked
+ *      `synthesized` and will not execute unless a real endpoint is later wired.
  *
  * A discovered specialist with `mcp_endpoint` set automatically routes through
  * `makeMcpForwardingSpecialist`, so bid + execute become real MCP tool calls
@@ -58,7 +58,6 @@ export interface DiscoveryResult {
 const DEFAULT_ORDER: Array<"catalog" | "registry" | "synthesized"> = [
   "catalog",
   "registry",
-  "synthesized",
 ];
 
 const CATALOG_MIN_FIT = 0.55;
@@ -92,7 +91,8 @@ export async function discoverSpecialist(
       return { ...hit, verified_tools: [] };
     }
   }
-  // Should be unreachable — synthesize always returns.
+  // No real remote agent matched. Return an unavailable synthesized record so
+  // callers can surface the gap without silently executing a placeholder.
   return await (async () => {
     const hit = await synthesize(args.query, args.taskType, args.existing, taken);
     return { ...hit, verified_tools: [] };
@@ -411,7 +411,7 @@ async function synthesize(
   existing: SpecialistConfig[],
   taken: Set<string>,
 ): Promise<Omit<DiscoveryResult, "verified_tools">> {
-  const sys = `You design specialist AI agents for a general-purpose marketplace where agents bid on any kind of work — payments, design, code, research, marketing, data, ops, anything. The user describes a goal the existing roster and the live MCP registry cannot cover well; you invent a new in-persona specialist tailored to that goal.
+  const sys = `You design unavailable specialist records for a general-purpose marketplace where agents bid on any kind of work — payments, design, code, research, marketing, data, ops, anything. The user describes a goal the existing roster and the live MCP registry cannot cover well; you invent a clearly non-executing specialist profile tailored to that goal.
 
 Stay in the user's domain — don't drift toward marketing/campaign framing unless that's literally what they asked for. If the goal is "set up Stripe Connect", build a payments specialist, not a marketing one.
 
@@ -485,10 +485,11 @@ Do not duplicate any existing agent_id.`;
       typeof raw.one_liner === "string" && raw.one_liner.trim()
         ? raw.one_liner.trim().slice(0, 200)
         : `Synthesized specialist for: ${query.trim().slice(0, 80)}`,
-    system_prompt:
+    system_prompt: `${
       typeof raw.system_prompt === "string" && raw.system_prompt.trim()
         ? raw.system_prompt.trim()
-        : `You are ${agent_id}, an LLM-only specialist synthesized for the goal: "${query.trim()}". You have no remote MCP tools — be honest about that limitation and answer the user's request on its own terms, without assuming it's marketing or campaign work.`,
+        : `You are ${agent_id}, a non-executing specialist profile synthesized for the goal: "${query.trim()}".`
+    } You have no remote MCP or A2A tools. Decline execution until a real endpoint is configured.`,
     discovered: true,
     discovery_source: "synthesized",
     discovered_for: query.trim().slice(0, 240),
@@ -498,7 +499,7 @@ Do not duplicate any existing agent_id.`;
     specialist: cfg,
     source: "synthesized",
     rationale:
-      "No real MCP specialist matched well in the catalog or live registry — synthesized an in-persona LLM agent as a fallback.",
+      "No real MCP specialist matched well in the catalog or live registry — synthesized a non-executing profile to show the capability gap.",
   };
 }
 

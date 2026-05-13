@@ -295,7 +295,7 @@ function workflowSections(isMultiStepParent: boolean): WorkflowSectionMeta[] {
       key: "plan",
       step: 3,
       title: "Approve",
-      description: "Review the selected specialist's execution plan.",
+      description: "Review the selected executor's execution plan.",
     },
     {
       key: "execution",

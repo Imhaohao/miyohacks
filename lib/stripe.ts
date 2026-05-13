@@ -20,5 +20,9 @@ export function stripeWebhookSecret() {
 }
 
 export function paymentServerSecret() {
-  return process.env.PAYMENT_SERVER_SECRET;
+  const secret = process.env.PAYMENT_SERVER_SECRET?.trim();
+  if (!secret) {
+    throw new Error("PAYMENT_SERVER_SECRET is required");
+  }
+  return secret;
 }

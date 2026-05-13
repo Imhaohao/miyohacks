@@ -10,7 +10,7 @@ export function implementationPlanFromText(args: {
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 260) ||
-    "The winning specialist produced an implementation plan for approval.";
+    "The winning executor produced an implementation plan for approval.";
 
   return {
     kind: "implementation_plan",

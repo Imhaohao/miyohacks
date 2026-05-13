@@ -1,9 +1,6 @@
-import {
-  codexRunnerConfigured,
-  runCodexWriter,
-  type CodexRunResponse,
-} from "../codex-runner";
+import type { CodexRunResponse } from "../codex-runner";
 import { isImplementationTask } from "../campaign-context";
+import { roleForSpecialist } from "../agent-roles";
 import type {
   BidPayload,
   SpecialistConfig,
@@ -16,6 +13,21 @@ function configuredMode() {
   if (process.env.CODEX_RUNNER_URL?.trim()) return "remote Codex runner";
   if (process.env.CODEX_WORKSPACE_DIR?.trim()) return "local Codex CLI";
   return null;
+}
+
+function codexRunnerConfigured() {
+  return Boolean(
+    process.env.CODEX_RUNNER_URL?.trim() ||
+      process.env.CODEX_WORKSPACE_DIR?.trim(),
+  );
+}
+
+async function loadCodexRunner() {
+  const dynamicImport = new Function(
+    "specifier",
+    "return import(specifier)",
+  ) as (specifier: string) => Promise<typeof import("../codex-runner")>;
+  return await dynamicImport("../codex-runner");
 }
 
 function formatCodexResult(result: CodexRunResponse) {
@@ -73,6 +85,7 @@ export function makeCodexWriterSpecialist(
         bid_price: config.cost_baseline,
         capability_claim: `I will run ${mode} against the configured checkout, make scoped repo edits, and return changed files plus verification results.`,
         estimated_seconds: 1800,
+        agent_role: roleForSpecialist(config),
         execution_preview:
           "Real repo-editing run: Codex receives the approved task/context, edits the working tree, and returns git diff evidence.",
         tool_availability: {
@@ -96,6 +109,7 @@ export function makeCodexWriterSpecialist(
           "Real Codex execution is not configured. Set CODEX_RUNNER_URL or CODEX_WORKSPACE_DIR.",
         );
       }
+      const { runCodexWriter } = await loadCodexRunner();
       const result = await runCodexWriter({
         agent_id: config.agent_id,
         prompt,

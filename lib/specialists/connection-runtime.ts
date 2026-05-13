@@ -5,6 +5,7 @@ import {
   type A2AAgentCard,
   type A2ATaskResponse,
 } from "../a2a-client";
+import { isArborA2ABridgeUrl } from "../agent-execution-status";
 import { discoverTools, type RemoteMcpTool } from "../mcp-outbound";
 import type { BidPayload, SpecialistConfig } from "../types";
 
@@ -49,16 +50,6 @@ type ToolAvailability = NonNullable<BidPayload["tool_availability"]>;
 function trim(value: string | undefined): string | undefined {
   const v = value?.trim();
   return v ? v : undefined;
-}
-
-export function isArborA2ABridgeUrl(url: string | undefined): boolean {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    return parsed.pathname.startsWith("/api/a2a/agents/");
-  } catch {
-    return url.includes("/api/a2a/agents/");
-  }
 }
 
 export function getSpecialistConnection(
@@ -146,6 +137,14 @@ export function configuredConnectionAvailability(
       status: "manual",
       checked,
       reason: "manual specialist; no live API credential required",
+    };
+  }
+
+  if (config.protocol === "a2a") {
+    return {
+      status: "missing",
+      checked,
+      reason: "A2A protocol selected but no native endpoint is configured",
     };
   }
 
@@ -287,7 +286,7 @@ export async function executeA2AConnectedSpecialist(args: {
     throw new Error(`${args.config.agent_id} does not have an A2A endpoint`);
   }
   if (!connection.endpointUrl) {
-    throw new Error(`${args.config.agent_id} is missing an A2A tasks/send endpoint`);
+    throw new Error(`${args.config.agent_id} is missing an A2A message/send endpoint`);
   }
 
   const probe = await probeSpecialistConnection(args.config);
@@ -322,4 +321,3 @@ export async function executeA2AConnectedSpecialist(args: {
     probe,
   };
 }
-

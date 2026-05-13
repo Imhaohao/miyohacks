@@ -1,3 +1,5 @@
+"use node";
+
 export interface CodexRunRequest {
   agent_id: string;
   prompt: string;

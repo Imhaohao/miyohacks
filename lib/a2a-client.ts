@@ -31,6 +31,28 @@ interface JsonRpcEnvelope<T> {
   error?: { message?: string };
 }
 
+export type A2ASendMethod = "message/send" | "tasks/send";
+
+export function buildA2ASendRequest(args: {
+  prompt: string;
+  metadata?: Record<string, unknown>;
+  method?: A2ASendMethod;
+  id?: string;
+}) {
+  return {
+    jsonrpc: "2.0",
+    id: args.id ?? `arbor-${Date.now()}`,
+    method: args.method ?? "message/send",
+    params: {
+      message: {
+        role: "user",
+        parts: [{ kind: "text", text: args.prompt }],
+      },
+      ...(args.metadata ? { metadata: args.metadata } : {}),
+    },
+  };
+}
+
 function isJsonRpcEnvelope<T>(
   response: T | JsonRpcEnvelope<T>,
 ): response is JsonRpcEnvelope<T> {
@@ -80,21 +102,15 @@ export async function sendA2ATask(args: {
   prompt: string;
   apiKey?: string;
   metadata?: Record<string, unknown>;
+  method?: A2ASendMethod;
 }): Promise<A2ATaskResponse> {
   const response = await fetchJson<A2ATaskResponse | JsonRpcEnvelope<A2ATaskResponse>>(
     args.endpointUrl,
-    {
-      jsonrpc: "2.0",
-      id: `arbor-${Date.now()}`,
-      method: "tasks/send",
-      params: {
-        message: {
-          role: "user",
-          parts: [{ kind: "text", text: args.prompt }],
-        },
-        ...(args.metadata ? { metadata: args.metadata } : {}),
-      },
-    },
+    buildA2ASendRequest({
+      prompt: args.prompt,
+      metadata: args.metadata,
+      method: args.method,
+    }),
     args.apiKey,
     45_000,
   );

@@ -14,14 +14,15 @@ interface Props {
 }
 
 export function BidWindow({ task, events }: Props) {
-  if (task.status === "planning" || task.status === "shortlisting") {
-    return null;
-  }
   const [now, setNow] = useState<number>(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(t);
   }, []);
+
+  if (task.status === "planning" || task.status === "shortlisting") {
+    return null;
+  }
 
   const remainingMs = Math.max(0, task.bid_window_closes_at - now);
   const remainingSec = (remainingMs / 1000).toFixed(1);

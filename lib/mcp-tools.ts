@@ -30,6 +30,10 @@ import {
   AGENT_CONTACT_CATALOG,
   contactToSpecialistConfig,
 } from "@/lib/agent-contacts";
+import {
+  EXECUTION_STATUS_DESCRIPTIONS,
+  classifyAgentExecution,
+} from "@/lib/agent-execution-status";
 import { rankAgentContacts } from "@/lib/agent-broker";
 import type { AgentIndustry, AgentProtocol, SpecialistConfig } from "@/lib/types";
 import {
@@ -419,7 +423,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "approve_execution_plan",
     description:
-      "Approve the winning agent's execution plan so the task can move from plan_review to execution.",
+      "Approve the winning executor's execution plan so the task can move from plan_review to execution.",
     inputSchema: {
       type: "object",
       required: ["task_id"],
@@ -432,7 +436,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "request_plan_revision",
     description:
-      "Ask the winning agent to revise the execution plan before approval. Execution does not start.",
+      "Ask the winning executor to revise the execution plan before approval. Execution does not start.",
     inputSchema: {
       type: "object",
       required: ["task_id", "feedback"],
@@ -734,6 +738,7 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
     const l = liveById.get(s.agent_id);
     const connection = getSpecialistConnection(s);
     const availability = configuredConnectionAvailability(s);
+    const executionStatus = classifyAgentExecution(s);
     return {
       agent_id: s.agent_id,
       sponsor: s.sponsor,
@@ -743,6 +748,8 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
       reputation_score: l?.reputation_score ?? s.starting_reputation,
       total_tasks_completed: l?.total_tasks_completed ?? 0,
       protocol: s.protocol,
+      execution_status: executionStatus,
+      execution_status_description: EXECUTION_STATUS_DESCRIPTIONS[executionStatus],
       execution_connection: {
         protocol: connection.protocol,
         native: connection.native,

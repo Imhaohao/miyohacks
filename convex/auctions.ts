@@ -34,6 +34,11 @@ import {
   computeAuctionValue,
   qualityAdjustedVickreyPrice,
 } from "../lib/auction-value";
+import {
+  isExecutableAgent,
+  roleForAgent,
+  roleForSpecialist,
+} from "../lib/agent-roles";
 import { configuredConnectionAvailability } from "../lib/specialists/connection-runtime";
 
 const BUYER_ID = "buyer:default";
@@ -125,6 +130,7 @@ export const solicitBids = internalAction({
         agent_id: d.agent_id,
         display_name: d.display_name,
         sponsor: d.sponsor,
+        agent_role: d.agent_role,
         capabilities: d.capabilities,
         system_prompt: d.system_prompt,
         cost_baseline: d.cost_baseline,
@@ -154,6 +160,7 @@ export const solicitBids = internalAction({
         agent_id: c.agent_id,
         display_name: c.display_name,
         sponsor: c.sponsor,
+        agent_role: "executor",
         capabilities: c.capabilities,
         system_prompt: `You are ${c.display_name}, an MCP-equipped specialist for ${c.sponsor}. Your remote tools cover: ${c.capabilities.join(", ")}. ${c.one_liner} Treat the user's goal on its own terms — never translate it into another domain. Decline cleanly when the goal is outside what your tools can do.`,
         cost_baseline: c.cost_baseline,
@@ -177,6 +184,7 @@ export const solicitBids = internalAction({
           agent_id: c.agent_id,
           display_name: c.display_name,
           sponsor: c.sponsor,
+          agent_role: c.agent_role,
           capabilities: c.capabilities,
           system_prompt: c.system_prompt,
           cost_per_task_estimate: c.cost_baseline,
@@ -210,6 +218,7 @@ export const solicitBids = internalAction({
           agent_id: c.agent_id,
           display_name: c.display_name,
           sponsor: c.sponsor,
+          agent_role: c.agent_role,
           capabilities: c.capabilities,
           system_prompt: c.system_prompt,
           cost_per_task_estimate: c.cost_baseline,
@@ -311,6 +320,7 @@ export const solicitBids = internalAction({
           const bid_id = await ctx.runMutation(internal.bids._insert, {
             task_id: args.task_id,
             agent_id: spec.agent_id,
+            agent_role: bid.agent_role ?? roleForSpecialist(spec),
             bid_price: bid.bid_price,
             capability_claim: bid.capability_claim,
             estimated_seconds: bid.estimated_seconds,
@@ -399,14 +409,44 @@ export const resolve = internalAction({
       return;
     }
 
+    const executorBids = validBids.filter((b) =>
+      isExecutableAgent(b.agent_id, b.agent_role),
+    );
+
+    if (executorBids.length === 0) {
+      await ctx.runMutation(internal.payments._refundTaskReservation, {
+        task_id: args.task_id,
+        buyer_id: task.posted_by || BUYER_ID,
+        amount: task.max_budget,
+        reason: "auction failed: no executable bids under budget",
+      });
+      await ctx.runMutation(internal.tasks._setStatus, {
+        task_id: args.task_id,
+        status: "failed",
+      });
+      await ctx.runMutation(internal.lifecycle.log, {
+        task_id: args.task_id,
+        event_type: "auction_failed",
+        payload: {
+          reason: "no executable bids under budget",
+          all_bids: allBids,
+        },
+      });
+      return;
+    }
+
     // Sort by expected value, not raw cheapness. `score` remains populated for
     // backwards compatibility, but new bids use value_score as the canonical
     // ranking signal.
-    const sorted = [...validBids].sort(
+    const sortedExecutors = [...executorBids].sort(
       (a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score),
     );
-    const winner = sorted[0];
-    const runnerUp = sorted[1];
+    const supportingBids = validBids
+      .filter((b) => !isExecutableAgent(b.agent_id, b.agent_role))
+      .sort((a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score));
+    const sorted = [...sortedExecutors, ...supportingBids];
+    const winner = sortedExecutors[0];
+    const runnerUp = sortedExecutors[1];
     const price_paid = qualityAdjustedVickreyPrice({
       winnerExpectedQuality: winner.expected_quality ?? winner.score * winner.bid_price,
       runnerUpValueScore: runnerUp?.value_score ?? runnerUp?.score,
@@ -416,6 +456,7 @@ export const resolve = internalAction({
     const serializeBid = (b: typeof winner) => ({
       bid_id: b._id,
       agent_id: b.agent_id,
+      agent_role: roleForAgent(b.agent_id, b.agent_role),
       bid_price: b.bid_price,
       score: b.value_score ?? b.score,
       value_score: b.value_score ?? b.score,
@@ -445,7 +486,8 @@ export const resolve = internalAction({
       event_type: "auction_resolved",
       payload: {
         bids: sorted.map(serializeBid),
-        top_3: sorted.slice(0, 3).map(serializeBid),
+        top_3: sortedExecutors.slice(0, 3).map(serializeBid),
+        support_bids: supportingBids.map(serializeBid),
         winner: serializeBid(winner),
         vickrey: {
           winner_bid_price: winner.bid_price,
@@ -453,7 +495,7 @@ export const resolve = internalAction({
           clearing_price: price_paid,
           price_paid,
           rule:
-            sorted.length >= 2
+            sortedExecutors.length >= 2
               ? "quality_adjusted_second_price"
               : "degenerate_single_bid",
         },
@@ -492,7 +534,7 @@ function fallbackExecutionPlan(args: {
     kind: "execution_plan",
     title: "Execution plan for approval",
     summary:
-      "The winning specialist will use the attached Hyperspell/Nia context to produce the requested deliverable after buyer approval.",
+      "The winning executor will use the attached executive/context guidance to produce the requested deliverable after buyer approval.",
     agent_id: args.agent_id,
     user_goal: args.prompt,
     deliverables: [
@@ -538,7 +580,7 @@ function fallbackExecutionPlan(args: {
     ],
     estimated_seconds: args.estimated_seconds,
     approval_prompt:
-      "Approve this plan to release the winning specialist into execution, or request a revision with concrete feedback.",
+      "Approve this plan to release the winning executor, or request a revision with concrete feedback.",
   };
 }
 
@@ -616,8 +658,8 @@ export const prepareExecutionPlan = internalAction({
       args.revision_feedback
         ? `Buyer requested revision. Address this feedback:\n${args.revision_feedback}`
         : null,
-      `Winning agent: ${winner.agent_id}`,
-      `Winning bid: $${winner.bid_price.toFixed(2)}`,
+      `Winning executor: ${winner.agent_id}`,
+      `Winning executor bid: $${winner.bid_price.toFixed(2)}`,
       `Estimated execution seconds: ${winner.estimated_seconds}`,
     ]
       .filter(Boolean)
@@ -628,7 +670,7 @@ export const prepareExecutionPlan = internalAction({
       const raw = await Promise.race([
         callOpenAIJSON<PlanLLMResponse>({
           systemPrompt:
-            "You are Arbor's execution-plan writer. Before any specialist does paid/external work, produce a concise buyer-approval plan. Output JSON only with title, summary, deliverables, context_required, risks, acceptance_criteria, and approval_prompt. Do not claim execution has happened.",
+            "You are Arbor's execution-plan writer. Before the selected executor does paid/external work, produce a concise buyer-approval plan. Output JSON only with title, summary, deliverables, context_required, risks, acceptance_criteria, and approval_prompt. Do not claim execution has happened.",
           userPrompt,
           maxTokens: 900,
           timeoutMs: 25_000,
@@ -719,6 +761,7 @@ export const execute = internalAction({
           agent_id: discoveredEntry.agent_id,
           display_name: discoveredEntry.display_name,
           sponsor: discoveredEntry.sponsor,
+          agent_role: discoveredEntry.agent_role,
           capabilities: discoveredEntry.capabilities,
           system_prompt: discoveredEntry.system_prompt,
           cost_baseline: discoveredEntry.cost_baseline,

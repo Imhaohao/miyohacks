@@ -26,6 +26,7 @@ function toConvexContact(contact: AgentContact) {
     ...(contact.agent_card_url ? { agent_card_url: contact.agent_card_url } : {}),
     auth_type: contact.auth_type,
     ...(contact.auth_env ? { auth_env: contact.auth_env } : {}),
+    execution_status: contact.execution_status,
     verification_status: contact.verification_status,
     health_status: contact.health_status,
     supported_input_modes: contact.supported_input_modes,

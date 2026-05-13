@@ -5,6 +5,7 @@ export default defineSchema({
   user_accounts: defineTable({
     account_id: v.string(),
     clerk_user_id: v.string(),
+    token_identifier: v.optional(v.string()),
     email: v.optional(v.string()),
     display_name: v.optional(v.string()),
     avatar_url: v.optional(v.string()),
@@ -13,7 +14,8 @@ export default defineSchema({
     updated_at: v.number(),
   })
     .index("by_account", ["account_id"])
-    .index("by_clerk_user", ["clerk_user_id"]),
+    .index("by_clerk_user", ["clerk_user_id"])
+    .index("by_token_identifier", ["token_identifier"]),
 
   projects: defineTable({
     owner_account_id: v.string(),
@@ -28,6 +30,14 @@ export default defineSchema({
     agent_id: v.string(),
     display_name: v.string(),
     sponsor: v.string(),
+    agent_role: v.optional(
+      v.union(
+        v.literal("executive"),
+        v.literal("context"),
+        v.literal("executor"),
+        v.literal("judge"),
+      ),
+    ),
     capabilities: v.array(v.string()),
     system_prompt: v.string(),
     cost_per_task_estimate: v.number(),
@@ -155,6 +165,14 @@ export default defineSchema({
   bids: defineTable({
     task_id: v.id("tasks"),
     agent_id: v.string(),
+    agent_role: v.optional(
+      v.union(
+        v.literal("executive"),
+        v.literal("context"),
+        v.literal("executor"),
+        v.literal("judge"),
+      ),
+    ),
     bid_price: v.number(),
     capability_claim: v.string(),
     estimated_seconds: v.number(),
@@ -372,6 +390,14 @@ export default defineSchema({
     display_name: v.string(),
     sponsor: v.string(),
     industry: v.string(),
+    agent_role: v.optional(
+      v.union(
+        v.literal("executive"),
+        v.literal("context"),
+        v.literal("executor"),
+        v.literal("judge"),
+      ),
+    ),
     protocol: v.union(
       v.literal("a2a"),
       v.literal("mcp"),
@@ -385,6 +411,7 @@ export default defineSchema({
     agent_card_url: v.optional(v.string()),
     auth_type: v.string(),
     auth_env: v.optional(v.string()),
+    execution_status: v.optional(v.string()),
     verification_status: v.string(),
     health_status: v.string(),
     supported_input_modes: v.array(v.string()),
@@ -448,6 +475,14 @@ export default defineSchema({
     agent_id: v.string(),
     display_name: v.string(),
     sponsor: v.string(),
+    agent_role: v.optional(
+      v.union(
+        v.literal("executive"),
+        v.literal("context"),
+        v.literal("executor"),
+        v.literal("judge"),
+      ),
+    ),
     capabilities: v.array(v.string()),
     system_prompt: v.string(),
     cost_baseline: v.number(),

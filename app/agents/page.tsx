@@ -8,7 +8,16 @@ import { ArborMark } from "@/components/ui/ArborMark";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { formatMoney, formatScore } from "@/lib/utils";
-import type { AgentContact, AgentIndustry, AgentProtocol } from "@/lib/types";
+import {
+  EXECUTION_STATUS_DESCRIPTIONS,
+  EXECUTION_STATUS_LABELS,
+} from "@/lib/agent-execution-status";
+import type {
+  AgentContact,
+  AgentExecutionStatus,
+  AgentIndustry,
+  AgentProtocol,
+} from "@/lib/types";
 import { ArrowLeft } from "@phosphor-icons/react";
 
 interface ContactView extends AgentContact {
@@ -39,6 +48,14 @@ const PROTOCOLS: Array<"all" | AgentProtocol> = [
   "manual",
 ];
 
+const EXECUTION_STATUSES: AgentExecutionStatus[] = [
+  "native_mcp",
+  "native_a2a",
+  "arbor_real_adapter",
+  "needs_vendor_a2a_endpoint",
+  "mock_unconnected",
+];
+
 export default function AgentsPage() {
   const [industry, setIndustry] = useState<"all" | AgentIndustry>("all");
   const [protocol, setProtocol] = useState<"all" | AgentProtocol>("all");
@@ -55,6 +72,17 @@ export default function AgentsPage() {
       byIndustry.set(contact.industry, (byIndustry.get(contact.industry) ?? 0) + 1);
     }
     return byIndustry;
+  }, [contacts]);
+  const executionCounts = useMemo(() => {
+    const byStatus = new Map<AgentExecutionStatus, number>();
+    for (const status of EXECUTION_STATUSES) byStatus.set(status, 0);
+    for (const contact of contacts) {
+      byStatus.set(
+        contact.execution_status,
+        (byStatus.get(contact.execution_status) ?? 0) + 1,
+      );
+    }
+    return byStatus;
   }, [contacts]);
 
   return (
@@ -76,12 +104,12 @@ export default function AgentsPage() {
 
       <header className="mb-6 mt-12 animate-fade-up">
         <h1 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-          100 connected MCP/A2A specialists.
+          Specialists for startup launch work.
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-ink-muted">
-          Arbor brokers tasks across native MCP specialists and Arbor-hosted
-          A2A bridges for every housed contact. The auction only invites the
-          best-fit shortlist, so broad coverage does not mean noisy bidding.
+          Browse execution modes, reputation, baseline cost, and tool
+          readiness before approving paid work. Native tool connections are
+          separated from bridges and plan-only fallbacks.
         </p>
       </header>
 
@@ -136,6 +164,23 @@ export default function AgentsPage() {
         </div>
       </Card>
 
+      <section className="mb-5 grid gap-3 md:grid-cols-5">
+        {EXECUTION_STATUSES.map((status) => (
+          <div
+            key={status}
+            className="rounded-lg border border-line bg-white p-3 shadow-soft"
+            title={EXECUTION_STATUS_DESCRIPTIONS[status]}
+          >
+            <div className="text-[11px] font-medium text-ink-muted">
+              {EXECUTION_STATUS_LABELS[status]}
+            </div>
+            <div className="mt-1 font-mono text-2xl font-semibold text-ink">
+              {executionCounts.get(status) ?? 0}
+            </div>
+          </div>
+        ))}
+      </section>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {contacts.map((contact) => (
           <AgentContactCard key={contact.agent_id} contact={contact} />
@@ -146,6 +191,7 @@ export default function AgentsPage() {
 }
 
 function AgentContactCard({ contact }: { contact: ContactView }) {
+  const statusTone = executionTone(contact.execution_status);
   return (
     <Card className="animate-fade-up">
       <CardHeader
@@ -154,6 +200,9 @@ function AgentContactCard({ contact }: { contact: ContactView }) {
             <span className="truncate">{contact.display_name}</span>
             <Pill tone={contact.protocol === "mcp" || contact.protocol === "a2a" ? "info" : "neutral"}>
               {contact.protocol.toUpperCase()}
+            </Pill>
+            <Pill tone={statusTone}>
+              {EXECUTION_STATUS_LABELS[contact.execution_status]}
             </Pill>
           </span>
         }
@@ -181,14 +230,25 @@ function AgentContactCard({ contact }: { contact: ContactView }) {
           {contact.verification_status}
         </Pill>
       </div>
-      {contact.endpoint_url && (
-        <div className="mb-4 rounded-lg bg-brand-50 px-3 py-2 font-mono text-[11px] text-brand-700">
-          <div className="truncate">{contact.endpoint_url}</div>
-          {contact.auth_env && (
-            <div className="mt-1 text-brand-600">auth: {contact.auth_env}</div>
-          )}
-        </div>
-      )}
+      <div className="mb-4 grid gap-2 rounded-xl bg-surface-subtle p-3 text-xs sm:grid-cols-3">
+        <TrustCell
+          label="Mode"
+          value={EXECUTION_STATUS_LABELS[contact.execution_status]}
+        />
+        <TrustCell label="Baseline" value={formatMoney(contact.cost_baseline)} />
+        <TrustCell
+          label="Last check"
+          value={contact.updated_at ? new Date(contact.updated_at).toLocaleDateString() : "Seeded"}
+        />
+        {contact.endpoint_url && (
+          <div className="min-w-0 border-t border-line pt-2 font-mono text-[11px] text-brand-700 sm:col-span-3">
+            <div className="break-all">{contact.endpoint_url}</div>
+            {contact.auth_env && (
+              <div className="mt-1 text-brand-600">auth: {contact.auth_env}</div>
+            )}
+          </div>
+        )}
+      </div>
       <div className="mb-4">
         <div className="mb-1.5 flex items-center justify-between text-xs">
           <span className="text-ink-muted">Reputation</span>
@@ -214,11 +274,27 @@ function AgentContactCard({ contact }: { contact: ContactView }) {
         ))}
       </div>
       <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs text-ink-muted">
-        <span>Baseline {formatMoney(contact.cost_baseline)}</span>
+        <span>{EXECUTION_STATUS_DESCRIPTIONS[contact.execution_status]}</span>
         <span>
           {contact.total_tasks_completed} done · {contact.total_disputes_lost} disputes
         </span>
       </div>
     </Card>
+  );
+}
+
+function executionTone(status: AgentExecutionStatus) {
+  if (status === "native_mcp" || status === "native_a2a") return "success";
+  if (status === "arbor_real_adapter") return "info";
+  if (status === "needs_vendor_a2a_endpoint") return "warning";
+  return "danger";
+}
+
+function TrustCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[11px] text-ink-muted">{label}</div>
+      <div className="mt-0.5 font-mono text-ink">{value}</div>
+    </div>
   );
 }

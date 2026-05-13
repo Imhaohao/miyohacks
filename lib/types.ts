@@ -55,6 +55,13 @@ export type AgentIndustry =
   | "creative-media";
 
 export type AgentProtocol = "a2a" | "mcp" | "mock" | "manual";
+export type AgentRole = "executive" | "context" | "executor" | "judge";
+export type AgentExecutionStatus =
+  | "native_mcp"
+  | "native_a2a"
+  | "arbor_real_adapter"
+  | "needs_vendor_a2a_endpoint"
+  | "mock_unconnected";
 
 export type AgentHealthStatus =
   | "unknown"
@@ -74,6 +81,7 @@ export interface AgentContact {
   display_name: string;
   sponsor: string;
   industry: AgentIndustry;
+  agent_role?: AgentRole;
   protocol: AgentProtocol;
   one_liner: string;
   capabilities: string[];
@@ -82,6 +90,7 @@ export interface AgentContact {
   agent_card_url?: string;
   auth_type: "none" | "api_key" | "oauth" | "manual";
   auth_env?: string;
+  execution_status: AgentExecutionStatus;
   verification_status: AgentVerificationStatus;
   health_status: AgentHealthStatus;
   supported_input_modes: string[];
@@ -137,6 +146,7 @@ export interface BidPayload {
   bid_price: number;
   capability_claim: string;
   estimated_seconds: number;
+  agent_role?: AgentRole;
   execution_preview?: string;
   tool_availability?: {
     status: "available" | "manual" | "mock" | "missing";
@@ -258,6 +268,7 @@ export interface SpecialistConfig {
   display_name: string;
   sponsor: string;
   sponsor_logo?: string;
+  agent_role?: AgentRole;
   capabilities: string[];
   system_prompt: string;
   cost_baseline: number;
@@ -278,10 +289,11 @@ export interface SpecialistConfig {
   is_verified?: boolean;
   /** Public homepage / docs URL for the sponsor. */
   homepage_url?: string;
-  /** Optional A2A endpoints. When unavailable, the runner falls back to mock/manual mode. */
+  /** Optional A2A endpoints. Sponsor runners decline when unavailable. */
   a2a_agent_card_url?: string;
   a2a_endpoint?: string;
   auth_type?: "none" | "api_key" | "oauth" | "manual";
+  execution_status?: AgentExecutionStatus;
   health_status?: AgentHealthStatus;
   verification_status?: AgentVerificationStatus;
   /**

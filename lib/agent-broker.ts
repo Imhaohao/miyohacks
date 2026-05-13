@@ -1,5 +1,6 @@
 import type {
   AgentContact,
+  AgentExecutionStatus,
   AgentHealthStatus,
   AgentIndustry,
   AgentProtocol,
@@ -135,6 +136,14 @@ const HEALTH_BOOST: Record<AgentHealthStatus, number> = {
   unreachable: -5,
 };
 
+const EXECUTION_STATUS_BOOST: Record<AgentExecutionStatus, number> = {
+  native_mcp: 0.6,
+  native_a2a: 0.6,
+  arbor_real_adapter: 0.4,
+  needs_vendor_a2a_endpoint: -0.6,
+  mock_unconnected: -1.5,
+};
+
 export interface RankContactsInput {
   prompt: string;
   taskType: string;
@@ -208,11 +217,18 @@ export function rankAgentContacts(input: RankContactsInput): BrokeredAgentContac
       score += reputation;
       score += PROTOCOL_BOOST[contact.protocol];
       score += HEALTH_BOOST[contact.health_status];
+      score += EXECUTION_STATUS_BOOST[contact.execution_status];
       if (contact.verification_status === "verified") score += 0.35;
       if (contact.verification_status === "configured") score += 0.15;
       if (contact.auth_type === "none") score += 0.1;
       if (contact.auth_type === "api_key" && contact.health_status === "auth_required") {
         reasons.push(`needs ${contact.auth_env ?? "API key"} for live tools`);
+      }
+      if (contact.execution_status === "mock_unconnected") {
+        reasons.push("mock catalog entry; no live execution endpoint");
+      }
+      if (contact.execution_status === "needs_vendor_a2a_endpoint") {
+        reasons.push("needs vendor A2A endpoint before execution");
       }
 
       if (reasons.length === 0) {
@@ -231,4 +247,3 @@ export function rankAgentContacts(input: RankContactsInput): BrokeredAgentContac
     .slice(0, limit)
     .map((item, index) => ({ ...item, rank: index + 1 }));
 }
-

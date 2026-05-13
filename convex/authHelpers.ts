@@ -1,5 +1,6 @@
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { UserIdentity } from "convex/server";
 
 type ReadCtx = QueryCtx | MutationCtx;
 
@@ -7,14 +8,39 @@ export function accountIdForClerkUserId(clerkUserId: string) {
   return `clerk:${clerkUserId}`;
 }
 
+export function accountIdForTokenIdentifier(tokenIdentifier: string) {
+  return `clerk-token:${tokenIdentifier}`;
+}
+
+export function accountIdForIdentity(identity: Pick<UserIdentity, "tokenIdentifier" | "subject">) {
+  return accountIdForTokenIdentifier(identity.tokenIdentifier);
+}
+
 export function isClerkAccountId(accountId: string) {
-  return accountId.startsWith("clerk:");
+  return accountId.startsWith("clerk:") || accountId.startsWith("clerk-token:");
 }
 
 export async function requireAccountId(ctx: ReadCtx) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("authentication required");
-  return accountIdForClerkUserId(identity.subject);
+  const tokenAccount = await ctx.db
+    .query("user_accounts")
+    .withIndex("by_token_identifier", (q) =>
+      q.eq("token_identifier", identity.tokenIdentifier),
+    )
+    .first();
+  if (tokenAccount) return tokenAccount.account_id;
+
+  // Transitional fallback for accounts created before token_identifier was
+  // stored. Ownership is still derived server-side from the authenticated
+  // identity; ensureCurrentUser will backfill token_identifier on next write.
+  const legacyAccount = await ctx.db
+    .query("user_accounts")
+    .withIndex("by_clerk_user", (q) => q.eq("clerk_user_id", identity.subject))
+    .first();
+  if (legacyAccount) return legacyAccount.account_id;
+
+  return accountIdForIdentity(identity);
 }
 
 export async function assertProjectOwned(
@@ -44,5 +70,5 @@ export async function assertTaskReadable(
 
 export async function actorForCurrentUser(ctx: ReadCtx) {
   const identity = await ctx.auth.getUserIdentity();
-  return identity ? accountIdForClerkUserId(identity.subject) : "buyer:web";
+  return identity ? await requireAccountId(ctx) : "buyer:web";
 }

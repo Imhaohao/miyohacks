@@ -153,8 +153,10 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
       {loading && !data && <SuggestionSkeleton />}
 
       {!loading && !error && data && data.suggestions.length === 0 && (
-        <p className="text-sm text-ink-muted">
-          No specialist matched yet. Try discovery to spawn one.
+        <p className="rounded-xl bg-surface-subtle px-3 py-2 text-sm text-ink-muted">
+          No specialist matched this brief yet. Add a little more detail about
+          the goal, channel, or artifact you want, then Arbor can rank a better
+          shortlist.
         </p>
       )}
 
@@ -163,10 +165,10 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
           {data.suggestions.map((s) => (
             <div
               key={s.agent_id}
-              className="flex animate-fade-up items-start justify-between gap-3 py-3 text-sm"
+              className="flex animate-fade-up flex-col gap-3 py-3 text-sm sm:flex-row sm:items-start sm:justify-between"
             >
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-ink">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 text-ink">
                   <span className="font-medium tracking-tight">
                     {s.display_name}
                   </span>
@@ -182,15 +184,35 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
                 <p className="mt-1.5 text-xs text-ink-soft">
                   {s.fit_reasoning}
                 </p>
-              </div>
-              <div className="shrink-0 text-right text-xs">
-                <div className="text-ink-subtle">Fit</div>
-                <div className="font-mono text-ink">
-                  {formatScore(s.fit_score)}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {s.capabilities.slice(0, 3).map((capability) => (
+                    <span
+                      key={capability}
+                      className="rounded-md bg-surface-muted px-2 py-0.5 font-mono text-[10px] text-ink-muted"
+                    >
+                      {capability}
+                    </span>
+                  ))}
                 </div>
-                <div className="mt-1 text-ink-subtle">Cost</div>
-                <div className="font-mono text-ink">
-                  {formatMoney(s.cost_baseline)}
+              </div>
+              <div className="grid w-full shrink-0 grid-cols-3 gap-2 rounded-xl bg-surface-subtle p-3 text-xs sm:w-44">
+                <div>
+                  <div className="text-ink-subtle">Fit</div>
+                  <div className="font-mono text-ink">
+                    {formatScore(s.fit_score)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-ink-subtle">Cost</div>
+                  <div className="font-mono text-ink">
+                    {formatMoney(s.cost_baseline)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-ink-subtle">Mode</div>
+                  <div className="font-mono text-ink">
+                    {s.mcp_endpoint ? "Tool" : "Plan"}
+                  </div>
                 </div>
               </div>
             </div>
@@ -299,7 +321,13 @@ function SourceBadge({
   source?: DiscoverySource;
   hasEndpoint: boolean;
 }) {
-  if (!discovered) return null;
+  if (!discovered) {
+    return hasEndpoint ? (
+      <Pill tone="success">Live tools</Pill>
+    ) : (
+      <Pill tone="neutral">Plan-only</Pill>
+    );
+  }
   const map: Record<DiscoverySource, { label: string; tone: PillTone }> = {
     catalog: { label: "MCP · catalog", tone: "success" },
     registry: { label: "MCP · registry", tone: "success" },

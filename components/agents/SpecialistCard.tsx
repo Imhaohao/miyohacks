@@ -6,7 +6,11 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ReputationChart } from "./ReputationChart";
 import { formatMoney, formatScore, cn } from "@/lib/utils";
-import type { SpecialistConfig } from "@/lib/types";
+import {
+  EXECUTION_STATUS_LABELS,
+  classifyAgentExecution,
+} from "@/lib/agent-execution-status";
+import type { AgentExecutionStatus, SpecialistConfig } from "@/lib/types";
 import { CheckCircle, Plug, ShieldWarning } from "@phosphor-icons/react";
 
 interface LiveAgent {
@@ -75,6 +79,7 @@ export function SpecialistCard({
   const total = completed + disputes;
   const disputeRate = total === 0 ? 0 : (disputes / total) * 100;
 
+  const executionStatus = spec.execution_status ?? classifyAgentExecution(spec);
   const hasMcpEndpoint = !!spec.mcp_endpoint;
   const mcpConnected = hasMcpEndpoint && !!spec.is_verified;
 
@@ -100,9 +105,9 @@ export function SpecialistCard({
               </Pill>
             )}
             {!hasMcpEndpoint && (
-              <Pill tone="neutral">
+              <Pill tone={executionTone(executionStatus)}>
                 <Plug size={11} />
-                Soft
+                {EXECUTION_STATUS_LABELS[executionStatus]}
               </Pill>
             )}
           </span>
@@ -112,14 +117,31 @@ export function SpecialistCard({
 
       <p className="mb-4 text-sm text-ink-muted">{spec.one_liner}</p>
 
-      {hasMcpEndpoint && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 font-mono text-[11px] text-brand-700">
-          <span className="font-sans font-medium">
-            {mcpConnected ? "Live MCP" : "MCP auth"}
-          </span>
-          <span className="truncate">{spec.mcp_endpoint}</span>
-        </div>
-      )}
+      <div className="mb-4 grid gap-2 rounded-xl bg-surface-subtle p-3 text-xs sm:grid-cols-3">
+        <TrustStat
+          label="Execution"
+          value={EXECUTION_STATUS_LABELS[executionStatus]}
+          tone={executionStatusTone(executionStatus)}
+        />
+        <TrustStat
+          label="Baseline"
+          value={formatMoney(spec.cost_baseline)}
+          tone="neutral"
+        />
+        <TrustStat
+          label="Verified"
+          value={mcpConnected ? "Configured" : "Not yet"}
+          tone={mcpConnected ? "success" : "neutral"}
+        />
+        {hasMcpEndpoint && (
+          <div className="min-w-0 border-t border-line pt-2 font-mono text-[11px] text-brand-700 sm:col-span-3">
+            <span className="font-sans font-medium text-ink-muted">
+              Endpoint
+            </span>{" "}
+            <span className="break-all">{spec.mcp_endpoint}</span>
+          </div>
+        )}
+      </div>
 
       <div className="mb-4">
         <div className="mb-1.5 flex items-center justify-between text-xs">
@@ -181,9 +203,59 @@ export function SpecialistCard({
       </div>
 
       <div className="mt-3 text-xs text-ink-subtle">
-        Cost baseline · {formatMoney(spec.cost_baseline)}
+        Why this matters: Arbor surfaces fit, execution status, and reputation
+        before a buyer approves paid execution.
       </div>
     </Card>
+  );
+}
+
+function executionTone(status: AgentExecutionStatus) {
+  if (status === "native_mcp" || status === "native_a2a") return "success";
+  if (status === "arbor_real_adapter") return "info";
+  if (status === "needs_vendor_a2a_endpoint") return "warning";
+  return "danger";
+}
+
+function executionStatusTone(
+  status: AgentExecutionStatus,
+): "success" | "warning" | "neutral" {
+  if (
+    status === "native_mcp" ||
+    status === "native_a2a" ||
+    status === "arbor_real_adapter"
+  ) {
+    return "success";
+  }
+  if (status === "needs_vendor_a2a_endpoint") return "warning";
+  return "neutral";
+}
+
+function TrustStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "success" | "warning" | "neutral";
+}) {
+  return (
+    <div>
+      <div className="text-[11px] text-ink-muted">{label}</div>
+      <div
+        className={cn(
+          "mt-0.5 font-mono",
+          tone === "success"
+            ? "text-emerald-700"
+            : tone === "warning"
+              ? "text-amber-700"
+              : "text-ink",
+        )}
+      >
+        {value}
+      </div>
+    </div>
   );
 }
 

@@ -46,8 +46,11 @@ function cleanList(values: Array<string | undefined>): string[] {
 }
 
 function requireServerSecret(secret: string | undefined) {
-  const expected = process.env.PAYMENT_SERVER_SECRET;
-  if (expected && secret !== expected) {
+  const expected = process.env.PAYMENT_SERVER_SECRET?.trim();
+  if (!expected) {
+    throw new Error("PAYMENT_SERVER_SECRET is required");
+  }
+  if (secret !== expected) {
     throw new Error("invalid server secret");
   }
 }

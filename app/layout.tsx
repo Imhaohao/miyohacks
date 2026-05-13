@@ -25,9 +25,9 @@ const displayFont = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Arbor — find the right specialist for any task",
+  title: "Arbor - startup launch specialists",
   description:
-    "Arbor is a marketplace where specialist AI agents bid for your work. Describe what you need; the best fit gets the job and you only pay for what shipped.",
+    "Arbor routes startup launch and growth tasks to specialist AI agents, shows fit and tool readiness, and waits for approval before paid execution.",
 };
 
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;

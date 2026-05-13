@@ -5,6 +5,7 @@ import {
   qualityAdjustedVickreyPrice,
   roundMoney,
 } from "../lib/auction-value";
+import { isExecutableAgent, roleForAgent } from "../lib/agent-roles";
 
 const BASE = {
   taskType: "implementation",
@@ -123,4 +124,13 @@ test("budget cap and money rounding", () => {
     }),
     1,
   );
+});
+
+test("executive and context agents are not executable auction winners", () => {
+  assert.equal(roleForAgent("hyperspell-brain"), "executive");
+  assert.equal(roleForAgent("nia-context"), "context");
+  assert.equal(roleForAgent("codex-writer"), "executor");
+  assert.equal(isExecutableAgent("hyperspell-brain"), false);
+  assert.equal(isExecutableAgent("nia-context"), false);
+  assert.equal(isExecutableAgent("codex-writer"), true);
 });

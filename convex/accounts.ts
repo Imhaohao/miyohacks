@@ -25,8 +25,11 @@ interface AccountMeResult {
 }
 
 function requireServerSecret(secret: string | undefined) {
-  const expected = process.env.PAYMENT_SERVER_SECRET;
-  if (expected && secret !== expected) {
+  const expected = process.env.PAYMENT_SERVER_SECRET?.trim();
+  if (!expected) {
+    throw new Error("PAYMENT_SERVER_SECRET is required");
+  }
+  if (secret !== expected) {
     throw new Error("invalid server secret");
   }
 }
@@ -40,6 +43,7 @@ async function upsertAccount(
   ctx: MutationCtx,
   input: {
     clerk_user_id: string;
+    token_identifier?: string;
     email?: string;
     display_name?: string;
     avatar_url?: string;
@@ -47,14 +51,27 @@ async function upsertAccount(
 ): Promise<{ account: Doc<"user_accounts">; created: boolean }> {
   const now = Date.now();
   const accountId = accountIdForClerkUserId(input.clerk_user_id);
-  const existing = await ctx.db
-    .query("user_accounts")
-    .withIndex("by_clerk_user", (q) => q.eq("clerk_user_id", input.clerk_user_id))
-    .first();
+  const existingByToken = input.token_identifier
+    ? await ctx.db
+        .query("user_accounts")
+        .withIndex("by_token_identifier", (q) =>
+          q.eq("token_identifier", input.token_identifier),
+        )
+        .first()
+    : null;
+  const existing =
+    existingByToken ??
+    (await ctx.db
+      .query("user_accounts")
+      .withIndex("by_clerk_user", (q) =>
+        q.eq("clerk_user_id", input.clerk_user_id),
+      )
+      .first());
 
   const patch = {
     account_id: accountId,
     clerk_user_id: input.clerk_user_id,
+    token_identifier: cleanOptional(input.token_identifier),
     email: cleanOptional(input.email),
     display_name: cleanOptional(input.display_name),
     avatar_url: cleanOptional(input.avatar_url),
@@ -156,6 +173,7 @@ export const ensureCurrentUser = mutation({
     if (!identity) throw new Error("authentication required");
     const { account } = await upsertAccount(ctx, {
       clerk_user_id: identity.subject,
+      token_identifier: identity.tokenIdentifier,
       email: identity.email,
       display_name: identity.name ?? identity.preferredUsername,
       avatar_url: identity.pictureUrl,
@@ -170,6 +188,7 @@ export const ensureByClerkUser = mutation({
   args: {
     server_secret: v.optional(v.string()),
     clerk_user_id: v.string(),
+    token_identifier: v.optional(v.string()),
     email: v.optional(v.string()),
     display_name: v.optional(v.string()),
     avatar_url: v.optional(v.string()),

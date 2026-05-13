@@ -28,6 +28,19 @@ export interface NiaEnrichmentResult {
   duration_ms: number;
 }
 
+export function buildNiaResearchQuery(prompt: string, taskType: string): string {
+  return [
+    "Use Nia's indexed source workflow to gather repo/source context for this Arbor task.",
+    "If the task mentions a GitHub URL, owner/repo, or source repository, index or search that GitHub repository first.",
+    "Locate and read README.md or the repository README before asking the user for more context.",
+    "Return README-derived project purpose, setup commands, architecture, important routes/packages, and constraints first, then supporting source/docs evidence.",
+    "Ask the user only for context gaps that remain after GitHub and README inspection.",
+    "",
+    `Task type: ${taskType}`,
+    `Task: ${prompt}`,
+  ].join("\n");
+}
+
 export async function enrichRepoContextFromNia(
   prompt: string,
   taskType: string,
@@ -41,7 +54,7 @@ export async function enrichRepoContextFromNia(
     const result = await callRemoteTool(
       NIA_MCP_URL,
       "nia_research",
-      { query: prompt, mode: "quick", num_results: 5 },
+      { query: buildNiaResearchQuery(prompt, taskType), mode: "quick", num_results: 5 },
       NIA_RESEARCH_TIMEOUT_MS,
       apiKey,
     );
@@ -54,11 +67,12 @@ export async function enrichRepoContextFromNia(
       summary,
       source_map: fallbackSourceMap,
       retrieval_queries: [
-        prompt,
+        buildNiaResearchQuery(prompt, taskType),
         `Background context relevant to a ${taskType} task`,
       ],
       guardrails: [
         "Cite the Nia research above whenever making claims about external repos, docs, or APIs.",
+        "For GitHub-backed tasks, verify repository context through GitHub indexing and README inspection before asking the user to restate project basics.",
         "If the answer is not supported by the Nia research, mark it explicitly as an assumption.",
         "Do not invent file paths, package versions, or API names that don't appear in the research.",
       ],

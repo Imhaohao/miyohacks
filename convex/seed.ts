@@ -13,6 +13,7 @@ export const seedAgents = mutation({
         await ctx.db.patch(existing._id, {
           display_name: spec.display_name,
           sponsor: spec.sponsor,
+          agent_role: spec.agent_role,
           capabilities: spec.capabilities,
           system_prompt: spec.system_prompt,
           cost_per_task_estimate: spec.cost_baseline,
@@ -23,6 +24,7 @@ export const seedAgents = mutation({
         agent_id: spec.agent_id,
         display_name: spec.display_name,
         sponsor: spec.sponsor,
+        agent_role: spec.agent_role,
         capabilities: spec.capabilities,
         system_prompt: spec.system_prompt,
         cost_per_task_estimate: spec.cost_baseline,

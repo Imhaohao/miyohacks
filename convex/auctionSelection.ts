@@ -2,13 +2,17 @@ import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { qualityAdjustedVickreyPrice } from "../lib/auction-value";
+import { isExecutableAgent } from "../lib/agent-roles";
 import { actorForCurrentUser, assertTaskReadable } from "./authHelpers";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
 function requireServerSecret(secret: string | undefined) {
-  const expected = process.env.PAYMENT_SERVER_SECRET;
-  if (expected && secret !== expected) {
+  const expected = process.env.PAYMENT_SERVER_SECRET?.trim();
+  if (!expected) {
+    throw new Error("PAYMENT_SERVER_SECRET is required");
+  }
+  if (secret !== expected) {
     throw new Error("invalid server secret");
   }
 }
@@ -48,13 +52,14 @@ async function chooseTopBidCore(
     .filter(
       (bid) =>
         bid.bid_price <= task.max_budget &&
-        (bid.tool_availability?.status ?? "available") !== "missing",
+        (bid.tool_availability?.status ?? "available") !== "missing" &&
+        isExecutableAgent(bid.agent_id, bid.agent_role),
     )
     .sort((a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score));
 
   const top3 = validBids.slice(0, 3);
   if (!top3.some((bid) => bid._id === args.bid_id)) {
-    throw new Error("buyer can only choose from the top 3 valid proposals");
+    throw new Error("buyer can only choose from the top 3 executor proposals");
   }
 
   const runner = validBids.find((bid) => bid._id !== selected._id);

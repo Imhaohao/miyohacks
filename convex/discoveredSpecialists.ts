@@ -25,6 +25,14 @@ const SPECIALIST_FIELDS = {
   agent_id: v.string(),
   display_name: v.string(),
   sponsor: v.string(),
+  agent_role: v.optional(
+    v.union(
+      v.literal("executive"),
+      v.literal("context"),
+      v.literal("executor"),
+      v.literal("judge"),
+    ),
+  ),
   capabilities: v.array(v.string()),
   system_prompt: v.string(),
   cost_baseline: v.number(),
@@ -78,6 +86,7 @@ export const create = mutation({
       agent_id: args.agent_id,
       display_name: args.display_name,
       sponsor: args.sponsor,
+      agent_role: args.agent_role,
       capabilities: args.capabilities,
       system_prompt: args.system_prompt,
       cost_per_task_estimate: args.cost_baseline,
@@ -89,4 +98,3 @@ export const create = mutation({
     return { id, agent_id: args.agent_id, created_at };
   },
 });
-

@@ -3,14 +3,17 @@ import type {
   AgentHealthStatus,
   AgentIndustry,
   AgentProtocol,
+  AgentRole,
   AgentVerificationStatus,
   SpecialistConfig,
 } from "./types";
+import { classifyAgentExecution } from "./agent-execution-status";
 
 interface ContactBlueprint {
   id: string;
   name: string;
   sponsor: string;
+  agent_role?: AgentRole;
   one_liner: string;
   capabilities: string[];
   domain_tags: string[];
@@ -85,6 +88,7 @@ const CLUSTERS: IndustryCluster[] = [
         id: "nia-context",
         name: "Nia Context",
         sponsor: "Nia",
+        agent_role: "context",
         one_liner: "Codebase, docs, package, and source-context retrieval.",
         capabilities: ["repo-context", "code-search", "doc-retrieval", "dependency-context"],
         domain_tags: ["nia", "code context", "repo", "docs", "source", "implementation"],
@@ -586,6 +590,7 @@ const CLUSTERS: IndustryCluster[] = [
         id: "hyperspell-brain",
         name: "Hyperspell Brain",
         sponsor: "Hyperspell",
+        agent_role: "executive",
         one_liner: "Workspace knowledge synthesis across internal docs, CRM, Slack, and email.",
         capabilities: ["workspace-synthesis", "internal-knowledge", "crm-context", "briefing"],
         domain_tags: ["hyperspell", "workspace", "context", "crm", "internal knowledge"],
@@ -994,11 +999,18 @@ export const AGENT_CONTACT_CATALOG: AgentContact[] = CLUSTERS.flatMap(
           : hasNativeA2A
             ? (contact.health_status ?? "unknown")
             : "healthy";
+      const executionStatus = classifyAgentExecution({
+        agent_id: contact.id,
+        protocol,
+        endpoint_url: endpointUrl,
+        agent_card_url: agentCardUrl,
+      });
       return {
         agent_id: contact.id,
         display_name: contact.name,
         sponsor: contact.sponsor,
         industry: cluster.industry,
+        agent_role: contact.agent_role,
         protocol,
         one_liner: contact.one_liner,
         capabilities: contact.capabilities,
@@ -1014,8 +1026,19 @@ export const AGENT_CONTACT_CATALOG: AgentContact[] = CLUSTERS.flatMap(
         agent_card_url: agentCardUrl,
         auth_type: authType,
         auth_env: bridgedA2A ? undefined : contact.auth_env,
-        verification_status: verificationStatus,
-        health_status: healthStatus,
+        execution_status: executionStatus,
+        verification_status:
+          executionStatus === "mock_unconnected"
+            ? "mock"
+            : executionStatus === "needs_vendor_a2a_endpoint"
+              ? "unverified"
+              : verificationStatus,
+        health_status:
+          executionStatus === "mock_unconnected"
+            ? "unknown"
+            : executionStatus === "needs_vendor_a2a_endpoint"
+              ? "auth_required"
+              : healthStatus,
         supported_input_modes: DEFAULT_INPUT_MODES,
         supported_output_modes: ["text/markdown", "application/json"],
         artifact_types: contact.artifact_types ?? [
@@ -1039,6 +1062,7 @@ export function contactToSpecialistConfig(contact: AgentContact): SpecialistConf
     agent_id: contact.agent_id,
     display_name: contact.display_name,
     sponsor: contact.sponsor,
+    agent_role: contact.agent_role,
     capabilities: contact.capabilities,
     system_prompt: [
       `You are ${contact.display_name}, a specialist agent in the ${contact.industry} industry.`,
@@ -1058,6 +1082,7 @@ export function contactToSpecialistConfig(contact: AgentContact): SpecialistConf
     industry: contact.industry,
     auth_type: contact.auth_type,
     health_status: contact.health_status,
+    execution_status: contact.execution_status,
     verification_status: contact.verification_status,
     is_verified: contact.verification_status === "verified",
     homepage_url: contact.homepage_url,

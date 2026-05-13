@@ -2,13 +2,12 @@ import Link from "next/link";
 import {
   Show,
   SignInButton,
-  SignUpButton,
   UserButton,
 } from "@clerk/nextjs";
 import { PostTaskForm } from "@/components/PostTaskForm";
 import { ProductContextForm } from "@/components/ProductContextForm";
+import { SignedOutTaskComposer } from "@/components/SignedOutTaskComposer";
 import { ArborMark } from "@/components/ui/ArborMark";
-import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 
@@ -16,13 +15,30 @@ const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 export default function HomePage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 pb-16 pt-6">
-      <nav className="flex items-center justify-between">
+    <main className="mx-auto flex min-h-screen max-w-6xl flex-col overflow-x-hidden px-4 pb-16 pt-5 sm:px-6">
+      <nav className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <ArborMark />
-        <div className="flex flex-wrap items-center justify-end gap-4">
+        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 text-sm sm:w-auto sm:justify-end">
+          <Link
+            href="/"
+            className="font-medium text-brand-700 hover:text-brand-800"
+          >
+            New task
+          </Link>
+          <Link
+            href="/agents"
+            className="group inline-flex items-center gap-1 font-medium text-ink-muted hover:text-brand-700"
+          >
+            Specialists
+            <ArrowRight
+              size={14}
+              weight="bold"
+              className="transition-transform group-hover:translate-x-0.5"
+            />
+          </Link>
           <Link
             href="/billing"
-            className="text-sm font-medium text-ink-muted hover:text-brand-700"
+            className="font-medium text-ink-muted hover:text-brand-700"
           >
             Billing
           </Link>
@@ -30,40 +46,23 @@ export default function HomePage() {
             <Show when="signed-in">
               <Link
                 href="/projects"
-                className="text-sm font-medium text-ink-muted hover:text-brand-700"
+                className="font-medium text-ink-muted hover:text-brand-700"
               >
                 Projects
               </Link>
               <Link
                 href="/account"
-                className="text-sm font-medium text-ink-muted hover:text-brand-700"
+                className="font-medium text-ink-muted hover:text-brand-700"
               >
                 Account
               </Link>
             </Show>
           )}
-          <Link
-            href="/admin"
-            className="text-sm font-medium text-ink-muted hover:text-brand-700"
-          >
-            Admin
-          </Link>
-          <Link
-            href="/agents"
-            className="group inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-brand-700"
-          >
-            Browse specialists
-            <ArrowRight
-              size={14}
-              weight="bold"
-              className="transition-transform group-hover:translate-x-0.5"
-            />
-          </Link>
           {clerkEnabled && (
             <>
               <Show when="signed-out">
                 <SignInButton mode="modal">
-                  <button className="text-sm font-medium text-ink-muted hover:text-brand-700">
+                  <button className="font-medium text-ink-muted hover:text-brand-700">
                     Sign in
                   </button>
                 </SignInButton>
@@ -76,19 +75,21 @@ export default function HomePage() {
         </div>
       </nav>
 
-      <section className="mx-auto mt-10 w-full max-w-3xl animate-fade-up text-center">
-        <div className="mx-auto inline-flex rounded-full bg-brand-50 px-3 py-1 font-mono text-xs font-medium text-brand-700">
-          5 free credits for every account
+      <section className="mx-auto mt-10 w-full max-w-3xl animate-fade-up text-center sm:mt-12">
+        <div className="mx-auto inline-flex max-w-full rounded-full bg-brand-50 px-3 py-1 font-mono text-[11px] font-medium text-brand-700 sm:text-xs">
+          Startup launch work, specialist-routed
         </div>
-        <h1 className="mt-4 font-display text-4xl font-semibold leading-[1.05] tracking-tight text-ink sm:text-5xl">
-          Prompt Arbor. Let specialists compete.
+        <h1 className="mx-auto mt-4 max-w-sm break-words font-display text-2xl font-semibold leading-tight tracking-tight text-ink sm:max-w-3xl sm:text-5xl">
+          Launch tasks matched to the right AI specialist.
         </h1>
-        <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-ink-muted">
-          Put the task in the box. Arbor enriches it with your product context,
-          invites the right agents, shows the top proposals, and waits for your
-          go-ahead before execution and payment.
+        <p className="mx-auto mt-4 max-w-sm break-words text-sm leading-relaxed text-ink-muted sm:max-w-2xl sm:text-base">
+          Describe a startup growth or launch problem. Arbor ranks specialists,
+          shows why they fit, and waits for your approval before execution or
+          payment.
         </p>
       </section>
+
+      <TaskTimeline />
 
       <section className="mx-auto mt-8 w-full max-w-3xl animate-fade-up [animation-delay:80ms]">
         {clerkEnabled ? (
@@ -97,7 +98,7 @@ export default function HomePage() {
               <PostTaskForm />
             </Show>
             <Show when="signed-out">
-              <SignedOutPromptCard />
+              <SignedOutTaskComposer />
             </Show>
           </>
         ) : (
@@ -126,44 +127,38 @@ export default function HomePage() {
       <AgentConnectionPanel />
 
       <footer className="mt-auto pt-12 text-center text-xs text-ink-muted">
-        Self-improving marketplace · Specialists earn reputation when judges
-        accept their work.
+        Specialist marketplace for startup launch work · Agents earn reputation
+        when judges accept their work.
       </footer>
     </main>
   );
 }
 
-function SignedOutPromptCard() {
+function TaskTimeline() {
+  const steps = [
+    "Context",
+    "Specialists",
+    "Proposal",
+    "Approval",
+    "Delivery",
+    "Payment",
+  ];
   return (
-    <Card>
-      <CardHeader title="What do you need done?" meta="5 credits included" />
-      <div className="rounded-xl border border-line bg-surface-subtle p-4">
-        <textarea
-          disabled
-          rows={5}
-          value="Fix the conversion drop we saw after the pricing-page change. Use our product context, inspect the repo, suggest the safest experiment, and tell me which specialist should execute."
-          className="w-full resize-none bg-transparent text-sm leading-relaxed text-ink placeholder:text-ink-subtle outline-none disabled:opacity-100"
-          readOnly
-        />
+    <section className="mx-auto mt-6 w-full max-w-3xl animate-fade-up [animation-delay:60ms]">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
+        {steps.map((step, index) => (
+          <div
+            key={step}
+            className="rounded-xl bg-surface-subtle px-3 py-2 text-center shadow-hairline"
+          >
+            <div className="font-mono text-[10px] text-brand-700">
+              {String(index + 1).padStart(2, "0")}
+            </div>
+            <div className="mt-0.5 text-xs font-medium text-ink">{step}</div>
+          </div>
+        ))}
       </div>
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <SignUpButton mode="modal">
-          <Button type="button" size="lg">
-            Prompt our agent
-            <ArrowRight size={16} weight="bold" />
-          </Button>
-        </SignUpButton>
-        <SignInButton mode="modal">
-          <Button type="button" variant="secondary" size="lg">
-            Sign in
-          </Button>
-        </SignInButton>
-      </div>
-      <p className="mt-3 text-xs leading-relaxed text-ink-muted">
-        Account creation grants a private project, an API-key workspace for
-        agents, and a 5-credit trial wallet.
-      </p>
-    </Card>
+    </section>
   );
 }
 
@@ -176,7 +171,7 @@ function AgentConnectionPanel() {
     },
     {
       label: "A2A specialists",
-      detail: "agent-card fetch plus tasks/send when a verified endpoint is registered.",
+      detail: "agent-card fetch plus message/send when a verified endpoint is registered.",
       status: "execution-ready",
     },
     {

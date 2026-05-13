@@ -7,6 +7,14 @@ const contactValidator = v.object({
   display_name: v.string(),
   sponsor: v.string(),
   industry: v.string(),
+  agent_role: v.optional(
+    v.union(
+      v.literal("executive"),
+      v.literal("context"),
+      v.literal("executor"),
+      v.literal("judge"),
+    ),
+  ),
   protocol: v.union(
     v.literal("a2a"),
     v.literal("mcp"),
@@ -20,6 +28,13 @@ const contactValidator = v.object({
   agent_card_url: v.optional(v.string()),
   auth_type: v.string(),
   auth_env: v.optional(v.string()),
+  execution_status: v.union(
+    v.literal("native_mcp"),
+    v.literal("native_a2a"),
+    v.literal("arbor_real_adapter"),
+    v.literal("needs_vendor_a2a_endpoint"),
+    v.literal("mock_unconnected"),
+  ),
   verification_status: v.string(),
   health_status: v.string(),
   supported_input_modes: v.array(v.string()),
@@ -50,6 +65,7 @@ export const list = query({
         ...(stored
           ? {
               health_status: stored.health_status,
+              execution_status: stored.execution_status ?? contact.execution_status,
               verification_status: stored.verification_status,
               updated_at: stored.updated_at,
             }
@@ -98,4 +114,3 @@ export const _seedCatalog = internalMutation({
     return { count: args.contacts.length };
   },
 });
-

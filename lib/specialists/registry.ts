@@ -22,8 +22,12 @@ import {
 } from "./convex-realtime";
 import { makeMcpForwardingSpecialist } from "./mcp-forwarding";
 import { makeA2AForwardingSpecialist } from "./a2a-forwarding";
-import { makeMockSpecialist } from "./base";
-import type { SpecialistConfig, SpecialistRunner, AgentId } from "../types";
+import type {
+  SpecialistConfig,
+  SpecialistRunner,
+  AgentId,
+  DeclineDecision,
+} from "../types";
 
 /**
  * All ten Nozomio sponsor agents. Listed in display order — Reacher first
@@ -79,7 +83,25 @@ function buildRunner(cfg: SpecialistConfig): SpecialistRunner {
   if (cfg.protocol === "a2a" || cfg.a2a_agent_card_url || cfg.a2a_endpoint) {
     return makeA2AForwardingSpecialist(cfg);
   }
-  return makeMockSpecialist(cfg);
+  return makeUnavailableSpecialist(cfg);
+}
+
+function makeUnavailableSpecialist(config: SpecialistConfig): SpecialistRunner {
+  return {
+    config,
+    async bid(): Promise<DeclineDecision> {
+      return {
+        decline: true,
+        reason:
+          "No real MCP or A2A execution connection is configured for this specialist, so Arbor will not use a placeholder persona.",
+      };
+    },
+    async execute(): Promise<never> {
+      throw new Error(
+        `${config.agent_id} has no real MCP or A2A execution connection configured`,
+      );
+    },
+  };
 }
 
 export function getRunner(agent_id: AgentId): SpecialistRunner {

@@ -33,21 +33,21 @@ function splitSourceHints(value: string): string[] {
 function hyperspellStatus(status: string | undefined) {
   if (status === "seeded") {
     return {
-      label: "Hyperspell memory ready",
+      label: "Company memory ready",
       className: "bg-emerald-50 text-emerald-700",
       icon: <CheckCircle size={14} weight="bold" />,
     };
   }
   if (status === "pending") {
     return {
-      label: "Syncing to Hyperspell",
+      label: "Syncing company memory",
       className: "bg-brand-50 text-brand-700",
       icon: <CircleNotch size={14} className="animate-spin" weight="bold" />,
     };
   }
   if (status === "failed") {
     return {
-      label: "Hyperspell key failed",
+      label: "Memory sync failed",
       className: "bg-amber-50 text-amber-700",
       icon: <WarningCircle size={14} weight="bold" />,
     };
@@ -118,7 +118,7 @@ export function ProductContextForm({
         <CardHeader title="Sign in required" meta="Project context" />
         <p className="text-sm leading-relaxed text-ink-muted">
           {clerkEnabled
-            ? "Sign in to connect Hyperspell/Nia context to your private project."
+            ? "Sign in to connect company and source context to your private project."
             : "Clerk auth is not configured, so project context cannot be saved yet."}
         </p>
         {clerkEnabled ? (
@@ -178,7 +178,7 @@ export function ProductContextForm({
   return (
     <Card className="h-fit">
       <CardHeader
-        title="Connect product context"
+        title="Connect company context"
         meta={
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-1 ${status.className}`}
@@ -243,7 +243,7 @@ export function ProductContextForm({
 
         <div>
           <label htmlFor="businessContext" className={fieldLabel}>
-            What should Hyperspell know?
+            Company context
           </label>
           <textarea
             id="businessContext"
@@ -258,7 +258,7 @@ export function ProductContextForm({
 
         <div>
           <label htmlFor="repoContext" className={fieldLabel}>
-            What should Nia inspect?
+            Repo/source context
           </label>
           <textarea
             id="repoContext"
@@ -306,7 +306,7 @@ export function ProductContextForm({
               Saving context…
             </>
           ) : (
-            "Save product context"
+            "Save company context"
           )}
         </Button>
 

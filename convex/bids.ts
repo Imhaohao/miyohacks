@@ -26,6 +26,14 @@ export const _insert = internalMutation({
   args: {
     task_id: v.id("tasks"),
     agent_id: v.string(),
+    agent_role: v.optional(
+      v.union(
+        v.literal("executive"),
+        v.literal("context"),
+        v.literal("executor"),
+        v.literal("judge"),
+      ),
+    ),
     bid_price: v.number(),
     capability_claim: v.string(),
     estimated_seconds: v.number(),
