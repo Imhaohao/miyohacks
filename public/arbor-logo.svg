@@ -1,0 +1,10 @@
+<svg width="640" height="192" viewBox="0 0 640 192" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Arbor logo</title>
+  <desc id="desc">A blue rounded square tree mark next to the Arbor wordmark.</desc>
+  <rect width="640" height="192" rx="40" fill="white"/>
+  <rect x="48" y="40" width="112" height="112" rx="28" fill="#0B5CFF"/>
+  <path d="M104 65C92.402 65 83 74.402 83 86C83 96.008 90.003 104.386 99.375 106.482V127.5C99.375 130.607 101.893 133.125 105 133.125C108.107 133.125 110.625 130.607 110.625 127.5V106.482C119.997 104.386 127 96.008 127 86C127 74.402 117.598 65 106 65H104Z" fill="white"/>
+  <path d="M78.5 118C78.5 103.64 90.14 92 104.5 92H129.5C129.5 106.36 117.86 118 103.5 118H78.5Z" fill="white" fill-opacity="0.92"/>
+  <path d="M129.5 118C129.5 103.64 117.86 92 103.5 92H78.5C78.5 106.36 90.14 118 104.5 118H129.5Z" fill="white" fill-opacity="0.42"/>
+  <text x="192" y="119" fill="#111827" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="700" letter-spacing="-1">Arbor</text>
+</svg>

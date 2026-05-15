@@ -22,6 +22,16 @@ function codexRunnerConfigured() {
   );
 }
 
+function runnerHost() {
+  const url = process.env.CODEX_RUNNER_URL?.trim();
+  if (!url) return undefined;
+  try {
+    return new URL(url).host;
+  } catch {
+    return undefined;
+  }
+}
+
 async function loadCodexRunner() {
   const dynamicImport = new Function(
     "specifier",
@@ -96,6 +106,10 @@ export function makeCodexWriterSpecialist(
               : "CODEX_WORKSPACE_DIR",
           ],
           reason: `${mode} configured`,
+          protocol: "arbor_a2a_bridge",
+          execution_status: "arbor_real_adapter",
+          endpoint_host: runnerHost(),
+          proof: mode,
         },
       };
       return bid;

@@ -2,7 +2,7 @@ import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { actorForCurrentUser, assertTaskReadable } from "./authHelpers";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
 const planStatusValidator = v.union(
@@ -43,6 +43,29 @@ async function taskAndActor(
     task: await assertTaskReadable(ctx, args.task_id),
     actor: args.actor ?? (await actorForCurrentUser(ctx)),
   };
+}
+
+async function ensureEscrowLockedForApproval(
+  ctx: MutationCtx,
+  task: Doc<"tasks">,
+) {
+  if (!task.payment_status || task.payment_status === "escrow_locked") return;
+  if (task.payment_status !== "funds_reserved") {
+    throw new Error(`task payment is ${task.payment_status}, not escrow_locked`);
+  }
+  if (!task.winning_bid_id || task.price_paid === undefined) {
+    throw new Error("task payment is funds_reserved but no winning bid is set");
+  }
+  const winningBid = await ctx.db.get(task.winning_bid_id);
+  if (!winningBid || winningBid.task_id !== task._id) {
+    throw new Error("task winning bid does not belong to this task");
+  }
+  await ctx.runMutation(internal.escrow._lock, {
+    task_id: task._id,
+    buyer_id: task.posted_by,
+    seller_id: winningBid.agent_id,
+    locked_amount: task.price_paid,
+  });
 }
 
 export const forTask = query({
@@ -123,17 +146,13 @@ export const approve = mutation({
     if (task.status !== "plan_review") {
       throw new Error(`task is ${task.status}, not plan_review`);
     }
-    if (task.payment_status && task.payment_status !== "escrow_locked") {
-      throw new Error(
-        `task payment is ${task.payment_status}, not escrow_locked`,
-      );
-    }
     const plan = await ctx.db
       .query("execution_plans")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
       .order("desc")
       .first();
     if (!plan) throw new Error("no execution plan to approve");
+    await ensureEscrowLockedForApproval(ctx, task);
 
     await ctx.db.patch(plan._id, {
       status: "approved",

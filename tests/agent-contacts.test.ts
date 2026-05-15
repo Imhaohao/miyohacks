@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { AGENT_CONTACT_CATALOG } from "../lib/agent-contacts";
 import { executionStatusCounts } from "../lib/agent-execution-status";
+import { rankAgentContacts } from "../lib/agent-broker";
 import { SPECIALISTS } from "../lib/specialists/registry";
 
 test("all housed specialists have an MCP or A2A connection", () => {
@@ -70,4 +71,26 @@ test("Arbor-hosted A2A bridges are labeled by execution truth", () => {
       assert.equal(contact.verification_status, "mock");
     }
   }
+});
+
+test("mock catalog agents do not outrank real connections for executable work", () => {
+  const ranked = rankAgentContacts({
+    prompt:
+      "Create a Next.js and Supabase quarterly report PDF template from real repo data.",
+    taskType: "general",
+    contacts: AGENT_CONTACT_CATALOG,
+    limit: 12,
+  });
+
+  assert.ok(ranked.length > 0);
+  assert.equal(
+    ranked.some((item) => item.contact.execution_status === "mock_unconnected"),
+    false,
+  );
+  assert.equal(
+    ranked.some(
+      (item) => item.contact.execution_status === "needs_vendor_a2a_endpoint",
+    ),
+    false,
+  );
 });

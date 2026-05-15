@@ -200,6 +200,26 @@ export default defineSchema({
         checked: v.array(v.string()),
         missing: v.optional(v.array(v.string())),
         reason: v.optional(v.string()),
+        protocol: v.optional(
+          v.union(
+            v.literal("mcp"),
+            v.literal("a2a"),
+            v.literal("arbor_a2a_bridge"),
+            v.literal("manual"),
+            v.literal("none"),
+          ),
+        ),
+        execution_status: v.optional(
+          v.union(
+            v.literal("native_mcp"),
+            v.literal("native_a2a"),
+            v.literal("arbor_real_adapter"),
+            v.literal("needs_vendor_a2a_endpoint"),
+            v.literal("mock_unconnected"),
+          ),
+        ),
+        endpoint_host: v.optional(v.string()),
+        proof: v.optional(v.string()),
       }),
     ),
   }).index("by_task", ["task_id"]),

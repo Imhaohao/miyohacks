@@ -97,6 +97,15 @@ export interface BidDoc {
     checked: string[];
     missing?: string[];
     reason?: string;
+    protocol?: "mcp" | "a2a" | "arbor_a2a_bridge" | "manual" | "none";
+    execution_status?:
+      | "native_mcp"
+      | "native_a2a"
+      | "arbor_real_adapter"
+      | "needs_vendor_a2a_endpoint"
+      | "mock_unconnected";
+    endpoint_host?: string;
+    proof?: string;
   };
 }
 
@@ -173,6 +182,15 @@ export interface AuctionBidSummary {
     checked: string[];
     missing?: string[];
     reason?: string;
+    protocol?: "mcp" | "a2a" | "arbor_a2a_bridge" | "manual" | "none";
+    execution_status?:
+      | "native_mcp"
+      | "native_a2a"
+      | "arbor_real_adapter"
+      | "needs_vendor_a2a_endpoint"
+      | "mock_unconnected";
+    endpoint_host?: string;
+    proof?: string;
   };
 }
 

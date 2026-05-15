@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -23,6 +25,7 @@ import { ExecutionPanel } from "./ExecutionPanel";
 import { JudgeVerdictPanel } from "./JudgeVerdictPanel";
 import { SettlementPanel } from "./SettlementPanel";
 import { PlanPanel } from "./PlanPanel";
+import { ArrowLeft } from "@phosphor-icons/react";
 import type {
   AgentShortlistDoc,
   TaskDoc,
@@ -52,6 +55,7 @@ type WorkflowSectionMeta = {
 
 export function TaskView({ taskId }: { taskId: string }) {
   const id = taskId as Id<"tasks">;
+  const searchParams = useSearchParams();
   const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
   const { isAuthenticated } = useConvexAuth();
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
@@ -119,10 +123,15 @@ export function TaskView({ taskId }: { taskId: string }) {
   const activeSection = task
     ? activeWorkflowSection(task, lifecycle ?? [], isLoadedMultiStepParent)
     : "context";
+  const sections = workflowSections(isLoadedMultiStepParent);
+  const requestedSection = normalizeWorkflowSection(
+    searchParams.get("section"),
+    sections,
+  );
 
   useEffect(() => {
-    if (task) setSelectedSection(activeSection);
-  }, [activeSection, task?._id]);
+    if (task) setSelectedSection(requestedSection ?? activeSection);
+  }, [activeSection, requestedSection, task?._id]);
 
   if (signedOut) {
     return <TaskSignInRequired />;
@@ -152,10 +161,12 @@ export function TaskView({ taskId }: { taskId: string }) {
   // Multi-step parent: show the plan + a final synthesis section. Sub-step
   // auctions/bids live on the child task pages (linked from PlanPanel).
   const isMultiStepParent = isLoadedMultiStepParent;
-  const sections = workflowSections(isMultiStepParent);
 
   return (
     <div className="space-y-4">
+      {task.parent_task_id && (
+        <SubTaskBackLink parentTaskId={task.parent_task_id} />
+      )}
       <TaskHeader task={task} />
       <WorkflowStepper
         sections={sections}
@@ -254,6 +265,32 @@ export function TaskView({ taskId }: { taskId: string }) {
   );
 }
 
+function normalizeWorkflowSection(
+  section: string | null,
+  sections: WorkflowSectionMeta[],
+): WorkflowKey | null {
+  if (!section) return null;
+  return sections.some((item) => item.key === section)
+    ? (section as WorkflowKey)
+    : null;
+}
+
+function SubTaskBackLink({ parentTaskId }: { parentTaskId: string }) {
+  return (
+    <Link
+      href={`/task/${parentTaskId}?section=auction`}
+      className="group inline-flex items-center gap-2 rounded-full border border-brand-100 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:border-brand-200 hover:bg-brand-100 hover:text-brand-800"
+    >
+      <ArrowLeft
+        size={14}
+        weight="bold"
+        className="transition-transform group-hover:-translate-x-0.5"
+      />
+      Back to task plan
+    </Link>
+  );
+}
+
 function workflowSections(isMultiStepParent: boolean): WorkflowSectionMeta[] {
   if (isMultiStepParent) {
     return [
@@ -320,6 +357,15 @@ function activeWorkflowSection(
     task.status === "cancelled"
   ) {
     return "execution";
+  }
+  if (
+    isMultiStepParent &&
+    ((task.task_plan?.length ?? 0) >= 2 ||
+      events.some((event) =>
+        ["plan_decided", "step_started"].includes(event.event_type),
+      ))
+  ) {
+    return "auction";
   }
   if (task.status === "plan_review" || task.status === "approved") {
     return isMultiStepParent ? "execution" : "plan";

@@ -30,6 +30,23 @@ export const _lock = internalMutation({
     locked_amount: v.number(),
   },
   handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("escrow")
+      .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+      .first();
+    if (existing) {
+      if (existing.status !== "locked") {
+        throw new Error(`task escrow is ${existing.status}, not lockable`);
+      }
+      await ctx.runMutation(internal.payments._lockTaskEscrow, {
+        task_id: args.task_id,
+        buyer_id: args.buyer_id,
+        seller_id: args.seller_id,
+        price_paid: args.locked_amount,
+      });
+      return existing._id;
+    }
+
     const escrowId = await ctx.db.insert("escrow", {
       task_id: args.task_id,
       buyer_id: args.buyer_id,

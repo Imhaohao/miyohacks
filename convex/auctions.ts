@@ -35,10 +35,10 @@ import {
   qualityAdjustedVickreyPrice,
 } from "../lib/auction-value";
 import {
-  isExecutableAgent,
   roleForAgent,
   roleForSpecialist,
 } from "../lib/agent-roles";
+import { isSelectableExecutorBid } from "../lib/auction-selection";
 import { configuredConnectionAvailability } from "../lib/specialists/connection-runtime";
 
 const BUYER_ID = "buyer:default";
@@ -384,13 +384,13 @@ export const resolve = internalAction({
       task_id: args.task_id,
     })) as Doc<"bids">[];
 
-    const validBids = allBids.filter(
+    const visibleBids = allBids.filter(
       (b) =>
         b.bid_price <= task.max_budget &&
-        (b.tool_availability?.status ?? "available") !== "missing",
+        (b.tool_availability?.status ?? "missing") !== "missing",
     );
 
-    if (validBids.length === 0) {
+    if (visibleBids.length === 0) {
       await ctx.runMutation(internal.payments._refundTaskReservation, {
         task_id: args.task_id,
         buyer_id: task.posted_by || BUYER_ID,
@@ -409,8 +409,8 @@ export const resolve = internalAction({
       return;
     }
 
-    const executorBids = validBids.filter((b) =>
-      isExecutableAgent(b.agent_id, b.agent_role),
+    const executorBids = visibleBids.filter((b) =>
+      isSelectableExecutorBid(b, task.max_budget),
     );
 
     if (executorBids.length === 0) {
@@ -441,8 +441,8 @@ export const resolve = internalAction({
     const sortedExecutors = [...executorBids].sort(
       (a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score),
     );
-    const supportingBids = validBids
-      .filter((b) => !isExecutableAgent(b.agent_id, b.agent_role))
+    const supportingBids = visibleBids
+      .filter((b) => !isSelectableExecutorBid(b, task.max_budget))
       .sort((a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score));
     const sorted = [...sortedExecutors, ...supportingBids];
     const winner = sortedExecutors[0];
@@ -476,9 +476,10 @@ export const resolve = internalAction({
       tool_availability: b.tool_availability,
     });
 
-    await ctx.runMutation(internal.tasks._setStatus, {
+    await ctx.runMutation(internal.tasks._setWinner, {
       task_id: args.task_id,
-      status: "awarded",
+      winning_bid_id: winner._id,
+      price_paid,
     });
 
     await ctx.runMutation(internal.lifecycle.log, {
@@ -500,6 +501,9 @@ export const resolve = internalAction({
               : "degenerate_single_bid",
         },
       },
+    });
+    await ctx.scheduler.runAfter(0, internal.auctions.prepareExecutionPlan, {
+      task_id: args.task_id,
     });
   },
 });

@@ -62,9 +62,10 @@ test("native A2A specialists remain distinct from Arbor-hosted bridges", () => {
 test("Arbor-hosted A2A bridges are explicit execution connections", () => {
   const config: SpecialistConfig = {
     ...BASE_CONFIG,
+    agent_id: "codex-writer",
     protocol: "a2a",
-    a2a_endpoint: "http://localhost:3000/api/a2a/agents/test-specialist",
-    a2a_agent_card_url: "http://localhost:3000/api/a2a/agents/test-specialist",
+    a2a_endpoint: "http://localhost:3000/api/a2a/agents/codex-writer",
+    a2a_agent_card_url: "http://localhost:3000/api/a2a/agents/codex-writer",
     verification_status: "verified",
   };
 
@@ -77,3 +78,21 @@ test("Arbor-hosted A2A bridges are explicit execution connections", () => {
   assert.match(availability.reason ?? "", /Arbor-hosted A2A bridge/);
 });
 
+test("mock Arbor-hosted A2A catalog entries are unavailable for bidding", () => {
+  const config: SpecialistConfig = {
+    ...BASE_CONFIG,
+    agent_id: "quickbooks-ledger",
+    protocol: "a2a",
+    a2a_endpoint: "http://localhost:3000/api/a2a/agents/quickbooks-ledger",
+    a2a_agent_card_url: "http://localhost:3000/api/a2a/agents/quickbooks-ledger",
+    verification_status: "mock",
+    execution_status: "mock_unconnected",
+  };
+
+  const connection = getSpecialistConnection(config);
+  const availability = configuredConnectionAvailability(config);
+
+  assert.equal(connection.protocol, "arbor_a2a_bridge");
+  assert.equal(availability.status, "missing");
+  assert.match(availability.reason ?? "", /no real execution endpoint/);
+});

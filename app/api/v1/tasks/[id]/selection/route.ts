@@ -21,17 +21,31 @@ function convex() {
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
   const { id } = await ctx.params;
-  let body: { bid_id?: string };
+  let body: { bid_id?: string; action?: string };
   try {
     body = await req.json();
   } catch {
     return jsonError("invalid JSON body", 400);
   }
-  if (!body.bid_id) return jsonError("bid_id is required", 400);
+  if (body.action !== "repair_invalid_winner" && !body.bid_id) {
+    return jsonError("bid_id is required", 400);
+  }
 
   try {
     const identity = await resolveApiIdentity(req);
     if (!identity) return jsonError("unauthorized", 401);
+    if (body.action === "repair_invalid_winner") {
+      const result = await convex().mutation(
+        api.auctionSelection.repairInvalidWinnerForAccount,
+        {
+          server_secret: paymentServerSecret(),
+          account_id: identity.account_id,
+          task_id: id as Id<"tasks">,
+          actor: identity.agent_id,
+        },
+      );
+      return jsonOk(result);
+    }
     const result = await convex().mutation(
       api.auctionSelection.chooseTopBidForAccount,
       {

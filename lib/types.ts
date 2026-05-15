@@ -153,6 +153,10 @@ export interface BidPayload {
     checked: string[];
     missing?: string[];
     reason?: string;
+    protocol?: "mcp" | "a2a" | "arbor_a2a_bridge" | "manual" | "none";
+    execution_status?: AgentExecutionStatus;
+    endpoint_host?: string;
+    proof?: string;
   };
 }
 

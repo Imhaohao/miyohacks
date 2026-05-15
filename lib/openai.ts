@@ -112,10 +112,39 @@ export function parseJSONLoose<T>(text: string): T {
   if (fence) {
     return JSON.parse(fence[1]) as T;
   }
-  const first = trimmed.indexOf("{");
-  const last = trimmed.lastIndexOf("}");
-  if (first !== -1 && last !== -1 && last > first) {
-    return JSON.parse(trimmed.slice(first, last + 1)) as T;
+  const extracted = extractBalancedJson(trimmed);
+  if (extracted) {
+    return JSON.parse(extracted) as T;
   }
   throw new Error(`Could not parse JSON from OpenAI response: ${trimmed.slice(0, 200)}`);
+}
+
+function extractBalancedJson(text: string): string | null {
+  const start = text.search(/[\[{]/);
+  if (start === -1) return null;
+  const opener = text[start];
+  const closer = opener === "{" ? "}" : "]";
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i += 1) {
+    const char = text[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === opener) depth += 1;
+    if (char === closer) depth -= 1;
+    if (depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
 }

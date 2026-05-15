@@ -224,6 +224,8 @@ function catalogEntryToConfig(
     system_prompt: `You are ${entry.display_name}, an MCP-equipped specialist for ${entry.sponsor}. The marketplace registered you because the user goal lined up with your real capabilities (${entry.capabilities.join(", ")}). Use your remote tools to ground your answer in real data — never invent results. If the goal is outside what your tools can do, say so plainly and decline. Treat the user's request on its own terms; don't assume it's marketing/campaign work unless they say so.`,
     mcp_endpoint: entry.mcp_endpoint,
     mcp_api_key_env: entry.mcp_api_key_env,
+    execution_status: "native_mcp",
+    verification_status: "configured",
     is_verified: false,
     homepage_url: entry.homepage_url,
     discovered: true,
@@ -380,6 +382,8 @@ function registryCandidateToConfig(
     one_liner: truncate(c.description || c.name, 160),
     system_prompt: `You are ${slug}, an MCP-equipped specialist discovered from the live MCP registry. Your remote tools (advertised by ${c.name}) are the source of truth. ${hasMissingVars ? "Note: this server's URL template still has unresolved variables — call the user out if you'd need credentials before running." : "Use your remote tools to ground every claim in real data."}`,
     mcp_endpoint: resolvedUrl,
+    execution_status: "native_mcp",
+    verification_status: hasMissingVars ? "unverified" : "configured",
     is_verified: false,
     homepage_url: c.homepage,
     discovered: true,
@@ -493,6 +497,8 @@ Do not duplicate any existing agent_id.`;
     discovered: true,
     discovery_source: "synthesized",
     discovered_for: query.trim().slice(0, 240),
+    execution_status: "mock_unconnected",
+    verification_status: "mock",
   };
 
   return {

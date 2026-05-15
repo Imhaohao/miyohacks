@@ -5,6 +5,7 @@ import {
   qualityAdjustedVickreyPrice,
   roundMoney,
 } from "../lib/auction-value";
+import { isSelectableExecutorBid } from "../lib/auction-selection";
 import { isExecutableAgent, roleForAgent } from "../lib/agent-roles";
 
 const BASE = {
@@ -133,4 +134,52 @@ test("executive and context agents are not executable auction winners", () => {
   assert.equal(isExecutableAgent("hyperspell-brain"), false);
   assert.equal(isExecutableAgent("nia-context"), false);
   assert.equal(isExecutableAgent("codex-writer"), true);
+});
+
+test("selectable executor bids must be real external connections", () => {
+  assert.equal(
+    isSelectableExecutorBid(
+      {
+        agent_id: "nia-context",
+        agent_role: "context",
+        bid_price: 0.3,
+        tool_availability: {
+          status: "available",
+          execution_status: "native_mcp",
+        },
+      },
+      1,
+    ),
+    false,
+  );
+  assert.equal(
+    isSelectableExecutorBid(
+      {
+        agent_id: "pilot-cfo",
+        agent_role: "executor",
+        bid_price: 0.3,
+        tool_availability: {
+          status: "available",
+          execution_status: "mock_unconnected",
+        },
+      },
+      1,
+    ),
+    false,
+  );
+  assert.equal(
+    isSelectableExecutorBid(
+      {
+        agent_id: "github-engineering",
+        agent_role: "executor",
+        bid_price: 0.3,
+        tool_availability: {
+          status: "available",
+          execution_status: "native_mcp",
+        },
+      },
+      1,
+    ),
+    true,
+  );
 });

@@ -7,6 +7,10 @@ import {
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { buildOrchestrationContext } from "../lib/orchestration-context";
+import {
+  explainUnselectableExecutorBid,
+  isSelectableExecutorBid,
+} from "../lib/auction-selection";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import {
@@ -523,6 +527,22 @@ export const _setWinner = internalMutation({
     price_paid: v.number(),
   },
   handler: async (ctx, args) => {
+    const [task, winningBid] = await Promise.all([
+      ctx.db.get(args.task_id),
+      ctx.db.get(args.winning_bid_id),
+    ]);
+    if (!task) throw new Error("task not found");
+    if (!winningBid || winningBid.task_id !== args.task_id) {
+      throw new Error("winning bid does not belong to this task");
+    }
+    if (!isSelectableExecutorBid(winningBid, task.max_budget)) {
+      throw new Error(
+        `winning bid is not selectable: ${
+          explainUnselectableExecutorBid(winningBid, task.max_budget) ??
+          "unknown reason"
+        }`,
+      );
+    }
     await ctx.db.patch(args.task_id, {
       status: "awarded",
       winning_bid_id: args.winning_bid_id,

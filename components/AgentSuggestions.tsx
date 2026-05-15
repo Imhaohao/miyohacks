@@ -5,6 +5,8 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import { Pill, type PillTone } from "@/components/ui/Pill";
 import { formatMoney, formatScore } from "@/lib/utils";
 import { Sparkle, CircleNotch, Lightning } from "@phosphor-icons/react";
+import { EXECUTION_STATUS_LABELS } from "@/lib/agent-execution-status";
+import type { AgentExecutionStatus, AgentRole } from "@/lib/types";
 
 type DiscoverySource = "catalog" | "registry" | "synthesized";
 
@@ -20,6 +22,8 @@ interface SuggestionItem {
   discovered: boolean;
   discovery_source?: DiscoverySource;
   mcp_endpoint?: string;
+  execution_status: AgentExecutionStatus;
+  agent_role?: AgentRole;
   homepage_url?: string;
 }
 
@@ -176,7 +180,11 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
                     discovered={s.discovered}
                     source={s.discovery_source}
                     hasEndpoint={!!s.mcp_endpoint}
+                    executionStatus={s.execution_status}
                   />
+                  {s.agent_role && s.agent_role !== "executor" && (
+                    <Pill tone="warning">{s.agent_role} support</Pill>
+                  )}
                 </div>
                 <p className="text-xs text-ink-muted">
                   {s.sponsor} · {s.one_liner}
@@ -211,7 +219,7 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
                 <div>
                   <div className="text-ink-subtle">Mode</div>
                   <div className="font-mono text-ink">
-                    {s.mcp_endpoint ? "Tool" : "Plan"}
+                    {EXECUTION_STATUS_LABELS[s.execution_status]}
                   </div>
                 </div>
               </div>
@@ -259,6 +267,7 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
               discovered
               source={discovered.source}
               hasEndpoint={!!discovered.specialist.mcp_endpoint}
+              executionStatus={discovered.specialist.execution_status}
             />
           </div>
           <p className="mt-1 text-xs text-ink-muted">
@@ -316,11 +325,19 @@ function SourceBadge({
   discovered,
   source,
   hasEndpoint,
+  executionStatus,
 }: {
   discovered: boolean;
   source?: DiscoverySource;
   hasEndpoint: boolean;
+  executionStatus?: AgentExecutionStatus;
 }) {
+  if (executionStatus === "mock_unconnected") {
+    return <Pill tone="danger">Mock only</Pill>;
+  }
+  if (executionStatus === "needs_vendor_a2a_endpoint") {
+    return <Pill tone="warning">Needs A2A</Pill>;
+  }
   if (!discovered) {
     return hasEndpoint ? (
       <Pill tone="success">Live tools</Pill>

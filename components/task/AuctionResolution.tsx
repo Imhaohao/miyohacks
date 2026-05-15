@@ -6,9 +6,20 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { formatMoney, formatScore, cn } from "@/lib/utils";
 import { isExecutableAgent, roleForAgent } from "@/lib/agent-roles";
+import {
+  bidExecutionStatus,
+  explainUnselectableExecutorBid,
+  isSelectableExecutorBid,
+} from "@/lib/auction-selection";
+import { EXECUTION_STATUS_LABELS } from "@/lib/agent-execution-status";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Trophy, ArrowRight } from "@phosphor-icons/react";
+import {
+  Trophy,
+  ArrowRight,
+  ShieldCheck,
+  WarningCircle,
+} from "@phosphor-icons/react";
 import { Pill } from "@/components/ui/Pill";
 import { LoadingProgress, useElapsedSeconds } from "./LoadingProgress";
 import type {
@@ -30,8 +41,12 @@ export function AuctionResolution({
   useLiveQueries = true,
 }: Props) {
   const chooseTopBid = useMutation(api.auctionSelection.chooseTopBid);
+  const repairInvalidWinner = useMutation(api.auctionSelection.repairInvalidWinner);
   const [busyBidId, setBusyBidId] = useState<string | null>(null);
-  const resolved = events.find((e) => e.event_type === "auction_resolved");
+  const [repairError, setRepairError] = useState<string | null>(null);
+  const resolved = [...events]
+    .reverse()
+    .find((e) => e.event_type === "auction_resolved");
   const failed = events.find((e) => e.event_type === "auction_failed");
   const bidCount = events.filter((e) => e.event_type === "bid_received").length;
   const declineCount = events.filter((e) => e.event_type === "bid_declined").length;
@@ -86,13 +101,23 @@ export function AuctionResolution({
 
   const payload = resolved.payload as unknown as AuctionResolvedPayload;
   const { bids, winner, vickrey } = payload;
+  const winnerSelectable = isSelectableExecutorBid(winner, task.max_budget);
+  const invalidWinnerReason = winnerSelectable
+    ? null
+    : explainUnselectableExecutorBid(winner, task.max_budget);
   const isDegenerate = vickrey.rule === "degenerate_single_bid";
   const maxScore = Math.max(...bids.map((b) => b.value_score ?? b.score), 0.01);
-  const topChoices = payload.top_3 ?? bids.slice(0, 3);
+  const topChoices = (payload.top_3 ?? bids)
+    .filter((b) => isSelectableExecutorBid(b, task.max_budget))
+    .slice(0, 3);
   const supportBids =
     payload.support_bids ??
     bids.filter((b) => !isExecutableAgent(b.agent_id, b.agent_role));
   const canChoose = task.status === "awarded" && !task.winning_bid_id;
+  const canRepair =
+    task.status === "awarded" &&
+    Boolean(task.winning_bid_id) &&
+    !winnerSelectable;
 
   async function choose(bid: AuctionBidSummary) {
     setBusyBidId(bid.bid_id);
@@ -118,53 +143,121 @@ export function AuctionResolution({
     }
   }
 
+  async function repairSelection() {
+    setBusyBidId("repair");
+    setRepairError(null);
+    try {
+      if (useLiveQueries) {
+        await repairInvalidWinner({
+          task_id: task._id as Id<"tasks">,
+        });
+      } else {
+        const res = await fetch(`/api/v1/tasks/${task._id}/selection`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "repair_invalid_winner" }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json?.error?.message ?? "Unable to repair selection");
+        }
+      }
+    } catch (error) {
+      setRepairError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusyBidId(null);
+    }
+  }
+
   return (
     <Card className="animate-fade-up">
       <CardHeader
         title="Executor selected"
         meta={
-          <span className="inline-flex items-center gap-1.5 text-brand-700">
-            <Trophy size={12} weight="fill" />
-            <span className="font-mono">{winner.agent_id}</span>
-          </span>
+          winnerSelectable ? (
+            <span className="inline-flex items-center gap-1.5 text-brand-700">
+              <Trophy size={12} weight="fill" />
+              <span className="font-mono">{winner.agent_id}</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-amber-700">
+              <WarningCircle size={13} weight="fill" />
+              Selection blocked
+            </span>
+          )
         }
       />
 
-      <div className="mb-6 rounded-2xl bg-brand-50 p-5">
-        <div className="text-xs font-medium text-brand-700">
-          Best value · quality-adjusted Vickrey
+      {!winnerSelectable && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
+            <WarningCircle size={16} weight="fill" />
+            <span>Stored winner is not an executable external agent.</span>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-amber-900/80">
+            <span className="font-mono">{winner.agent_id}</span> is being treated as{" "}
+            {formatRole(roleForAgent(winner.agent_id, winner.agent_role))} support:
+            {invalidWinnerReason ? ` ${invalidWinnerReason}.` : " not selectable."}
+            Arbor will not send paid execution to it as a ChatGPT-style placeholder.
+          </p>
+          {canRepair && (
+            <Button
+              type="button"
+              size="sm"
+              className="mt-3"
+              disabled={busyBidId === "repair"}
+              onClick={repairSelection}
+            >
+              {busyBidId === "repair" ? "Repairing..." : "Select verified executor"}
+            </Button>
+          )}
+          {repairError && (
+            <p className="mt-2 text-xs text-rose-700">{repairError}</p>
+          )}
         </div>
-        <div className="mt-3 flex flex-wrap items-baseline gap-3">
-          <span className="text-sm text-ink-muted">
-            <span className="font-mono">{winner.agent_id}</span> executor bid
-          </span>
-          <span className="text-2xl text-ink-subtle line-through decoration-rose-400 decoration-2">
-            {formatMoney(vickrey.winner_bid_price)}
-          </span>
-          <ArrowRight size={18} weight="bold" className="text-ink-subtle" />
-          <span className="animate-value-pop font-display text-3xl font-semibold tracking-tight text-brand-700 sm:text-4xl">
-            pays {formatMoney(vickrey.price_paid)}
-          </span>
+      )}
+
+      {winnerSelectable && (
+        <div className="mb-6 rounded-2xl bg-brand-50 p-5">
+          <div className="text-xs font-medium text-brand-700">
+            Best value · quality-adjusted Vickrey
+          </div>
+          <div className="mt-3 flex flex-wrap items-baseline gap-3">
+            <span className="text-sm text-ink-muted">
+              <span className="font-mono">{winner.agent_id}</span> executor bid
+            </span>
+            <span className="text-2xl text-ink-subtle line-through decoration-rose-400 decoration-2">
+              {formatMoney(vickrey.winner_bid_price)}
+            </span>
+            <ArrowRight size={18} weight="bold" className="text-ink-subtle" />
+            <span className="animate-value-pop font-display text-3xl font-semibold tracking-tight text-brand-700 sm:text-4xl">
+              pays {formatMoney(vickrey.price_paid)}
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-ink-muted">
+            {isDegenerate
+              ? "Only one valid offer — they pay their own price."
+              : "Clearing price is derived from the runner-up's value score, so specialists compete on quality per dollar, not cheapness alone."}
+          </p>
+          <div className="mt-4 grid gap-2 text-[11px] sm:grid-cols-5">
+            <Metric label="Expected quality" value={formatPct(winner.expected_quality)} />
+            <Metric label="Effective price" value={formatMoney(winner.effective_price ?? winner.bid_price)} />
+            <Metric label="Value score" value={formatScore(winner.value_score ?? winner.score)} />
+            <Metric
+              label="Connection"
+              value={EXECUTION_STATUS_LABELS[bidExecutionStatus(winner)]}
+            />
+            <Metric
+              label="Runner benchmark"
+              value={
+                vickrey.runner_up_value_score
+                  ? formatScore(vickrey.runner_up_value_score)
+                  : "n/a"
+              }
+            />
+          </div>
         </div>
-        <p className="mt-2 text-xs text-ink-muted">
-          {isDegenerate
-            ? "Only one valid offer — they pay their own price."
-            : "Clearing price is derived from the runner-up's value score, so specialists compete on quality per dollar, not cheapness alone."}
-        </p>
-        <div className="mt-4 grid gap-2 text-[11px] sm:grid-cols-4">
-          <Metric label="Expected quality" value={formatPct(winner.expected_quality)} />
-          <Metric label="Effective price" value={formatMoney(winner.effective_price ?? winner.bid_price)} />
-          <Metric label="Value score" value={formatScore(winner.value_score ?? winner.score)} />
-          <Metric
-            label="Runner benchmark"
-            value={
-              vickrey.runner_up_value_score
-                ? formatScore(vickrey.runner_up_value_score)
-                : "n/a"
-            }
-          />
-        </div>
-      </div>
+      )}
 
       <div className="mb-4">
         <div className="mb-2 text-xs font-medium text-ink-muted">
@@ -189,12 +282,19 @@ export function AuctionResolution({
             Pick a proposal to lock escrow and ask that executor for an execution plan.
           </p>
         )}
+        {topChoices.length === 0 && (
+          <p className="rounded-xl bg-surface-subtle px-3 py-2 text-xs text-ink-muted">
+            No verified external executor bid is available for this auction yet.
+            Context agents can help scope the work, but Arbor will not present
+            them as paid executors.
+          </p>
+        )}
       </div>
 
       {supportBids.length > 0 && (
         <div className="mb-4 rounded-xl bg-surface-subtle p-3">
           <div className="text-xs font-medium text-ink-muted">
-            Executive/context support
+            Support / not executable
           </div>
           <div className="mt-2 grid gap-2 md:grid-cols-2">
             {supportBids.map((b) => (
@@ -207,7 +307,9 @@ export function AuctionResolution({
       {/* Bid ladder: executor winner first, supporting roles remain visible. */}
       <div className="space-y-2">
         {bids.map((b, i) => {
-          const isWinner = i === 0;
+          const isStoredWinner = b.bid_id === task.winning_bid_id;
+          const isWinner = isStoredWinner && isSelectableExecutorBid(b, task.max_budget);
+          const isBlockedWinner = isStoredWinner && !isWinner;
           const role = roleForAgent(b.agent_id, b.agent_role);
           const valueScore = b.value_score ?? b.score;
           const widthPct = Math.max(8, Math.round((valueScore / maxScore) * 100));
@@ -246,6 +348,18 @@ export function AuctionResolution({
                         Winner
                       </span>
                     )}
+                    {isBlockedWinner && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold tracking-tight text-amber-800">
+                        <WarningCircle size={9} weight="fill" />
+                        Blocked
+                      </span>
+                    )}
+                    {b.tool_availability?.execution_status && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium text-ink-muted">
+                        <ShieldCheck size={9} weight="fill" />
+                        {EXECUTION_STATUS_LABELS[b.tool_availability.execution_status]}
+                      </span>
+                    )}
                   </div>
                   <p
                     className={cn(
@@ -272,7 +386,12 @@ export function AuctionResolution({
                     <span>quality {formatPct(b.expected_quality)}</span>
                     <span>fit {formatPct(b.task_fit_score)}</span>
                     <span>speed {formatPct(b.speed_score)}</span>
-                    <span>tools {b.tool_availability?.status ?? "available"}</span>
+                    <span>
+                      tools {b.tool_availability?.status ?? "unknown"}
+                      {b.tool_availability?.endpoint_host
+                        ? ` · ${b.tool_availability.endpoint_host}`
+                        : ""}
+                    </span>
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
@@ -359,7 +478,12 @@ function TopChoice({
         <span>quality {formatPct(bid.expected_quality)}</span>
         <span>value {formatScore(bid.value_score ?? bid.score)}</span>
         <span>fit {formatPct(bid.task_fit_score)}</span>
-        <span>tools {bid.tool_availability?.status ?? "available"}</span>
+        <span>
+          {EXECUTION_STATUS_LABELS[bidExecutionStatus(bid)]}
+          {bid.tool_availability?.endpoint_host
+            ? ` · ${bid.tool_availability.endpoint_host}`
+            : ""}
+        </span>
       </div>
       {canChoose && (
         <Button
@@ -390,6 +514,12 @@ function SupportBid({ bid }: { bid: AuctionBidSummary }) {
           </div>
           <p className="mt-1 line-clamp-2 leading-relaxed text-ink-muted">
             {bid.capability_claim}
+          </p>
+          <p className="mt-1 text-[10px] text-ink-subtle">
+            {bid.tool_availability?.execution_status
+              ? EXECUTION_STATUS_LABELS[bid.tool_availability.execution_status]
+              : "Unverified"}{" "}
+            · tools {bid.tool_availability?.status ?? "unknown"}
           </p>
         </div>
         <div className="shrink-0 text-right font-mono text-ink">

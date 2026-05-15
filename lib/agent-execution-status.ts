@@ -57,6 +57,14 @@ export const EXECUTION_STATUS_DESCRIPTIONS: Record<
     "Visible in the catalog only; it must not execute through a ChatGPT placeholder.",
 };
 
+export function isRealExecutionStatus(status: AgentExecutionStatus): boolean {
+  return (
+    status === "native_mcp" ||
+    status === "native_a2a" ||
+    status === "arbor_real_adapter"
+  );
+}
+
 export function isArborA2ABridgeUrl(url: string | undefined): boolean {
   if (!url) return false;
   try {

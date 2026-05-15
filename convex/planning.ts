@@ -145,6 +145,10 @@ export const decompose = internalAction({
       task_id: args.task_id,
       plan: steps,
     });
+    await ctx.runMutation(internal.tasks._setStatus, {
+      task_id: args.task_id,
+      status: "bidding",
+    });
     await ctx.runMutation(internal.lifecycle.log, {
       task_id: args.task_id,
       event_type: "plan_decided",

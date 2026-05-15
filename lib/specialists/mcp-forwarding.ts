@@ -24,6 +24,7 @@ import { parseJSONLoose } from "../openai";
 import { buildTaskContext, isImplementationTask } from "../campaign-context";
 import { implementationPlanFromText } from "../implementation-plan";
 import { roleForSpecialist } from "../agent-roles";
+import { classifyAgentExecution } from "../agent-execution-status";
 import type {
   SpecialistConfig,
   SpecialistDecision,
@@ -90,6 +91,14 @@ function toOpenAITools(remote: RemoteMcpTool[]) {
 /** OpenAI requires tool names to match `^[a-zA-Z0-9_-]+$`. */
 function sanitizeName(n: string): string {
   return n.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+}
+
+function endpointHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }
 
 async function chatCompletion(body: Record<string, unknown>, timeoutMs: number): Promise<ChatResponse> {
@@ -167,6 +176,24 @@ export function makeMcpForwardingSpecialist(
         .slice(0, 20)
         .map((t) => `- ${t.name}: ${t.description?.slice(0, 200) ?? ""}`)
         .join("\n");
+      const toolNames = tools.slice(0, 8).map((tool) => tool.name);
+      const availability: NonNullable<BidPayload["tool_availability"]> = {
+        status: "available",
+        checked: [
+          endpointHost(endpoint),
+          "tools/list",
+          ...(config.mcp_api_key_env ? [config.mcp_api_key_env] : []),
+        ],
+        reason: `native MCP tools/list returned ${tools.length} tool${tools.length === 1 ? "" : "s"}`,
+        protocol: "mcp",
+        execution_status: classifyAgentExecution({
+          agent_id: config.agent_id,
+          protocol: config.protocol,
+          mcp_endpoint: config.mcp_endpoint,
+        }),
+        endpoint_host: endpointHost(endpoint),
+        proof: `tools/list: ${toolNames.join(", ")}`,
+      };
 
       const systemPrompt = `${config.system_prompt}\n\n${VICKREY_PRELUDE}\n\nYou are connected to a real MCP server at ${endpoint}. Available tools:\n${toolList || "(tool discovery unavailable — bid only if your description clearly fits)"}\n\nYour cost baseline for a typical task is $${config.cost_baseline.toFixed(2)}. Adjust by task complexity but stay honest.\n\nIMPORTANT: This marketplace handles tasks across every domain. Decline if the user's goal is outside what your remote tools can actually do — don't translate the goal into your specialty. Your capability_claim must address the user's actual goal.\n\nReply with JSON only, one of:\n{ "decline": true, "reason": "<short reason>" }\nOR\n{ "bid_price": <number>, "capability_claim": "<one sentence about how you would handle this specific task>", "estimated_seconds": <integer> }`;
 
@@ -186,6 +213,7 @@ export function makeMcpForwardingSpecialist(
           capability_claim: config.one_liner,
           estimated_seconds: 30,
           agent_role: roleForSpecialist(config),
+          tool_availability: availability,
         };
       }
       const bid: BidPayload = {
@@ -193,6 +221,7 @@ export function makeMcpForwardingSpecialist(
         capability_claim: data.capability_claim,
         estimated_seconds: Math.max(1, Math.floor(data.estimated_seconds)),
         agent_role: roleForSpecialist(config),
+        tool_availability: availability,
       };
       return bid;
     },

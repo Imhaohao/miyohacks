@@ -5,7 +5,10 @@ import {
   type A2AAgentCard,
   type A2ATaskResponse,
 } from "../a2a-client";
-import { isArborA2ABridgeUrl } from "../agent-execution-status";
+import {
+  classifyAgentExecution,
+  isArborA2ABridgeUrl,
+} from "../agent-execution-status";
 import { discoverTools, type RemoteMcpTool } from "../mcp-outbound";
 import type { BidPayload, SpecialistConfig } from "../types";
 
@@ -89,27 +92,72 @@ function missingCredential(connection: SpecialistConnection): string[] {
   return connection.authEnv && !connection.apiKey ? [connection.authEnv] : [];
 }
 
+function endpointHost(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    return new URL(url).host;
+  } catch {
+    return undefined;
+  }
+}
+
 export function configuredConnectionAvailability(
   config: SpecialistConfig,
 ): ToolAvailability {
   const connection = getSpecialistConnection(config);
+  const executionStatus = classifyAgentExecution({
+    agent_id: config.agent_id,
+    protocol: config.protocol,
+    endpoint_url: connection.endpointUrl,
+    agent_card_url: connection.agentCardUrl,
+    mcp_endpoint: config.mcp_endpoint,
+    a2a_endpoint: config.a2a_endpoint,
+    a2a_agent_card_url: config.a2a_agent_card_url,
+  });
   const checked = [
     connection.protocol,
     ...(connection.authEnv ? [connection.authEnv] : []),
   ].filter((item): item is string => Boolean(item));
   const missing = missingCredential(connection);
+  const base = {
+    checked,
+    ...(missing.length > 0 ? { missing } : {}),
+    protocol: connection.protocol,
+    execution_status: executionStatus,
+    endpoint_host: endpointHost(connection.endpointUrl ?? connection.agentCardUrl),
+  } satisfies Partial<ToolAvailability>;
+
+  if (executionStatus === "mock_unconnected") {
+    return {
+      ...base,
+      status: "missing",
+      checked: [...checked, "execution_status"],
+      reason:
+        "mock catalog entry has no real execution endpoint; Arbor will not use a ChatGPT placeholder",
+    };
+  }
+
+  if (executionStatus === "needs_vendor_a2a_endpoint") {
+    return {
+      ...base,
+      status: "missing",
+      checked: [...checked, "execution_status"],
+      reason: "real vendor A2A endpoint is required before this agent can bid",
+    };
+  }
 
   if (missing.length > 0) {
     return {
+      ...base,
       status: "missing",
       checked,
-      missing,
       reason: `missing required credential${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`,
     };
   }
 
   if (connection.protocol === "mcp") {
     return {
+      ...base,
       status: "available",
       checked,
       reason: "native MCP endpoint is configured",
@@ -118,6 +166,7 @@ export function configuredConnectionAvailability(
 
   if (connection.protocol === "a2a") {
     return {
+      ...base,
       status: "available",
       checked,
       reason: "native A2A endpoint is configured",
@@ -126,6 +175,7 @@ export function configuredConnectionAvailability(
 
   if (connection.protocol === "arbor_a2a_bridge") {
     return {
+      ...base,
       status: "available",
       checked,
       reason: "Arbor-hosted A2A bridge is configured",
@@ -134,6 +184,7 @@ export function configuredConnectionAvailability(
 
   if (config.protocol === "manual") {
     return {
+      ...base,
       status: "manual",
       checked,
       reason: "manual specialist; no live API credential required",
@@ -142,6 +193,7 @@ export function configuredConnectionAvailability(
 
   if (config.protocol === "a2a") {
     return {
+      ...base,
       status: "missing",
       checked,
       reason: "A2A protocol selected but no native endpoint is configured",
@@ -150,6 +202,7 @@ export function configuredConnectionAvailability(
 
   if (config.verification_status === "mock" || config.protocol === "mock") {
     return {
+      ...base,
       status: "mock",
       checked,
       reason: "mock specialist; output is synthetic",
@@ -157,6 +210,7 @@ export function configuredConnectionAvailability(
   }
 
   return {
+    ...base,
     status: "mock",
     checked,
     reason: "no MCP or A2A execution connection is configured",
@@ -250,8 +304,27 @@ export async function probeSpecialistConnection(
 }
 
 export function toolAvailabilityFromProbe(probe: ConnectionProbe): ToolAvailability {
+  const base = {
+    protocol: probe.protocol,
+    execution_status:
+      probe.protocol === "mcp"
+        ? "native_mcp"
+        : probe.protocol === "a2a"
+          ? "native_a2a"
+          : probe.protocol === "arbor_a2a_bridge"
+            ? "arbor_real_adapter"
+            : "mock_unconnected",
+    endpoint_host: endpointHost(probe.endpointUrl ?? probe.agentCardUrl),
+    proof:
+      probe.toolNames && probe.toolNames.length > 0
+        ? `tools/list: ${probe.toolNames.join(", ")}`
+        : probe.cardName
+          ? `agent-card: ${probe.cardName}`
+          : undefined,
+  } satisfies Partial<ToolAvailability>;
   if (probe.status === "missing_auth") {
     return {
+      ...base,
       status: "missing",
       checked: probe.checked,
       missing: probe.missing,
@@ -260,12 +333,14 @@ export function toolAvailabilityFromProbe(probe: ConnectionProbe): ToolAvailabil
   }
   if (probe.status === "available") {
     return {
+      ...base,
       status: "available",
       checked: probe.checked,
       reason: probe.reason,
     };
   }
   return {
+    ...base,
     status: "missing",
     checked: probe.checked,
     missing: probe.missing,
