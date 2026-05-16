@@ -30,8 +30,10 @@ test("A2A client sends message/send by default and supports legacy tasks/send", 
 });
 
 test("A2A agent card reports codex-writer as an Arbor real adapter", async () => {
-  const previousWorkspace = process.env.CODEX_WORKSPACE_DIR;
-  process.env.CODEX_WORKSPACE_DIR = "/tmp/arbor-codex-test";
+  const previousGithub = process.env.GITHUB_TOKEN;
+  const previousOpenAI = process.env.OPENAI_API_KEY;
+  process.env.GITHUB_TOKEN = "ghp_test";
+  process.env.OPENAI_API_KEY = "sk-test";
   try {
     const res = await getA2AAgent(
       new NextRequest("http://localhost:3000/api/a2a/agents/codex-writer"),
@@ -41,10 +43,12 @@ test("A2A agent card reports codex-writer as an Arbor real adapter", async () =>
 
     assert.equal(card.protocolVersion, "0.2.6");
     assert.equal(card.capabilities.executionStatus, "arbor_real_adapter");
-    assert.equal(card.capabilities.backingSystem, "codex_runner");
+    assert.equal(card.capabilities.backingSystem, "github_pr");
   } finally {
-    if (previousWorkspace === undefined) delete process.env.CODEX_WORKSPACE_DIR;
-    else process.env.CODEX_WORKSPACE_DIR = previousWorkspace;
+    if (previousGithub === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = previousGithub;
+    if (previousOpenAI === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = previousOpenAI;
   }
 });
 
@@ -79,4 +83,39 @@ test("mock catalog A2A agents fail instead of returning persona output", async (
     body.result.status.message.parts[0].text,
     /will not substitute a ChatGPT placeholder/,
   );
+});
+
+test("codex-writer A2A failures include the underlying runner error", async () => {
+  const previousGithub = process.env.GITHUB_TOKEN;
+  const previousOpenAI = process.env.OPENAI_API_KEY;
+  delete process.env.GITHUB_TOKEN;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    const res = await postA2AAgent(
+      new NextRequest("http://localhost:3000/api/a2a/agents/codex-writer", {
+        method: "POST",
+        body: JSON.stringify(
+          buildA2ASendRequest({
+            prompt: "health check",
+            metadata: { task_type: "general" },
+            id: "codex-runner-error-test",
+          }),
+        ),
+        headers: { "content-type": "application/json" },
+      }),
+      routeContext("codex-writer"),
+    );
+    const body = await res.json();
+
+    assert.equal(body.result.status.state, "failed");
+    assert.match(
+      body.result.status.message.parts[0].text,
+      /Runner error: codex-writer is not configured: set GITHUB_TOKEN and OPENAI_API_KEY/,
+    );
+  } finally {
+    if (previousGithub === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = previousGithub;
+    if (previousOpenAI === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = previousOpenAI;
+  }
 });

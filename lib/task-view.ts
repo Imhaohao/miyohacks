@@ -39,6 +39,8 @@ export interface TaskDoc {
   result?: { text: string; agent_id: string; artifact?: ExecutionArtifact } | unknown;
   judge_verdict?: JudgeVerdict;
   output_schema?: Record<string, unknown>;
+  target_repo?: string;
+  target_branch?: string;
   parent_task_id?: string;
   step_index?: number;
   task_plan?: TaskPlanStep[];

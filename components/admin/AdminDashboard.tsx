@@ -16,14 +16,16 @@ import type {
 import { cn } from "@/lib/utils";
 import {
   Bank,
+  ChatCircle,
   CircleNotch,
   Gauge,
   Lightning,
   ShieldCheck,
   Warning,
 } from "@phosphor-icons/react";
+import { AgentChat } from "./AgentChat";
 
-type Tab = "overview" | "tasks" | "payments" | "agents" | "incidents";
+type Tab = "overview" | "tasks" | "payments" | "agents" | "chat" | "incidents";
 
 interface AdminState {
   overview?: AdminOverview;
@@ -123,7 +125,7 @@ export function AdminDashboard() {
       </Card>
 
       <div className="flex flex-wrap gap-2">
-        {(["overview", "tasks", "payments", "agents", "incidents"] as const).map((item) => (
+        {(["overview", "tasks", "payments", "agents", "chat", "incidents"] as const).map((item) => (
           <button
             key={item}
             type="button"
@@ -177,6 +179,34 @@ export function AdminDashboard() {
           actionBusy={actionBusy}
           runAction={runAction}
         />
+      )}
+      {tab === "chat" && (
+        <Card>
+          <CardHeader
+            title="Live agent chat"
+            meta={
+              <span className="inline-flex items-center gap-2 text-xs text-ink-muted">
+                <ChatCircle size={14} weight="bold" />
+                A2A bridge · POST /api/a2a/agents/:id
+              </span>
+            }
+          />
+          <p className="mb-3 text-sm text-ink-muted">
+            Send live <span className="font-mono">message/send</span> requests
+            to any agent through the same A2A bridge external clients use.
+            Responses surface real <span className="font-mono">failed</span>{" "}
+            states for unconnected agents instead of hiding them behind a
+            placeholder.
+          </p>
+          <AgentChat
+            agents={
+              state.agents?.agents.map((agent) => ({
+                agent_id: agent.agent_id,
+                display_name: agent.display_name,
+              })) ?? []
+            }
+          />
+        </Card>
       )}
       {tab === "incidents" && (
         <Incidents

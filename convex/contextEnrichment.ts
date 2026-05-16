@@ -13,7 +13,7 @@ import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { enrichRepoContextFromNia } from "../lib/nia-loader";
-import { enrichBusinessContextFromHyperspell } from "../lib/hyperspell";
+import { addMemory, enrichBusinessContextFromHyperspell } from "../lib/hyperspell";
 import type { BusinessContext } from "../lib/orchestration-context";
 
 const BID_WINDOW_MS = 15_000;
@@ -140,6 +140,36 @@ export const enrichAndStartAuction = internalAction({
 
     await ctx.scheduler.runAfter(0, internal.broker.shortlist, {
       task_id: args.task_id,
+    });
+  },
+});
+
+export const recordCodexPr = internalAction({
+  args: { task_id: v.id("tasks"), pr_url: v.string() },
+  handler: async (ctx, args) => {
+    if (!process.env.HYPERSPELL_API_KEY) return;
+    const task = await ctx.runQuery(internal.tasks._get, {
+      task_id: args.task_id,
+    });
+    await addMemory({
+      userId: process.env.HYPERSPELL_USER_ID?.trim() || "agent:codex-writer",
+      title: `Codex opened PR for task: ${task.prompt.slice(0, 60)}`,
+      collection: "arbor_codex_prs",
+      text: [
+        `Task id: ${args.task_id}`,
+        `Buyer: ${task.posted_by}`,
+        `Target repo: ${task.target_repo}`,
+        `PR: ${args.pr_url}`,
+        "",
+        "Task prompt:",
+        task.prompt,
+      ].join("\n"),
+      date: new Date().toISOString(),
+      metadata: {
+        source: "arbor_codex_pr",
+        task_id: args.task_id,
+        pr_url: args.pr_url,
+      },
     });
   },
 });

@@ -4,9 +4,16 @@
 
 import { addMemory, searchMemories } from "../hyperspell";
 import { isImplementationTask } from "../campaign-context";
+import {
+  buildPlanUserPrompt,
+  EXECUTION_PLAN_JSON_SCHEMA,
+} from "../execution-plan";
+import { callOpenAIJSON } from "../openai";
 import type {
   BidPayload,
   DeclineDecision,
+  ExecutionPlanLLMResponse,
+  ExecutionPlanRequest,
   SpecialistConfig,
   SpecialistOutput,
   SpecialistRunner,
@@ -178,5 +185,74 @@ export const hyperspellBrain: SpecialistRunner = {
     ]
       .filter(Boolean)
       .join("\n");
+  },
+
+  async plan(request: ExecutionPlanRequest): Promise<ExecutionPlanLLMResponse> {
+    // Hyperspell's plan() retrieves real memory documents first so the
+    // resulting plan is grounded in the buyer's actual workspace knowledge,
+    // then folds that evidence into a JSON plan via OpenAI in Hyperspell's
+    // voice.
+    let memoryAnswer: string | undefined;
+    let memorySources: string[] = [];
+    if (hyperspellKey()) {
+      try {
+        const userId = userIdForTask();
+        const result = await searchMemories({
+          userId,
+          query: [
+            "Find the business, customer, and workspace context required to draft an approval plan for this Arbor task.",
+            "Surface concrete facts, constraints, open questions, and any prior decisions.",
+            "",
+            `Task type: ${request.taskType}`,
+            `Task: ${request.prompt}`,
+          ].join("\n"),
+          answer: true,
+          maxResults: 6,
+          effort: "low",
+        });
+        memoryAnswer = result.answer?.trim();
+        memorySources = result.documents
+          .slice(0, 6)
+          .map(formatDocument);
+      } catch {
+        // Treat memory unavailability as a context gap, not a hard failure.
+        memoryAnswer = undefined;
+        memorySources = [];
+      }
+    }
+
+    const systemPrompt = [
+      HYPERSPELL_BRAIN_CONFIG.system_prompt,
+      "",
+      "You are now drafting a PRE-EXECUTION approval plan. You are not the implementation agent — your job is to expose the business/workspace context needed before any executor touches paid work.",
+      "Rules:",
+      "- Use the Hyperspell memory evidence below as your source of truth. Cite specific facts in context_required.why.",
+      "- If memory is empty, the plan must call out exactly what business context is missing and which workspace surfaces need to be seeded.",
+      "- Do not invent business goals, customer segments, or success metrics that are not supported by the memory evidence.",
+    ].join("\n");
+
+    const userPrompt = [
+      buildPlanUserPrompt(HYPERSPELL_BRAIN_CONFIG, request),
+      "",
+      "Hyperspell memory evidence:",
+      memoryAnswer
+        ? memoryAnswer
+        : "(no direct memory answer — flag this as a context gap)",
+      "",
+      "Retrieved memory sources:",
+      memorySources.length
+        ? memorySources.join("\n")
+        : "(no memory documents matched — seed company/workspace context before execution)",
+      "",
+      EXECUTION_PLAN_JSON_SCHEMA,
+    ].join("\n");
+
+    return await callOpenAIJSON<ExecutionPlanLLMResponse>({
+      systemPrompt,
+      userPrompt,
+      maxTokens: 1200,
+      timeoutMs: 50_000,
+      retries: 0,
+    });
   },
 };

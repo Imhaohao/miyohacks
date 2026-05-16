@@ -138,6 +138,7 @@ export type LifecycleEventType =
   | "payment_released"
   | "execution_started"
   | "execution_complete"
+  | "codex_pr_opened"
   | "execution_failed"
   | "judge_verdict"
   | "settled";
@@ -238,6 +239,19 @@ export interface ImplementationPlanArtifact {
   };
 }
 
+export type ExecutionPlanSource =
+  | "specialist_runner"
+  | "default_llm"
+  | "fallback_generic";
+
+export interface ExecutionPlanProvenance {
+  source: ExecutionPlanSource;
+  agent_id: string;
+  execution_status: AgentExecutionStatus;
+  probe_status: "available" | "missing_auth" | "not_configured" | "unreachable" | "skipped";
+  note?: string;
+}
+
 export interface ExecutionPlanArtifact {
   kind: "execution_plan";
   title: string;
@@ -258,6 +272,7 @@ export interface ExecutionPlanArtifact {
   acceptance_criteria: string[];
   estimated_seconds: number;
   approval_prompt: string;
+  produced_by?: ExecutionPlanProvenance;
 }
 
 export type ExecutionArtifact =
@@ -316,10 +331,54 @@ export interface SpecialistConfig {
   discovered_for?: string;
 }
 
+export interface ExecutionPlanLLMResponse {
+  title?: string;
+  summary?: string;
+  deliverables?: Array<{
+    title?: string;
+    description?: string;
+    artifact_type?: string;
+  }>;
+  context_required?: Array<{
+    owner?: "hyperspell" | "nia" | "user" | "auction-house";
+    item?: string;
+    why?: string;
+  }>;
+  risks?: string[];
+  acceptance_criteria?: string[];
+  approval_prompt?: string;
+}
+
+export interface ExecutionPlanRequest {
+  prompt: string;
+  taskType: string;
+  taskContext?: string;
+  revisionFeedback?: string;
+  estimatedSeconds: number;
+  bidPrice: number;
+}
+
+export interface SpecialistExecuteOpts {
+  task_id?: string;
+  target_repo?: string;
+  target_branch?: string;
+  acceptance_criteria?: string[];
+}
+
 export interface SpecialistRunner {
   config: SpecialistConfig;
   /** Decide whether to bid on a task. */
   bid(prompt: string, taskType: string): Promise<SpecialistDecision>;
   /** Execute the task once awarded. */
-  execute(prompt: string, taskType: string): Promise<SpecialistOutput>;
+  execute(
+    prompt: string,
+    taskType: string,
+    opts?: SpecialistExecuteOpts,
+  ): Promise<SpecialistOutput>;
+  /**
+   * Produce a buyer-approval plan in this specialist's voice. Optional; when
+   * absent, the orchestrator falls back to a default LLM call using the
+   * specialist's own system_prompt.
+   */
+  plan?(request: ExecutionPlanRequest): Promise<ExecutionPlanLLMResponse>;
 }

@@ -90,6 +90,8 @@ export function PlanReviewPanel({
     return json;
   }
 
+  const producedBy = artifact.produced_by;
+
   return (
     <Card className="animate-fade-up">
       <CardHeader
@@ -111,6 +113,29 @@ export function PlanReviewPanel({
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
           {artifact.summary}
         </p>
+        {producedBy && (
+          <p
+            className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-medium text-ink-muted"
+            title={producedBy.note ?? undefined}
+          >
+            <span
+              className={
+                producedBy.source === "fallback_generic"
+                  ? "text-amber-700"
+                  : "text-brand-700"
+              }
+            >
+              {producedBy.source === "specialist_runner"
+                ? `Plan written by ${producedBy.agent_id} via its runner`
+                : producedBy.source === "default_llm"
+                  ? `Plan written by GPT in ${producedBy.agent_id}'s voice`
+                  : `Generic fallback plan — specialist unreachable`}
+            </span>
+            <span className="font-mono text-ink-subtle">
+              {producedBy.execution_status} · probe {producedBy.probe_status}
+            </span>
+          </p>
+        )}
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">

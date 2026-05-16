@@ -8,6 +8,7 @@ import { MarkdownLite } from "./MarkdownLite";
 import { LaunchProduct } from "./LaunchProduct";
 import { ImplementationPlanProduct } from "./ImplementationPlanProduct";
 import type { ExecutionArtifact } from "@/lib/types";
+import { ArrowRight } from "@phosphor-icons/react";
 
 interface Props {
   task: TaskDoc;
@@ -27,6 +28,16 @@ function isResult(v: unknown): v is ResultShape {
       "text" in v &&
       typeof (v as Record<string, unknown>).text === "string"
   );
+}
+
+function prUrlFromEvents(events: LifecycleEventDoc[]): string | null {
+  const event = events.find((e) => e.event_type === "codex_pr_opened");
+  const payload = event?.payload as { pr_url?: string } | undefined;
+  return payload?.pr_url ?? null;
+}
+
+function prUrlFromText(text: string): string | null {
+  return text.match(/\bhttps:\/\/github\.com\/[^\s)]+\/pull\/\d+\b/)?.[0] ?? null;
 }
 
 export function ExecutionPanel({ task, events }: Props) {
@@ -106,6 +117,7 @@ export function ExecutionPanel({ task, events }: Props) {
       ? JSON.stringify(task.result, null, 2)
       : "";
   const artifact = isResult(task.result) ? task.result.artifact : undefined;
+  const prUrl = prUrlFromEvents(events) ?? prUrlFromText(text);
 
   return (
     <Card className="animate-fade-up">
@@ -117,6 +129,17 @@ export function ExecutionPanel({ task, events }: Props) {
           </span>
         }
       />
+      {prUrl && (
+        <a
+          href={prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-4 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+        >
+          Open pull request
+          <ArrowRight size={14} weight="bold" />
+        </a>
+      )}
       {artifact?.kind === "campaign_launch" ? (
         <LaunchProduct artifact={artifact} />
       ) : artifact?.kind === "implementation_plan" ? (

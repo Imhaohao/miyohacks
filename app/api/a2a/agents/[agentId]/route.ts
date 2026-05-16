@@ -65,6 +65,14 @@ function taskType(body: A2ARequest) {
   return typeof raw === "string" && raw.trim() ? raw : "general";
 }
 
+function executionTaskType(agentId: string, body: A2ARequest) {
+  const requested = taskType(body);
+  if (agentId === "codex-writer" && requested === "general") {
+    return "implementation";
+  }
+  return requested;
+}
+
 function supportedMethod(method: string | undefined): method is A2ASupportedMethod {
   return method === "message/send" || method === "tasks/send";
 }
@@ -124,7 +132,7 @@ function backingSystem(
   config: SpecialistConfig,
   executionStatus: AgentExecutionStatus,
 ) {
-  if (config.agent_id === "codex-writer") return "codex_runner";
+  if (config.agent_id === "codex-writer") return "github_pr";
   if (config.agent_id === "hyperspell-brain") return "hyperspell_memory_api";
   if (config.agent_id === "vercel-v0") return "v0_api";
   if (executionStatus === "native_mcp") return "mcp";
@@ -259,18 +267,21 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   }
 
   try {
-    const output = await runner.execute(prompt, taskType(body));
+    const output = await runner.execute(prompt, executionTaskType(agentId, body));
     if (typeof output === "string") {
       text = output;
     } else {
       text = output.summary;
       artifact = output;
     }
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     const errorText = [
       `# ${contact.display_name} execution failed`,
       "",
       "The Arbor-hosted A2A bridge accepted the task, but the configured execution runner could not complete it.",
+      "",
+      `Runner error: ${message}`,
       "",
       `Execution status: ${executionStatus}`,
       `Native connection: ${nativeConnection ? "yes" : "no"}`,
@@ -300,7 +311,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
           mode: executionStatus,
           execution_status: executionStatus,
           native_connection: nativeConnection,
-          task_type: taskType(body),
+          task_type: executionTaskType(agentId, body),
+          requested_task_type: taskType(body),
           request_method: body.method,
         },
         artifact,

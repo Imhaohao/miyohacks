@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { codexRunnerConfigured } from "../lib/codex-runner";
 import { codexWriter } from "../lib/specialists/codex-writer";
 
 const CODEX_ENV_KEYS = [
-  "CODEX_RUNNER_URL",
-  "CODEX_WORKSPACE_DIR",
-  "CODEX_RUNNER_SECRET",
+  "GITHUB_TOKEN",
+  "OPENAI_API_KEY",
 ] as const;
 
 async function withCodexEnv<T>(
@@ -32,10 +30,8 @@ async function withCodexEnv<T>(
   }
 }
 
-test("codex-writer declines implementation tasks without a real runner", async () => {
+test("codex-writer declines implementation tasks without GitHub/OpenAI creds", async () => {
   await withCodexEnv({}, async () => {
-    assert.equal(codexRunnerConfigured(), false);
-
     const decision = await codexWriter.bid(
       "Fix the repo bug and update the React task view.",
       "implementation",
@@ -44,17 +40,15 @@ test("codex-writer declines implementation tasks without a real runner", async (
     assert.equal("decline" in decision && decision.decline, true);
     assert.match(
       "reason" in decision ? decision.reason : "",
-      /Real Codex execution is not configured/,
+      /GITHUB_TOKEN.*OPENAI_API_KEY/,
     );
   });
 });
 
-test("codex-writer bids only when a real runner is configured", async () => {
+test("codex-writer bids only when GitHub and OpenAI are configured", async () => {
   await withCodexEnv(
-    { CODEX_RUNNER_URL: "https://runner.example.test/api/codex/run" },
+    { GITHUB_TOKEN: "ghp_test", OPENAI_API_KEY: "sk-test" },
     async () => {
-      assert.equal(codexRunnerConfigured(), true);
-
       const decision = await codexWriter.bid(
         "Implement the dashboard API integration in this repo.",
         "implementation",
@@ -64,8 +58,11 @@ test("codex-writer bids only when a real runner is configured", async () => {
         assert.fail(`expected a bid, got decline: ${decision.reason}`);
       }
       assert.equal(decision.tool_availability?.status, "available");
-      assert.deepEqual(decision.tool_availability?.checked, ["CODEX_RUNNER_URL"]);
-      assert.match(decision.capability_claim, /remote Codex runner/);
+      assert.deepEqual(decision.tool_availability?.checked, [
+        "GITHUB_TOKEN",
+        "OPENAI_API_KEY",
+      ]);
+      assert.match(decision.capability_claim, /GitHub PR/);
       assert.match(decision.execution_preview ?? "", /Real repo-editing run/);
     },
   );

@@ -66,6 +66,8 @@ interface CreateTaskArgs {
   prompt: string;
   max_budget: number;
   output_schema?: unknown;
+  target_repo?: string;
+  target_branch?: string;
   business_context?: string;
   repo_context?: string;
   source_hints?: string[];
@@ -118,6 +120,8 @@ async function createTask(ctx: MutationCtx, args: CreateTaskArgs) {
     task_type: args.task_type ?? "general",
     prompt: args.prompt,
     max_budget: args.max_budget,
+    target_repo: cleanOptional(args.target_repo),
+    target_branch: cleanOptional(args.target_branch),
     payment_status: "unfunded",
     output_schema: args.output_schema,
     status: "planning",
@@ -159,6 +163,8 @@ async function createTask(ctx: MutationCtx, args: CreateTaskArgs) {
       project_id: args.project_id,
       prompt: args.prompt,
       max_budget: args.max_budget,
+      target_repo: cleanOptional(args.target_repo),
+      target_branch: cleanOptional(args.target_branch),
     },
   });
 
@@ -204,6 +210,8 @@ export const post = mutation({
     prompt: v.string(),
     max_budget: v.number(),
     output_schema: v.optional(v.any()),
+    target_repo: v.optional(v.string()),
+    target_branch: v.optional(v.string()),
     business_context: v.optional(v.string()),
     repo_context: v.optional(v.string()),
     source_hints: v.optional(v.array(v.string())),
@@ -220,6 +228,8 @@ export const postAuthenticated = mutation({
     prompt: v.string(),
     max_budget: v.number(),
     output_schema: v.optional(v.any()),
+    target_repo: v.optional(v.string()),
+    target_branch: v.optional(v.string()),
     business_context: v.optional(v.string()),
     repo_context: v.optional(v.string()),
     source_hints: v.optional(v.array(v.string())),
@@ -243,6 +253,8 @@ export const postForAccount = mutation({
     prompt: v.string(),
     max_budget: v.number(),
     output_schema: v.optional(v.any()),
+    target_repo: v.optional(v.string()),
+    target_branch: v.optional(v.string()),
     business_context: v.optional(v.string()),
     repo_context: v.optional(v.string()),
     source_hints: v.optional(v.array(v.string())),
@@ -267,6 +279,8 @@ export const postForAccount = mutation({
       prompt: args.prompt,
       max_budget: args.max_budget,
       output_schema: args.output_schema,
+      target_repo: args.target_repo,
+      target_branch: args.target_branch,
       business_context: args.business_context,
       repo_context: args.repo_context,
       source_hints: args.source_hints,
@@ -305,6 +319,8 @@ export const _createChild = internalMutation({
       step_index: args.step_index,
       project_id: parent.project_id,
       product_context_profile_id: parent.product_context_profile_id,
+      target_repo: parent.target_repo,
+      target_branch: parent.target_branch,
     });
     await ctx.runMutation(internal.payments._allocateChildBudget, {
       parent_task_id: args.parent_task_id,

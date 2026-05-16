@@ -52,6 +52,8 @@ export default defineSchema({
     prompt: v.string(),
     output_schema: v.optional(v.any()),
     max_budget: v.number(),
+    target_repo: v.optional(v.string()),
+    target_branch: v.optional(v.string()),
     payment_status: v.optional(
       v.union(
         v.literal("unfunded"),

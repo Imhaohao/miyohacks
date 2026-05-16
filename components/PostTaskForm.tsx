@@ -76,6 +76,7 @@ export function PostTaskForm() {
   );
   const [prompt, setPrompt] = useState("");
   const [budget, setBudget] = useState("2.00");
+  const [targetRepo, setTargetRepo] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +92,7 @@ export function PostTaskForm() {
           task_type: DEFAULT_TASK_TYPE,
           prompt,
           max_budget: Number(budget),
+          target_repo: targetRepo.trim() || undefined,
         });
         router.push(`/task/${task_id}`);
       } else if (hasClerkSession) {
@@ -102,6 +104,7 @@ export function PostTaskForm() {
             task_type: DEFAULT_TASK_TYPE,
             prompt,
             max_budget: Number(budget),
+            target_repo: targetRepo.trim() || undefined,
           }),
         });
         const json = await res.json();
@@ -241,6 +244,21 @@ export function PostTaskForm() {
             requiredContext={requiredContext}
             likelySoftwareTask={likelySoftwareTask}
           />
+          <div>
+            <label htmlFor="target-repo" className={fieldLabel}>
+              GitHub repo{" "}
+              <span className="font-normal text-ink-subtle">
+                (optional, for code tasks)
+              </span>
+            </label>
+            <input
+              id="target-repo"
+              value={targetRepo}
+              onChange={(e) => setTargetRepo(e.target.value)}
+              placeholder="owner/repo or https://github.com/owner/repo"
+              className={inputBase}
+            />
+          </div>
           <div>
             <label htmlFor="budget" className={fieldLabel}>
               Budget

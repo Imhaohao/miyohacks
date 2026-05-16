@@ -61,6 +61,8 @@ export interface PostTaskArgs {
   task_type?: string;
   output_schema?: Record<string, unknown>;
   agent_id?: string;
+  target_repo?: string;
+  target_branch?: string;
   business_context?: string;
   repo_context?: string;
   source_hints?: string[];
@@ -334,6 +336,16 @@ export const TOOLS: ToolDefinition[] = [
           description:
             "Optional caller identifier. Defaults to 'agent:mcp'. No auth in v0.",
         },
+        target_repo: {
+          type: "string",
+          description:
+            "Optional GitHub repo for code tasks, e.g. owner/repo or https://github.com/owner/repo.",
+        },
+        target_branch: {
+          type: "string",
+          description:
+            "Optional base branch override for code tasks. Defaults to repo default branch.",
+        },
         business_context: {
           type: "string",
           description:
@@ -603,6 +615,8 @@ export async function handlePostTask(
         prompt: args.prompt,
         max_budget: args.max_budget,
         output_schema: args.output_schema,
+        target_repo: args.target_repo,
+        target_branch: args.target_branch,
         business_context: args.business_context,
         repo_context: args.repo_context,
         source_hints: args.source_hints,
@@ -613,6 +627,8 @@ export async function handlePostTask(
         prompt: args.prompt,
         max_budget: args.max_budget,
         output_schema: args.output_schema,
+        target_repo: args.target_repo,
+        target_branch: args.target_branch,
         business_context: args.business_context,
         repo_context: args.repo_context,
         source_hints: args.source_hints,

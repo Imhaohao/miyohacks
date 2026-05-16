@@ -1,12 +1,15 @@
 const MODEL = "gpt-5.5";
 const CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const RESPONSES_URL = "https://api.openai.com/v1/responses";
 
 interface CallOptions {
   systemPrompt: string;
   userPrompt: string;
+  model?: string;
   maxTokens?: number;
   timeoutMs?: number;
   retries?: number;
+  responseFormat?: unknown;
 }
 
 interface OpenAITextResponse {
@@ -17,13 +20,28 @@ interface OpenAITextResponse {
   }>;
 }
 
+interface OpenAIResponsesResponse {
+  output_text?: string;
+  output?: Array<{
+    content?: Array<{
+      type?: string;
+      text?: string;
+    }>;
+  }>;
+}
+
 async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return await Promise.race([
-    p,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms),
-    ),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function apiKey(): string {
@@ -44,18 +62,90 @@ function extractText(data: OpenAITextResponse): string {
   throw new Error("OpenAI returned no text content");
 }
 
+function extractResponsesText(data: OpenAIResponsesResponse): string {
+  if (typeof data.output_text === "string") return data.output_text;
+  const text = data.output
+    ?.flatMap((item) => item.content ?? [])
+    .filter((content) => content.type === "output_text" && typeof content.text === "string")
+    .map((content) => content.text)
+    .join("\n");
+  if (text) return text;
+  throw new Error("OpenAI returned no response text content");
+}
+
+function normalizeResponsesFormat(responseFormat: unknown): unknown {
+  if (
+    responseFormat &&
+    typeof responseFormat === "object" &&
+    "json_schema" in responseFormat
+  ) {
+    const legacy = responseFormat as {
+      type?: string;
+      json_schema?: {
+        name?: string;
+        description?: string;
+        strict?: boolean;
+        schema?: unknown;
+      };
+    };
+    if (legacy.type === "json_schema" && legacy.json_schema) {
+      return {
+        type: "json_schema",
+        name: legacy.json_schema.name,
+        description: legacy.json_schema.description,
+        strict: legacy.json_schema.strict,
+        schema: legacy.json_schema.schema,
+      };
+    }
+  }
+  return responseFormat;
+}
+
 export async function callOpenAI(opts: CallOptions): Promise<string> {
   const {
     systemPrompt,
     userPrompt,
+    model = MODEL,
     maxTokens = 1024,
     timeoutMs = 20_000,
     retries = 1,
+    responseFormat,
   } = opts;
 
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
+      if (responseFormat) {
+        const response = await withTimeout(
+          fetch(RESPONSES_URL, {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${apiKey()}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              model,
+              input: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              max_output_tokens: maxTokens,
+              text: {
+                format: normalizeResponsesFormat(responseFormat),
+              },
+            }),
+          }),
+          timeoutMs,
+        );
+
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`OpenAI API error ${response.status}: ${text.slice(0, 300)}`);
+        }
+
+        return extractResponsesText((await response.json()) as OpenAIResponsesResponse);
+      }
+
       const response = await withTimeout(
         fetch(CHAT_COMPLETIONS_URL, {
           method: "POST",
@@ -64,7 +154,7 @@ export async function callOpenAI(opts: CallOptions): Promise<string> {
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            model: MODEL,
+            model,
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },

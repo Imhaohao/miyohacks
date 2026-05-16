@@ -18,12 +18,22 @@ import type {
   AgentId,
   BidPayload,
   ExecutionPlanArtifact,
+  ExecutionPlanProvenance,
+  ExecutionPlanRequest,
+  ExecutionPlanSource,
   ExecutionArtifact,
   JudgeVerdict,
   SpecialistConfig,
   SpecialistOutput,
 } from "../lib/types";
 import { callOpenAIJSON } from "../lib/openai";
+import {
+  fallbackExecutionPlan,
+  makeDefaultPlanFn,
+  normalizeExecutionPlan,
+} from "../lib/execution-plan";
+import { probeSpecialistConnection } from "../lib/specialists/connection-runtime";
+import { classifyAgentExecution } from "../lib/agent-execution-status";
 import {
   buildTaskContext,
   isCreatorCommerceTask,
@@ -510,122 +520,15 @@ export const resolve = internalAction({
 
 // ─── Phase 4a: buyer-review execution plan ───────────────────────────────
 
-interface PlanLLMResponse {
-  title?: string;
-  summary?: string;
-  deliverables?: Array<{
-    title?: string;
-    description?: string;
-    artifact_type?: string;
-  }>;
-  context_required?: Array<{
-    owner?: "hyperspell" | "nia" | "user" | "auction-house";
-    item?: string;
-    why?: string;
-  }>;
-  risks?: string[];
-  acceptance_criteria?: string[];
-  approval_prompt?: string;
-}
+const SPECIALIST_PLAN_TIMEOUT_MS = 60_000;
 
-function fallbackExecutionPlan(args: {
-  agent_id: string;
-  prompt: string;
-  estimated_seconds: number;
-  revisionFeedback?: string;
-}): ExecutionPlanArtifact {
-  return {
-    kind: "execution_plan",
-    title: "Execution plan for approval",
-    summary:
-      "The winning executor will use the attached executive/context guidance to produce the requested deliverable after buyer approval.",
-    agent_id: args.agent_id,
-    user_goal: args.prompt,
-    deliverables: [
-      {
-        title: "Final work product",
-        description:
-          "A concrete artifact that directly addresses the user's original request and preserves the attached business/repo context.",
-        artifact_type: "markdown_report",
-      },
-      {
-        title: "Evidence and assumptions",
-        description:
-          "A concise explanation of sources used, assumptions made, and follow-up actions needed.",
-        artifact_type: "structured_json",
-      },
-    ],
-    context_required: [
-      {
-        owner: "hyperspell",
-        item: "Business context, goals, and constraints",
-        why: "Keeps the specialist aligned with the buyer's product and operating reality.",
-      },
-      {
-        owner: "nia",
-        item: "Repo/docs/source context",
-        why: "Prevents invented implementation details and protects existing system behavior.",
-      },
-      {
-        owner: "auction-house",
-        item: "Winning bid, budget, and acceptance criteria",
-        why: "Defines the paid execution contract before external work begins.",
-      },
-    ],
-    risks: [
-      "Live external tools may require credentials or return partial data.",
-      "The buyer should approve the plan before any externally visible action.",
-      ...(args.revisionFeedback ? [`Revision feedback to address: ${args.revisionFeedback}`] : []),
-    ],
-    acceptance_criteria: [
-      "Output stays on the user's actual task and does not drift into an unrelated domain.",
-      "Output cites or preserves the attached context packet where relevant.",
-      "Output is concrete enough for the buyer or a downstream agent to act on.",
-    ],
-    estimated_seconds: args.estimated_seconds,
-    approval_prompt:
-      "Approve this plan to release the winning executor, or request a revision with concrete feedback.",
-  };
-}
-
-function normalizeExecutionPlan(args: {
-  agent_id: string;
-  prompt: string;
-  estimated_seconds: number;
-  raw: PlanLLMResponse;
-  revisionFeedback?: string;
-}): ExecutionPlanArtifact {
-  const fallback = fallbackExecutionPlan(args);
-  return {
-    ...fallback,
-    title: args.raw.title?.trim() || fallback.title,
-    summary: args.raw.summary?.trim() || fallback.summary,
-    deliverables:
-      args.raw.deliverables
-        ?.filter((item) => item.title && item.description)
-        .map((item) => ({
-          title: item.title ?? "Deliverable",
-          description: item.description ?? "",
-          artifact_type: item.artifact_type ?? "markdown_report",
-        })) ?? fallback.deliverables,
-    context_required:
-      args.raw.context_required
-        ?.filter((item) => item.owner && item.item && item.why)
-        .map((item) => ({
-          owner: item.owner as "hyperspell" | "nia" | "user" | "auction-house",
-          item: item.item ?? "",
-          why: item.why ?? "",
-        })) ?? fallback.context_required,
-    risks:
-      args.raw.risks?.filter(
-        (item): item is string => typeof item === "string" && item.trim().length > 0,
-      ) ?? fallback.risks,
-    acceptance_criteria:
-      args.raw.acceptance_criteria?.filter(
-        (item): item is string => typeof item === "string" && item.trim().length > 0,
-      ) ?? fallback.acceptance_criteria,
-    approval_prompt: args.raw.approval_prompt?.trim() || fallback.approval_prompt,
-  };
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timeout (${ms}ms)`)), ms),
+    ),
+  ]);
 }
 
 export const prepareExecutionPlan = internalAction({
@@ -647,58 +550,106 @@ export const prepareExecutionPlan = internalAction({
       task_id: args.task_id,
     });
 
+    // Resolve the runner so plans are written by the winning specialist (in its
+    // own voice + with its own backing system) rather than by a generic
+    // plan-writer prompt that just *mentions* the agent's name.
+    let runner: ReturnType<typeof getRunner> | undefined;
+    let runnerConfig: SpecialistConfig | undefined;
+    let executionStatus = classifyAgentExecution({ agent_id: winner.agent_id });
+    try {
+      runner = getRunner(winner.agent_id as AgentId);
+      runnerConfig = runner.config;
+      executionStatus = classifyAgentExecution(runnerConfig);
+    } catch {
+      // Discovered specialists that haven't been hydrated into this process
+      // fall through with a synthetic config below.
+    }
+
     await ctx.runMutation(internal.lifecycle.log, {
       task_id: args.task_id,
       event_type: "execution_plan_started",
       payload: {
         agent_id: winner.agent_id,
         revision: Boolean(args.revision_feedback),
+        execution_status: executionStatus,
       },
     });
 
-    const userPrompt = [
-      `User goal:\n${task.prompt}`,
-      taskContext ? `Context packet:\n${taskContext.prompt_addendum}` : null,
-      args.revision_feedback
-        ? `Buyer requested revision. Address this feedback:\n${args.revision_feedback}`
-        : null,
-      `Winning executor: ${winner.agent_id}`,
-      `Winning executor bid: $${winner.bid_price.toFixed(2)}`,
-      `Estimated execution seconds: ${winner.estimated_seconds}`,
-    ]
-      .filter(Boolean)
-      .join("\n\n---\n\n");
+    const planRequest: ExecutionPlanRequest = {
+      prompt: task.prompt,
+      taskType: task.task_type,
+      taskContext: taskContext?.prompt_addendum,
+      revisionFeedback: args.revision_feedback,
+      estimatedSeconds: winner.estimated_seconds,
+      bidPrice: winner.bid_price,
+    };
 
     let plan: ExecutionPlanArtifact;
-    try {
-      const raw = await Promise.race([
-        callOpenAIJSON<PlanLLMResponse>({
-          systemPrompt:
-            "You are Arbor's execution-plan writer. Before the selected executor does paid/external work, produce a concise buyer-approval plan. Output JSON only with title, summary, deliverables, context_required, risks, acceptance_criteria, and approval_prompt. Do not claim execution has happened.",
-          userPrompt,
-          maxTokens: 900,
-          timeoutMs: 25_000,
-          retries: 0,
-        }),
-        new Promise<PlanLLMResponse>((_, reject) =>
-          setTimeout(() => reject(new Error("execution plan timeout (25s)")), 25_000),
-        ),
-      ]);
-      plan = normalizeExecutionPlan({
-        agent_id: winner.agent_id,
-        prompt: task.prompt,
-        estimated_seconds: winner.estimated_seconds,
-        raw,
-        revisionFeedback: args.revision_feedback,
-      });
-    } catch {
+    let source: ExecutionPlanSource = "fallback_generic";
+    let probeStatus: ExecutionPlanProvenance["probe_status"] = "skipped";
+    let provenanceNote: string | undefined;
+
+    if (runner && runnerConfig) {
+      // Probe so we can surface honestly whether the specialist's backing
+      // system was reachable when the plan was drafted. Probe failures do not
+      // block plan generation — they just downgrade the provenance.
+      try {
+        const probe = await probeSpecialistConnection(runnerConfig);
+        probeStatus = probe.status;
+        if (probe.status !== "available") {
+          provenanceNote = `probe: ${probe.reason}`;
+        }
+      } catch (err) {
+        probeStatus = "unreachable";
+        provenanceNote = err instanceof Error ? err.message : String(err);
+      }
+
+      const planFn = runner.plan ?? makeDefaultPlanFn(runnerConfig);
+      const usedRunnerOverride = Boolean(runner.plan);
+
+      try {
+        const raw = await withTimeout(
+          Promise.resolve(planFn(planRequest)),
+          SPECIALIST_PLAN_TIMEOUT_MS,
+          usedRunnerOverride ? "specialist plan" : "default plan",
+        );
+        plan = normalizeExecutionPlan({
+          agent_id: winner.agent_id,
+          prompt: task.prompt,
+          estimated_seconds: winner.estimated_seconds,
+          raw,
+          revisionFeedback: args.revision_feedback,
+        });
+        source = usedRunnerOverride ? "specialist_runner" : "default_llm";
+      } catch (err) {
+        plan = fallbackExecutionPlan({
+          agent_id: winner.agent_id,
+          prompt: task.prompt,
+          estimated_seconds: winner.estimated_seconds,
+          revisionFeedback: args.revision_feedback,
+        });
+        source = "fallback_generic";
+        provenanceNote = err instanceof Error ? err.message : String(err);
+      }
+    } else {
       plan = fallbackExecutionPlan({
         agent_id: winner.agent_id,
         prompt: task.prompt,
         estimated_seconds: winner.estimated_seconds,
         revisionFeedback: args.revision_feedback,
       });
+      source = "fallback_generic";
+      provenanceNote = "winning specialist runner not resolvable in this process";
     }
+
+    const provenance: ExecutionPlanProvenance = {
+      source,
+      agent_id: winner.agent_id,
+      execution_status: executionStatus,
+      probe_status: probeStatus,
+      ...(provenanceNote ? { note: provenanceNote } : {}),
+    };
+    plan = { ...plan, produced_by: provenance };
 
     const plan_id = await ctx.runMutation(internal.executionPlans._upsert, {
       task_id: args.task_id,
@@ -719,6 +670,7 @@ export const prepareExecutionPlan = internalAction({
         agent_id: winner.agent_id,
         revision: Boolean(args.revision_feedback),
         title: plan.title,
+        produced_by: provenance,
       },
     });
   },
@@ -780,12 +732,27 @@ export const execute = internalAction({
         });
       }
       const runner = getRunner(winner.agent_id as AgentId);
+      const latestPlan = await ctx.runQuery(
+        internal.executionPlans._latestForTask,
+        { task_id: args.task_id },
+      );
+      const planAcceptanceCriteria =
+        Array.isArray(latestPlan?.plan?.acceptance_criteria)
+          ? latestPlan.plan.acceptance_criteria.filter(
+              (item: unknown): item is string => typeof item === "string",
+            )
+          : undefined;
       // 180s cap on execute. MCP-forwarding specialists run multi-round
       // tool-calling loops (6 rounds × ~30s each worst case for Reacher /
       // Nia), so 60s would force a timeout before they finish. Plain
       // (mock) specialists return well under this.
       const result = await Promise.race([
-        runner.execute(promptForExecution, task.task_type),
+        runner.execute(promptForExecution, task.task_type, {
+          task_id: args.task_id,
+          target_repo: task.target_repo,
+          target_branch: task.target_branch,
+          acceptance_criteria: planAcceptanceCriteria,
+        }),
         new Promise<SpecialistOutput>((_, reject) =>
           setTimeout(() => reject(new Error("execution timeout (180s)")), 180_000),
         ),
@@ -805,6 +772,26 @@ export const execute = internalAction({
         event_type: "execution_complete",
         payload: { agent_id: winner.agent_id, length: normalized.text.length },
       });
+      const prUrlMatch =
+        typeof normalized.text === "string"
+          ? normalized.text.match(/\bhttps:\/\/github\.com\/[^\s)]+\/pull\/\d+\b/)
+          : null;
+      if (prUrlMatch && winner.agent_id === "codex-writer") {
+        await ctx.runMutation(internal.lifecycle.log, {
+          task_id: args.task_id,
+          event_type: "codex_pr_opened",
+          payload: {
+            agent_id: winner.agent_id,
+            pr_url: prUrlMatch[0],
+          },
+        });
+        await ctx
+          .runAction(internal.contextEnrichment.recordCodexPr, {
+            task_id: args.task_id,
+            pr_url: prUrlMatch[0],
+          })
+          .catch(() => undefined);
+      }
 
       // Phase 5 — judge.
       await ctx.scheduler.runAfter(0, internal.auctions.judge, {

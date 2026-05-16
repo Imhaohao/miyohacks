@@ -1,6 +1,6 @@
-// Specialist: codex-writer (powered by a real Codex execution runner).
-// Bids only when CODEX_RUNNER_URL or CODEX_WORKSPACE_DIR is configured, then
-// edits the target checkout via Codex instead of returning a persona mock.
+// Specialist: codex-writer (powered by OpenAI Responses + GitHub PRs).
+// Bids only when GITHUB_TOKEN and OPENAI_API_KEY are configured, then opens a
+// real PR on the buyer's target repo instead of returning a persona mock.
 
 import { makeCodexWriterSpecialist } from "./codex-real-runner";
 import type { SpecialistConfig, SpecialistRunner } from "../types";

@@ -1,4 +1,4 @@
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { actorForCurrentUser, assertTaskReadable } from "./authHelpers";
@@ -72,6 +72,17 @@ export const forTask = query({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
     await assertTaskReadable(ctx, args.task_id);
+    return await ctx.db
+      .query("execution_plans")
+      .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+      .order("desc")
+      .first();
+  },
+});
+
+export const _latestForTask = internalQuery({
+  args: { task_id: v.id("tasks") },
+  handler: async (ctx, args) => {
     return await ctx.db
       .query("execution_plans")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))

@@ -60,7 +60,7 @@ Every housed contact is reachable through either a native MCP endpoint or an Arb
 | `nia-context` | **Nia (Nozomio)** | A2A bridge | Adds campaign memory, indexed briefs, brand-context constraints, cross-session context. |
 | `hyperspell-brain` | **Hyperspell** | A2A bridge | Synthesizes brand persona and audience-fit rationale across scattered campaign context. |
 | `tensorlake-exec` | **Tensorlake** | A2A bridge | Verifies GMV evidence, sample feasibility, brand-safety risk before launch. |
-| `codex-writer` | **OpenAI Codex** | A2A bridge | Generates creator-specific outreach drafts, follow-ups, sample-request payloads. |
+| `codex-writer` | **OpenAI Codex** | A2A bridge | Generates scoped code patches and opens GitHub PRs for buyer review. |
 | `devin-engineer` | **Devin** | A2A bridge | Runs the end-to-end campaign operator workflow from discovery through launch plan. |
 | `vercel-v0` | **Vercel (v0)** | A2A bridge | Generates campaign landing pages, hero copy, creator-brief docs from the brand brief. |
 | `insforge-backend` | **InsForge** | A2A bridge | Spins up Postgres + auth + storage + edge functions sized for an agent-driven campaign. |
@@ -79,7 +79,7 @@ See [lib/mcp-outbound.ts](lib/mcp-outbound.ts) and [lib/specialists/mcp-forwardi
 
 When a housed specialist does not expose a native MCP server, Arbor exposes an A2A-compatible agent card and JSON-RPC `message/send` bridge at `/api/a2a/agents/:agentId`. The bridge only executes if the agent has a real backing adapter, native MCP endpoint, native A2A endpoint, or configured runner. Mock catalog entries return a failed A2A task state instead of a ChatGPT placeholder.
 
-`codex-writer` is different from the A2A bridge persona agents: it only bids when a real Codex execution runner is configured. Set `CODEX_RUNNER_URL` on the Convex deployment to a reachable runner endpoint, and set `CODEX_RUNNER_SECRET` plus `CODEX_WORKSPACE_DIR` on the runner host. The built-in local runner lives at `/api/codex/run`; it shells out to `codex exec`, edits the configured checkout, and returns changed files, diff stats, and verification output. If no runner is configured, `codex-writer` declines instead of pretending it edited the repo.
+`codex-writer` is different from the A2A bridge persona agents: it only bids when `GITHUB_TOKEN` and `OPENAI_API_KEY` are configured. It uses OpenAI Responses structured output to produce full-file patch proposals, writes them to a GitHub branch through the Contents API, opens a pull request, and returns the PR URL as the deliverable. If the task has no `target_repo` and `CODEX_DEFAULT_TARGET_REPO` is unset, or if GitHub/OpenAI credentials are missing, `codex-writer` declines/fails honestly instead of pretending it edited the repo. The old `/api/codex/run` CLI runner remains in the tree for one-commit rollback only.
 
 ### Connected execution framework
 
