@@ -2,12 +2,12 @@
  * Example MCP client — proves the agent-to-agent flow.
  *
  * Run:
- *   npx tsx examples/mcp-client.ts "your startup launch brief here" 2.00
+ *   npx tsx examples/mcp-client.ts "your task brief here" 2.00
  *
  * What it does:
  *   1. POSTs `tools/call` with `post_task` to /api/mcp.
  *   2. Prints the web_view_url so a human can click and watch the auction live.
- *   3. Polls `get_task` every 2s until status is complete / disputed / failed.
+ *   3. Polls `get_task` every 2s and prints status transitions until terminal.
  *   4. Prints the final result.
  *
  * Uses raw fetch (no SDK) so the on-the-wire payload is visible to the
@@ -64,7 +64,7 @@ async function callTool<T>(name: string, args: Record<string, unknown>): Promise
 async function main() {
   const prompt =
     process.argv[2] ??
-    "We are a seed-stage startup launching a clean-label electrolyte drink on TikTok Shop. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, flag risk, and produce a first 7-day launch plan.";
+    "Compare three ways to add Stripe Connect payouts to our agent marketplace, recommend the safest path, and produce an implementation plan with risks and acceptance criteria.";
   const max_budget = Number(process.argv[3] ?? "2.00");
 
   console.log(`endpoint: ${ENDPOINT}`);
@@ -87,19 +87,21 @@ async function main() {
   }>("post_task", {
     prompt,
     max_budget,
-    task_type: process.env.TASK_TYPE ?? "reacher-live-launch",
+    task_type: process.env.TASK_TYPE ?? "general",
   });
 
   console.log(`task posted: ${posted.task_id}`);
+  console.log(`initial status: ${posted.status}`);
   console.log(`watch live: ${posted.web_view_url}\n`);
 
   // 3. poll for completion
-  const terminalStatuses = new Set(["complete", "disputed", "failed"]);
-  let lastStatus = "";
+  const terminalStatuses = new Set(["complete", "disputed", "failed", "cancelled"]);
+  let lastStatus = posted.status;
+  let lastPricePaid: number | undefined;
   for (;;) {
     await new Promise((r) => setTimeout(r, 2000));
     const state = await callTool<{
-      task: { status: string; price_paid?: number; result?: unknown };
+      task: { status: string; price_paid?: number; result?: unknown } | null;
       bids: Array<{ agent_id: string; bid_price: number; score: number }>;
     }>("get_task", { task_id: posted.task_id });
 
@@ -107,9 +109,11 @@ async function main() {
     if (status !== lastStatus) {
       console.log(`status: ${status}`);
       lastStatus = status;
-      if (status === "awarded" && state.task.price_paid !== undefined) {
-        console.log(`  price paid (Vickrey): $${state.task.price_paid.toFixed(2)}`);
-      }
+    }
+    const pricePaid = state.task?.price_paid;
+    if (pricePaid !== undefined && pricePaid !== lastPricePaid) {
+      console.log(`price paid (protocol clearing): $${pricePaid.toFixed(2)}`);
+      lastPricePaid = pricePaid;
     }
     if (terminalStatuses.has(status)) {
       console.log("\n--- final state ---");

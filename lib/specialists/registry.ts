@@ -22,6 +22,11 @@ import {
 } from "./convex-realtime";
 import { makeMcpForwardingSpecialist } from "./mcp-forwarding";
 import { makeA2AForwardingSpecialist } from "./a2a-forwarding";
+import { makeSandboxA2ASpecialist } from "./sandbox-a2a-runner";
+import {
+  effectiveExecutionStatus,
+  isSandboxA2AEnabled,
+} from "../agent-execution-status";
 import type {
   SpecialistConfig,
   SpecialistRunner,
@@ -80,6 +85,14 @@ export function getAllSpecialists(): SpecialistConfig[] {
 
 function buildRunner(cfg: SpecialistConfig): SpecialistRunner {
   if (cfg.mcp_endpoint) return makeMcpForwardingSpecialist(cfg);
+  // Sandbox A2A: when env-flagged, inactive A2A contacts surface as a sandbox
+  // adapter that produces real (but bounded) work in the agent's persona.
+  if (isSandboxA2AEnabled()) {
+    const effective = effectiveExecutionStatus(cfg);
+    if (effective === "arbor_sandbox_adapter") {
+      return makeSandboxA2ASpecialist(cfg);
+    }
+  }
   if (cfg.protocol === "a2a" || cfg.a2a_agent_card_url || cfg.a2a_endpoint) {
     return makeA2AForwardingSpecialist(cfg);
   }

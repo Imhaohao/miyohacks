@@ -90,7 +90,7 @@ export function AuctionResolution({
           status={status}
           details={[
             "Quotes stay hidden — even from this view — until the window closes.",
-            "When the window closes, Arbor ranks expected quality divided by effective price.",
+            "When the window closes, Arbor ranks reputation score divided by bid price.",
           ]}
           elapsedSeconds={elapsed}
           tone="warning"
@@ -106,7 +106,7 @@ export function AuctionResolution({
     ? null
     : explainUnselectableExecutorBid(winner, task.max_budget);
   const isDegenerate = vickrey.rule === "degenerate_single_bid";
-  const maxScore = Math.max(...bids.map((b) => b.value_score ?? b.score), 0.01);
+  const maxScore = Math.max(...bids.map((b) => b.score), 0.01);
   const topChoices = (payload.top_3 ?? bids)
     .filter((b) => isSelectableExecutorBid(b, task.max_budget))
     .slice(0, 3);
@@ -220,7 +220,7 @@ export function AuctionResolution({
       {winnerSelectable && (
         <div className="mb-6 rounded-2xl bg-brand-50 p-5">
           <div className="text-xs font-medium text-brand-700">
-            Best value · quality-adjusted Vickrey
+            Best protocol score · Vickrey-style
           </div>
           <div className="mt-3 flex flex-wrap items-baseline gap-3">
             <span className="text-sm text-ink-muted">
@@ -237,21 +237,28 @@ export function AuctionResolution({
           <p className="mt-2 text-xs text-ink-muted">
             {isDegenerate
               ? "Only one valid offer — they pay their own price."
-              : "Clearing price is derived from the runner-up's value score, so specialists compete on quality per dollar, not cheapness alone."}
+              : "Clearing price is the next-ranked executor's raw bid. Winner selection uses reputation score divided by bid price."}
           </p>
           <div className="mt-4 grid gap-2 text-[11px] sm:grid-cols-5">
+            <Metric label="Reputation / bid" value={formatScore(winner.score)} />
             <Metric label="Expected quality" value={formatPct(winner.expected_quality)} />
-            <Metric label="Effective price" value={formatMoney(winner.effective_price ?? winner.bid_price)} />
-            <Metric label="Value score" value={formatScore(winner.value_score ?? winner.score)} />
+            <Metric
+              label="Value diagnostic"
+              value={
+                typeof winner.value_score === "number"
+                  ? formatScore(winner.value_score)
+                  : "n/a"
+              }
+            />
             <Metric
               label="Connection"
               value={EXECUTION_STATUS_LABELS[bidExecutionStatus(winner)]}
             />
             <Metric
-              label="Runner benchmark"
+              label="Runner-up bid"
               value={
-                vickrey.runner_up_value_score
-                  ? formatScore(vickrey.runner_up_value_score)
+                typeof vickrey.runner_up_bid_price === "number"
+                  ? formatMoney(vickrey.runner_up_bid_price)
                   : "n/a"
               }
             />
@@ -311,8 +318,8 @@ export function AuctionResolution({
           const isWinner = isStoredWinner && isSelectableExecutorBid(b, task.max_budget);
           const isBlockedWinner = isStoredWinner && !isWinner;
           const role = roleForAgent(b.agent_id, b.agent_role);
-          const valueScore = b.value_score ?? b.score;
-          const widthPct = Math.max(8, Math.round((valueScore / maxScore) * 100));
+          const protocolScore = b.score;
+          const widthPct = Math.max(8, Math.round((protocolScore / maxScore) * 100));
           return (
             <div
               key={b.bid_id}
@@ -379,7 +386,7 @@ export function AuctionResolution({
                       <span style={{ width: `${widthPct}%` }} />
                     </div>
                     <span className="shrink-0 font-mono text-[11px] text-ink-muted">
-                      value {formatScore(valueScore)}
+                      score {formatScore(protocolScore)}
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-ink-muted">
@@ -476,7 +483,7 @@ function TopChoice({
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-ink-muted">
         <span>quality {formatPct(bid.expected_quality)}</span>
-        <span>value {formatScore(bid.value_score ?? bid.score)}</span>
+        <span>score {formatScore(bid.score)}</span>
         <span>fit {formatPct(bid.task_fit_score)}</span>
         <span>
           {EXECUTION_STATUS_LABELS[bidExecutionStatus(bid)]}
@@ -523,7 +530,7 @@ function SupportBid({ bid }: { bid: AuctionBidSummary }) {
           </p>
         </div>
         <div className="shrink-0 text-right font-mono text-ink">
-          {formatScore(bid.value_score ?? bid.score)}
+          {formatScore(bid.score)}
         </div>
       </div>
     </div>

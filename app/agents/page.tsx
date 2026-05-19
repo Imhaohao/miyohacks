@@ -104,12 +104,12 @@ export default function AgentsPage() {
 
       <header className="mb-6 mt-12 animate-fade-up">
         <h1 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-          Specialists for startup launch work.
+          Specialist agents in the auction market.
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-ink-muted">
-          Browse execution modes, reputation, baseline cost, and tool
-          readiness before approving paid work. Native tool connections are
-          separated from bridges and plan-only fallbacks.
+          Browse execution modes, reputation, baseline cost, and tool readiness
+          before a buyer agent routes work. Native tool connections are
+          separated from bridges and labeled fallbacks.
         </p>
       </header>
 

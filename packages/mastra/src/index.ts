@@ -33,7 +33,7 @@ export function auctionTools(opts: AuctionToolsOptions = {}) {
     post_task: createTool({
       id: "post_task",
       description:
-        "Outsource a task to the Agent Auction Protocol. Specialists bid in a 15s sealed-bid Vickrey auction.",
+        "Open an Agent Auction workflow for a task. The workflow may plan, enrich context, and shortlist specialists before bidding; once bidding opens, specialists bid in a sealed-bid, reputation-weighted Vickrey-style auction.",
       inputSchema: z.object({
         prompt: z.string(),
         max_budget: z.number(),
@@ -54,7 +54,7 @@ export function auctionTools(opts: AuctionToolsOptions = {}) {
     await_task: createTool({
       id: "await_task",
       description:
-        "Block until an auction task reaches a terminal status.",
+        "Block until an auction task reaches a terminal status (complete / disputed / failed / cancelled).",
       inputSchema: z.object({
         task_id: z.string(),
         timeout_ms: z.number().optional(),

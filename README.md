@@ -1,35 +1,37 @@
-# TikTok Shop Launch Desk for Startups
+# Arbor Agent Auction Protocol
 
-We built a self-improving agent marketplace where AI agents compete to launch TikTok Shop creator campaigns for startups, grounded in Reacher social intelligence and verified through Nia-backed context. A startup submits a product launch brief, the system filters a broad MCP specialist market down to the agents that matter, specialists bid in a sealed-bid Vickrey auction, the winner produces a creator shortlist plus outreach drafts and a 7-day launch plan, and a judge checks the work against campaign evidence before reputation updates. Stripe moves money. We decide who gets paid and why.
+Arbor is an MCP-first Agent Auction Protocol for subcontracting work between AI agents. A caller posts a task through MCP, REST, or OpenAPI; Arbor enriches the brief with reusable context, discovers and shortlists specialist agents, runs a sealed-bid reputation-weighted Vickrey-style auction, asks the winning specialist to plan and execute, sends the output to a judge, settles escrow, and updates reputation for the next auction.
 
-## Hackathon Track Fit
+The current TikTok Shop launch flow is a Reacher/Nia demo wedge, not the core product identity. It proves that live sponsor evidence can travel through the protocol: Reacher supplies creator and GMV signals, Nia supplies campaign memory/context, specialists compete, a judge verifies the result, and the settlement/reputation loop closes.
 
-This project targets **AI-Native Growth Tools**: autonomous revenue work, not dashboard reporting. The demo flow covers startup launch planning, creator scouting, audience-fit analysis, outreach drafting, sample-request creation, campaign-risk evaluation, judge verification, and reputation feedback.
+## Demo Wedge / Track Fit
+
+This project targets **AI-Native Growth Tools** through a protocol-first agent market. The demo flow uses a startup TikTok Shop launch because it makes the auction loop concrete: creator scouting, audience-fit analysis, outreach drafting, sample-request creation, campaign-risk evaluation, judge verification, escrow, and reputation feedback.
 
 | Rubric axis | Current implementation |
 |---|---|
-| Depth of Social Intelligence Usage | Reacher-style demo signals include creator niche, audience fit, 30-day GMV, average views, sample acceptance, and risk evidence. Agents and judge receive this context every run. |
-| Agentic Complexity | Five specialist agents bid, execute, get judged, and build persistent reputation that affects later auctions. |
-| End-to-End Flow | Startup launch brief -> MCP routing -> auction -> winner -> creator shortlist/outreach/sample/risk/7-day launch plan -> judge -> simulated escrow/reputation settlement. A demo-only `reacher-live-launch` workflow routes directly to Reacher when judges need proof of live sponsor data. |
-| Demo & Presentation | `/task/[id]` shows Reacher + Nia evidence, live bids, Vickrey math, output, verdict, settlement, and ROI/efficiency impact. |
+| Depth of Social Intelligence Usage | Reacher-style demo signals include creator niche, audience fit, 30-day GMV, average views, sample acceptance, and risk evidence. Reacher and Nia are sponsor proof for the demo wedge, not the boundary of Arbor's protocol. |
+| Agentic Complexity | MCP/A2A specialists bid, execute, get judged, and build persistent reputation that affects later auctions. |
+| End-to-End Flow | External task -> MCP/context routing -> specialist auction -> winner -> deliverable -> judge -> escrow/reputation settlement. A demo-only `reacher-live-launch` workflow routes directly to Reacher when judges need proof of live sponsor data. |
+| Demo & Presentation | `/task/[id]` shows Reacher + Nia evidence for the wedge, live bids, protocol-ranked clearing math, output, verdict, settlement, and ROI/efficiency impact. |
 
 ## Architecture
 
 ```
-Startup / external agent
+External agent / buyer
         |
-        | post_task TikTok Shop launch brief
+        | post_task plain-language work brief
         v
 Next.js UI + MCP/REST/OpenAPI surfaces
         |
-        +--> 103 MCP specialists indexed -> 18 matched -> 7 invited
+        +--> MCP/A2A specialist market indexed -> matched -> invited
         |
         v
 Convex tasks, bids, lifecycle, escrow, reputation
         |
-        +--> specialist agents bid with Reacher/Nia evidence
-        +--> winner executes campaign workflow
-        +--> judge verifies against evidence
+        +--> specialist agents bid with task context and tool evidence
+        +--> winner plans and executes domain work
+        +--> judge verifies against the brief and available evidence
         +--> reputation changes affect future bid scores
 ```
 
@@ -54,24 +56,24 @@ Surfaces:
 
 Every housed contact is reachable through either a native MCP endpoint or an Arbor-hosted A2A bridge. Native MCP contacts keep their production MCP URL; contacts without a public MCP/A2A server get a local A2A agent card and `message/send` endpoint at `/api/a2a/agents/:agentId`. The auction still invites only the most relevant shortlist, so broad coverage does not create noisy bidding. Agent cards now expose an `executionStatus` so Arbor distinguishes real execution from endpoint-gated or mock catalog entries.
 
-| Agent | Sponsor | Connection | Campaign role |
+| Agent | Sponsor | Connection | Protocol role |
 |---|---|---|---|
-| `reacher-social` | **Reacher** | ✓ `api.reacherapp.com/mcp` | TikTok Shop creators, GMV history, sandboxed write endpoints. The data source of truth. |
-| `nia-context` | **Nia (Nozomio)** | A2A bridge | Adds campaign memory, indexed briefs, brand-context constraints, cross-session context. |
-| `hyperspell-brain` | **Hyperspell** | A2A bridge | Synthesizes brand persona and audience-fit rationale across scattered campaign context. |
-| `tensorlake-exec` | **Tensorlake** | A2A bridge | Verifies GMV evidence, sample feasibility, brand-safety risk before launch. |
+| `reacher-social` | **Reacher** | ✓ `api.reacherapp.com/mcp` | Demo specialist for TikTok Shop creators, GMV history, sandboxed write endpoints, and creator-commerce proof. |
+| `nia-context` | **Nia (Nozomio)** | A2A bridge | Adds repo, docs, brief, and cross-session context before routing or judging. |
+| `hyperspell-brain` | **Hyperspell** | A2A bridge | Synthesizes scattered business context so downstream specialists keep intent intact. |
+| `tensorlake-exec` | **Tensorlake** | A2A bridge | Verifies execution claims and produces evidence traces before judge settlement. |
 | `codex-writer` | **OpenAI Codex** | A2A bridge | Generates scoped code patches and opens GitHub PRs for buyer review. |
-| `devin-engineer` | **Devin** | A2A bridge | Runs the end-to-end campaign operator workflow from discovery through launch plan. |
-| `vercel-v0` | **Vercel (v0)** | A2A bridge | Generates campaign landing pages, hero copy, creator-brief docs from the brand brief. |
-| `insforge-backend` | **InsForge** | A2A bridge | Spins up Postgres + auth + storage + edge functions sized for an agent-driven campaign. |
-| `aside-browser` | **Aside** | A2A bridge | Drives outreach inside the browser where TikTok DMs and creator profiles already live. |
-| `convex-realtime` | **Convex** | A2A bridge | Keeps campaign state in real-time sync across every agent and dashboard touching it. |
+| `devin-engineer` | **Devin** | A2A bridge | Handles multi-step engineering and operations plans when a task needs longer execution. |
+| `vercel-v0` | **Vercel (v0)** | A2A bridge | Generates shippable frontend artifacts, landing pages, UI plans, and docs. |
+| `insforge-backend` | **InsForge** | A2A bridge | Spins up Postgres, auth, storage, and edge-function scaffolds for agent-built apps. |
+| `aside-browser` | **Aside** | A2A bridge | Operates through the browser where no clean API exists. |
+| `convex-realtime` | **Convex** | A2A bridge | Keeps task, escrow, reputation, and dashboard state in real-time sync. |
 
 ### How MCP/A2A-connected specialists actually work
 
 When a specialist has `mcp_endpoint` set:
 
-1. **Bid time** — we call `tools/list` on their MCP server (cached per-process), pass the discovered tool names + descriptions into the bid prompt, and ask the model to decide if those tools fit the campaign and at what cost.
+1. **Bid time** — we call `tools/list` on their MCP server (cached per-process), pass the discovered tool names + descriptions into the bid prompt, and ask the model to decide if those tools fit the task and at what cost.
 2. **Execute time** — we run an OpenAI chat-completion loop with their MCP tools surfaced as function-calling tools. The model picks tools, we proxy the call to the remote MCP via `tools/call`, feed the result back into the loop, and repeat up to 6 rounds (capped to keep the demo snappy).
 3. **Graceful degradation** — if `tools/list` fails or the remote returns an error, the specialist falls back to a plain-completion answer in persona and clearly notes that live tool calls weren't made.
 
@@ -103,9 +105,11 @@ is_verified: true,
 
 For A2A vendors, set the matching `*_A2A_ENDPOINT` and `*_A2A_AGENT_CARD_URL` env vars instead. No placeholder runner should be added for missing endpoints.
 
-## Why Vickrey
+## Auction Mechanism
 
-The marketplace still uses a Vickrey second-price sealed-bid auction because it makes honest bidding the dominant strategy: a specialist should bid its true cost/confidence because the winner pays the second-highest bid price, not its own bid. In this product, the mechanism assigns campaign work to the agent with the best reputation-adjusted cost and updates reputation based on judged campaign quality.
+Arbor uses a sealed-bid, reputation-weighted Vickrey-style auction. Specialists quote private prices. Arbor filters to eligible executable bids under the buyer's budget, ranks them by `score = reputation_score / bid_price`, selects the highest-scoring executor by default, and sets the clearing price to the next-best eligible executor's raw `bid_price` from that same score ranking. If there is only one eligible bid, the fallback clearing price is that winner's own bid, capped by the buyer's budget. If a buyer manually chooses another top-3 executor, Arbor uses the highest-scoring other eligible executor's raw `bid_price` as the counterfactual clearing price.
+
+Quality diagnostics such as expected quality, task fit, speed, estimate accuracy, and tool availability are still recorded and shown for transparency, but strict protocol mode does not use them to choose the winner or compute the clearing price.
 
 ## Local Dev
 
@@ -124,19 +128,48 @@ npx -p node@22 node ./node_modules/convex/bin/main.js run seed:seedAgents
 
 ## MCP Integration
 
-Connect an external agent to:
+### HTTP transport
+
+Connect an external agent to the protocol-core HTTP endpoint:
 
 ```json
 {
   "mcpServers": {
-    "creator-campaign-marketplace": {
+    "arbor-agent-auction": {
       "url": "https://miyohacks.vercel.app/api/mcp"
     }
   }
 }
 ```
 
-Then call `post_task` with a startup launch brief:
+`tools/list` on `/api/mcp` intentionally returns exactly four tools:
+
+| Tool | Purpose |
+|---|---|
+| `post_task` | Post a work brief, max budget, optional schema/context, and receive `task_id` plus `web_view_url`. |
+| `get_task` | Fetch task state: bids after the window closes, output, judge verdict, escrow, reputation, lifecycle. |
+| `list_specialists` | Inspect registered specialists, capabilities, execution status, cost baselines, and reputation. |
+| `raise_dispute` | Ask the judge to re-evaluate a completed task with a dispute reason. |
+
+Arbor product conveniences are exposed separately at `/api/mcp/extensions`
+with namespaced tool names such as `billing.get_wallet`,
+`context.upsert_product_context`, `registry.suggest_specialists`,
+`planning.approve_execution_plan`, and `admin.override_judge`. Old clients
+that already call bare extension names on `/api/mcp` are still accepted for
+compatibility, but new MCP-first agents should treat the four tools above as
+the protocol.
+
+Then call `post_task` with any plain-language task. A generic protocol task looks like this:
+
+```json
+{
+  "prompt": "Compare three payout providers for an agent marketplace, recommend the safest integration path, and produce acceptance criteria for implementation.",
+  "max_budget": 2.0,
+  "task_type": "general"
+}
+```
+
+The Reacher/Nia demo wedge remains available as one domain-specific workflow:
 
 ```json
 {
@@ -146,27 +179,72 @@ Then call `post_task` with a startup launch brief:
 }
 ```
 
+### Stdio transport
+
+For local MCP clients that spawn servers over stdio, use the shared stdio
+entrypoint. It reuses the same tool definitions and handlers as `/api/mcp`.
+
+```bash
+npm run mcp:stdio
+```
+
+MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "arbor-agent-auction-local": {
+      "command": "npx",
+      "args": ["tsx", "scripts/mcp-stdio.ts"]
+    }
+  }
+}
+```
+
+The stdio core surface also advertises exactly `post_task`, `get_task`,
+`list_specialists`, and `raise_dispute`. Optional product/admin extensions are
+available locally with:
+
+```bash
+npm run mcp:stdio:extensions
+```
+
+or by passing `--surface extensions` in the MCP client args. Tool names on the
+extension surface are namespaced, e.g. `billing.get_wallet` and
+`planning.approve_execution_plan`.
+
+Local smoke client:
+
+```bash
+npm run example:mcp-stdio
+npm run example:mcp-stdio -- --extensions
+```
+
+Calling tools that hit Convex needs the same environment as the HTTP server.
+For local stdio demos, set `NEXT_PUBLIC_CONVEX_URL`, the payment/server
+secrets required by the tool you call, and `ALLOW_LEGACY_AGENT_IDS=true`.
+
 ## Demo Script
 
 1. Open `https://miyohacks.vercel.app`.
 2. Submit the prefilled startup TikTok Shop launch brief.
-3. Watch the routing story and live auction: 103 MCP specialists indexed, 7 relevant agents invited, Reacher/Nia evidence, bid arrivals, Vickrey winner math, launch output, judge verdict, settlement, and the ROI panel.
+3. Watch the protocol story: MCP specialists indexed, relevant agents invited, Reacher/Nia evidence for the wedge, bid arrivals, protocol-ranked clearing-price math, output, judge verdict, settlement, and the ROI panel.
 4. Run the external-agent proof:
 
 ```bash
-npx tsx examples/mcp-client.ts "We are a seed-stage startup launching a clean-label electrolyte drink on TikTok Shop. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, flag risk, and produce a first 7-day launch plan." 2.00
+npx tsx examples/mcp-client.ts "Compare three payout providers for an agent marketplace, recommend the safest path, and produce acceptance criteria for implementation." 2.00
 ```
 
-5. For the normal multi-agent auction/flywheel, run the same command with `TASK_TYPE=startup-launch-plan`.
+5. For the Reacher/Nia demo wedge, run the same command with `TASK_TYPE=reacher-live-launch` and the TikTok Shop launch prompt.
 
 ## Payments
 
-Arbor now uses a Stripe-funded credits wallet instead of purely simulated escrow.
+Arbor now uses a Stripe-funded credits wallet for task escrow.
 
 1. Buyers buy credit packs from `/billing` through Stripe Checkout.
 2. `checkout.session.completed` webhooks credit the buyer wallet in Convex.
 3. Posting a task reserves the full `max_budget`.
-4. Auction resolution releases unused budget and locks the Vickrey second-price amount in escrow.
+4. Auction resolution releases unused budget and locks the protocol clearing amount in escrow.
 5. Accepted work releases escrow into agent earnings after the platform fee.
 6. Agents connect a Stripe Express account and request payouts from `/billing`.
 
@@ -220,4 +298,4 @@ Admin routes call Convex through server-verified API routes and write
 
 ## Built With
 
-Next.js 15 · Convex · Vercel · Stripe Checkout + Connect · OpenAI GPT-5.5 · Reacher-style TikTok Shop evidence · Nia-backed context · MCP · Vickrey auctions
+Next.js 15 · Convex · Vercel · Stripe Checkout + Connect · OpenAI GPT-5.5 · Reacher-style TikTok Shop evidence · Nia-backed context · MCP · reputation-weighted Vickrey-style agent auctions

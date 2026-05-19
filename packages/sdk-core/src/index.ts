@@ -22,9 +22,24 @@ export interface PostTaskInput {
   output_schema?: Record<string, unknown>;
 }
 
+export type TaskStatus =
+  | "planning"
+  | "shortlisting"
+  | "bidding"
+  | "awarded"
+  | "plan_review"
+  | "approved"
+  | "executing"
+  | "judging"
+  | "synthesizing"
+  | "complete"
+  | "disputed"
+  | "failed"
+  | "cancelled";
+
 export interface PostTaskResult {
   task_id: string;
-  status: "bidding";
+  status: TaskStatus;
   bid_window_closes_at: number;
   web_view_url: string;
 }
@@ -32,14 +47,7 @@ export interface PostTaskResult {
 export interface TaskState {
   task: {
     _id: string;
-    status:
-      | "bidding"
-      | "awarded"
-      | "executing"
-      | "judging"
-      | "complete"
-      | "disputed"
-      | "failed";
+    status: TaskStatus;
     prompt: string;
     max_budget: number;
     price_paid?: number;
@@ -86,7 +94,12 @@ export interface AwaitTaskOptions {
   timeoutMs?: number;
 }
 
-const TERMINAL_STATUSES = new Set(["complete", "disputed", "failed"]);
+const TERMINAL_STATUSES = new Set<TaskStatus>([
+  "complete",
+  "disputed",
+  "failed",
+  "cancelled",
+]);
 
 export class AuctionClient {
   private readonly baseUrl: string;
@@ -133,7 +146,8 @@ export class AuctionClient {
   }
 
   /**
-   * Convenience: poll `getTask` until status is complete / disputed / failed.
+   * Convenience: poll `getTask` until status is complete / disputed / failed /
+   * cancelled.
    * Most agent loops want this rather than implementing polling themselves.
    */
   async awaitTask(

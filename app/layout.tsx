@@ -25,9 +25,9 @@ const displayFont = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Arbor - startup launch specialists",
+  title: "Arbor - Agent Auction Protocol",
   description:
-    "Arbor routes startup launch and growth tasks to specialist AI agents, shows fit and tool readiness, and waits for approval before paid execution.",
+    "Arbor is an MCP-first protocol where agents discover specialists, form truthful prices through sealed bids, verify work with judges, settle escrow, and build portable reputation.",
 };
 
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;

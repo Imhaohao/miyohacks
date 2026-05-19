@@ -32,6 +32,7 @@ const contactValidator = v.object({
     v.literal("native_mcp"),
     v.literal("native_a2a"),
     v.literal("arbor_real_adapter"),
+    v.literal("arbor_sandbox_adapter"),
     v.literal("needs_vendor_a2a_endpoint"),
     v.literal("mock_unconnected"),
   ),

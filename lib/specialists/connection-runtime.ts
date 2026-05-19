@@ -7,7 +7,10 @@ import {
 } from "../a2a-client";
 import {
   classifyAgentExecution,
+  effectiveExecutionStatus,
   isArborA2ABridgeUrl,
+  isSandboxA2AEnabled,
+  SANDBOX_DISCLOSURE_TEXT,
 } from "../agent-execution-status";
 import { discoverTools, type RemoteMcpTool } from "../mcp-outbound";
 import type { BidPayload, SpecialistConfig } from "../types";
@@ -105,7 +108,7 @@ export function configuredConnectionAvailability(
   config: SpecialistConfig,
 ): ToolAvailability {
   const connection = getSpecialistConnection(config);
-  const executionStatus = classifyAgentExecution({
+  const executionSubject = {
     agent_id: config.agent_id,
     protocol: config.protocol,
     endpoint_url: connection.endpointUrl,
@@ -113,7 +116,10 @@ export function configuredConnectionAvailability(
     mcp_endpoint: config.mcp_endpoint,
     a2a_endpoint: config.a2a_endpoint,
     a2a_agent_card_url: config.a2a_agent_card_url,
-  });
+  };
+  const intrinsicStatus = classifyAgentExecution(executionSubject);
+  const effectiveStatus = effectiveExecutionStatus(executionSubject);
+  const executionStatus = effectiveStatus;
   const checked = [
     connection.protocol,
     ...(connection.authEnv ? [connection.authEnv] : []),
@@ -127,9 +133,29 @@ export function configuredConnectionAvailability(
     endpoint_host: endpointHost(connection.endpointUrl ?? connection.agentCardUrl),
   } satisfies Partial<ToolAvailability>;
 
-  if (executionStatus === "mock_unconnected") {
+  // Sandbox A2A: when env-flagged, otherwise inactive A2A contacts surface as
+  // available via the sandbox adapter. The disclosure flag tells callers to
+  // label output as sandbox rather than vendor-native.
+  if (
+    effectiveStatus === "arbor_sandbox_adapter" &&
+    isSandboxA2AEnabled() &&
+    (intrinsicStatus === "mock_unconnected" ||
+      intrinsicStatus === "needs_vendor_a2a_endpoint")
+  ) {
     return {
       ...base,
+      status: "available",
+      checked: [...checked, "ENABLE_SANDBOX_A2A=true"],
+      reason: SANDBOX_DISCLOSURE_TEXT,
+      sandbox: true,
+      proof: `sandbox runner: ${config.agent_id}`,
+    };
+  }
+
+  if (intrinsicStatus === "mock_unconnected") {
+    return {
+      ...base,
+      execution_status: intrinsicStatus,
       status: "missing",
       checked: [...checked, "execution_status"],
       reason:
@@ -137,9 +163,10 @@ export function configuredConnectionAvailability(
     };
   }
 
-  if (executionStatus === "needs_vendor_a2a_endpoint") {
+  if (intrinsicStatus === "needs_vendor_a2a_endpoint") {
     return {
       ...base,
+      execution_status: intrinsicStatus,
       status: "missing",
       checked: [...checked, "execution_status"],
       reason: "real vendor A2A endpoint is required before this agent can bid",

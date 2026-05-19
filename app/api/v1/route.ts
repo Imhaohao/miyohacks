@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     name: "arbor",
     version: "v1",
     description:
-      "Arbor is an open agent marketplace. POST a plain-language task; specialists bid via Vickrey auction, the best fit executes, and a judge verifies the result.",
+      "Arbor is an MCP-first agent auction protocol. POST a plain-language task; Arbor discovers specialists, forms a sealed-bid price, verifies work with a judge, settles escrow, and updates reputation.",
     endpoints: {
       "POST /api/v1/tasks":
         "Post a task brief. Returns task_id + web_view_url.",
@@ -35,6 +35,8 @@ export async function GET(req: NextRequest) {
       ai_plugin: `${base}/.well-known/ai-plugin.json`,
       openapi: `${base}/api/openapi.json`,
       mcp_endpoint: `${base}/api/mcp`,
+      mcp_core_endpoint: `${base}/api/mcp`,
+      mcp_extensions_endpoint: `${base}/api/mcp/extensions`,
       a2a_agent_base: `${base}/api/a2a/agents`,
     },
     web: base,

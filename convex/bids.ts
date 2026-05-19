@@ -1,6 +1,7 @@
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
 import { assertTaskReadable } from "./authHelpers";
+import { areBidsVisible, sortBidsByProtocolScore } from "../lib/auction-mechanism";
 
 /**
  * Public query: bids for a task. The sealed-bid property is enforced here —
@@ -11,14 +12,12 @@ export const forTask = query({
   args: { task_id: v.id("tasks") },
   handler: async (ctx, args) => {
     const task = await assertTaskReadable(ctx, args.task_id);
-    if (Date.now() < task.bid_window_closes_at) return [];
+    if (!areBidsVisible(Date.now(), task.bid_window_closes_at)) return [];
     const bids = await ctx.db
       .query("bids")
       .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
       .collect();
-    return bids.sort(
-      (a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score),
-    );
+    return sortBidsByProtocolScore(bids);
   },
 });
 
@@ -75,12 +74,14 @@ export const _insert = internalMutation({
             v.literal("native_mcp"),
             v.literal("native_a2a"),
             v.literal("arbor_real_adapter"),
+            v.literal("arbor_sandbox_adapter"),
             v.literal("needs_vendor_a2a_endpoint"),
             v.literal("mock_unconnected"),
           ),
         ),
         endpoint_host: v.optional(v.string()),
         proof: v.optional(v.string()),
+        sandbox: v.optional(v.boolean()),
       }),
     ),
   },

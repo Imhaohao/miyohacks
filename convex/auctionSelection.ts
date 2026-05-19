@@ -1,7 +1,11 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { qualityAdjustedVickreyPrice } from "../lib/auction-value";
+import {
+  eligibleExecutorBids,
+  protocolClearingPrice,
+  sortBidsByProtocolScore,
+} from "../lib/auction-mechanism";
 import {
   isSelectableExecutorBid,
   explainUnselectableExecutorBid,
@@ -47,18 +51,11 @@ async function chooseTopBidCore(
     throw new Error("selected bid does not belong to this task");
   }
 
-  const validBids = (
-    await ctx.db
-      .query("bids")
-      .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
-      .collect()
-  )
-    .filter(
-      (bid) =>
-        bid.bid_price <= task.max_budget &&
-        isSelectableExecutorBid(bid, task.max_budget),
-    )
-    .sort((a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score));
+  const allBids = await ctx.db
+    .query("bids")
+    .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+    .collect();
+  const validBids = eligibleExecutorBids(allBids, task.max_budget);
 
   const top3 = validBids.slice(0, 3);
   if (!top3.some((bid) => bid._id === args.bid_id)) {
@@ -66,11 +63,9 @@ async function chooseTopBidCore(
   }
 
   const runner = validBids.find((bid) => bid._id !== selected._id);
-  const price_paid = qualityAdjustedVickreyPrice({
-    winnerExpectedQuality:
-      selected.expected_quality ?? selected.score * selected.bid_price,
-    runnerUpValueScore: runner?.value_score ?? runner?.score,
-    winnerBidPrice: selected.bid_price,
+  const price_paid = protocolClearingPrice({
+    winner: selected,
+    runnerUp: runner,
     maxBudget: task.max_budget,
   });
 
@@ -136,19 +131,16 @@ async function repairInvalidWinnerCore(
     .query("bids")
     .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
     .collect();
-  const validBids = allBids
-    .filter((bid) => isSelectableExecutorBid(bid, task.max_budget))
-    .sort((a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score));
+  const validBids = eligibleExecutorBids(allBids, task.max_budget);
   if (validBids.length === 0) {
     throw new Error("no verified external executor bids are available");
   }
 
   const winner = validBids[0];
   const runnerUp = validBids[1];
-  const price_paid = qualityAdjustedVickreyPrice({
-    winnerExpectedQuality: winner.expected_quality ?? winner.score * winner.bid_price,
-    runnerUpValueScore: runnerUp?.value_score ?? runnerUp?.score,
-    winnerBidPrice: winner.bid_price,
+  const price_paid = protocolClearingPrice({
+    winner,
+    runnerUp,
     maxBudget: task.max_budget,
   });
   const serializeBid = (b: typeof winner) => ({
@@ -156,8 +148,8 @@ async function repairInvalidWinnerCore(
     agent_id: b.agent_id,
     agent_role: roleForAgent(b.agent_id, b.agent_role),
     bid_price: b.bid_price,
-    score: b.value_score ?? b.score,
-    value_score: b.value_score ?? b.score,
+    score: b.score,
+    value_score: b.value_score,
     capability_claim: b.capability_claim,
     estimated_seconds: b.estimated_seconds,
     task_fit_score: b.task_fit_score,
@@ -195,19 +187,22 @@ async function repairInvalidWinnerCore(
         : { bid_id: task.winning_bid_id, reason: "winning bid missing" },
       bids: validBids.map(serializeBid),
       top_3: validBids.slice(0, 3).map(serializeBid),
-      support_bids: allBids
-        .filter((bid) => !isSelectableExecutorBid(bid, task.max_budget))
-        .map(serializeBid),
+      support_bids: sortBidsByProtocolScore(
+        allBids.filter((bid) => !isSelectableExecutorBid(bid, task.max_budget)),
+      ).map(serializeBid),
       winner: serializeBid(winner),
       vickrey: {
         winner_bid_price: winner.bid_price,
-        runner_up_value_score: runnerUp?.value_score ?? runnerUp?.score,
+        winner_score: winner.score,
+        runner_up_bid_price: runnerUp?.bid_price,
+        runner_up_score: runnerUp?.score,
         clearing_price: price_paid,
         price_paid,
         rule:
           validBids.length >= 2
-            ? "quality_adjusted_second_price"
+            ? "strict_vickrey_second_price"
             : "degenerate_single_bid",
+        score_formula: "reputation_score / bid_price",
       },
     },
   });

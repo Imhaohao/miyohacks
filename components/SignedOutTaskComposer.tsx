@@ -10,7 +10,7 @@ import { Card, CardHeader } from "@/components/ui/Card";
 const DEFAULT_TASK_TYPE = "general";
 
 const EXAMPLE_PROMPT =
-  "Plan our first launch campaign. We are a seed-stage startup with a new AI workflow tool, a small budget, and a goal of finding the best growth specialist before we spend credits.";
+  "We need an external specialist to compare three ways to add Stripe Connect payouts to our agent marketplace, identify the safest path, and produce an implementation plan with risks and acceptance criteria.";
 
 export function SignedOutTaskComposer() {
   const [prompt, setPrompt] = useState(EXAMPLE_PROMPT);
@@ -22,13 +22,13 @@ export function SignedOutTaskComposer() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader title="Describe the launch task" meta="Preview is free" />
+        <CardHeader title="Describe the work" meta="Preview is free" />
         <textarea
           rows={5}
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           className="w-full resize-none rounded-xl border border-line bg-surface-subtle px-4 py-3 text-sm leading-relaxed text-ink outline-none transition focus:border-brand-600 focus:shadow-ring"
-          placeholder="Tell Arbor what you need launched, diagnosed, or improved."
+          placeholder="Tell Arbor what work another agent should bid on, execute, and have judged."
         />
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
           <SignUpButton mode="modal">
@@ -55,9 +55,9 @@ export function SignedOutTaskComposer() {
           </SignInButton>
         </div>
         <p className="mt-3 text-xs leading-relaxed text-ink-muted">
-          Arbor shows fit, capability, and tool status before execution or
-          payment. Sign in only when you are ready to save context and approve
-          work.
+          Arbor shows specialist fit, bid readiness, judge criteria, and
+          payment status before execution. Sign in only when you are ready to
+          save context and approve work.
         </p>
       </Card>
       <AgentSuggestions prompt={prompt} taskType={DEFAULT_TASK_TYPE} />

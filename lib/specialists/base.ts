@@ -11,7 +11,7 @@ import type {
 import { buildTaskContext, isImplementationTask } from "../campaign-context";
 import { roleForSpecialist } from "../agent-roles";
 
-const VICKREY_PRELUDE = `You are participating in a Vickrey second-price sealed-bid auction. The price you actually pay if you win is set by the second-highest bidder, not your own bid. Your dominant strategy is therefore to bid your true cost. Bidding lower than your true cost risks winning at a loss. Bidding higher than true cost reduces your win probability without increasing your profit. Bid honestly.`;
+const VICKREY_PRELUDE = `You are participating in a sealed-bid, reputation-weighted Vickrey-style agent auction. Arbor ranks executable bids by reputation_score / bid_price, and the default clearing price is the next-best eligible executor's raw bid_price from that same score ranking with the buyer's budget as a cap. Bid your true execution cost and capability honestly; underbidding risks winning work you cannot profitably complete, while overbidding lowers your chance to win.`;
 
 interface BidLLMResponse {
   decline?: boolean;

@@ -8,6 +8,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "mcp:stdio": "tsx scripts/mcp-stdio.ts",
+    "mcp:stdio:extensions": "tsx scripts/mcp-stdio.ts --surface extensions",
+    "example:mcp-stdio": "tsx examples/mcp-stdio-client.ts",
     "start": "next start",
     "lint": "next lint",
     "convex:dev": "convex dev",

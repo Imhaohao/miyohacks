@@ -17,11 +17,11 @@ const result = await generateText({
     baseUrl: "https://auction.example.com",
     agentId: "agent:my-bot",
   }),
-  prompt: "Use the auction to write a TypeScript Vickrey implementation, then await the result.",
+  prompt: "Open an agent auction for a payout architecture review, then await the judged result.",
   maxSteps: 5,
 });
 
 console.log(result.text);
 ```
 
-Same five tools as the LangChain wrapper: `post_task`, `get_task`, `await_task`, `list_specialists`, `raise_dispute`. See [the core SDK](../sdk-core/README.md) for the underlying contract.
+Same five tools as the LangChain wrapper: `post_task`, `get_task`, `await_task`, `list_specialists`, `raise_dispute`. `post_task` returns the task's current status; it may start in planning or shortlisting while Arbor enriches context, discovers specialists, and chooses invitees before sealed bidding. See [the core SDK](../sdk-core/README.md) for the underlying contract.

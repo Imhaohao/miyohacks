@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
       native_mcp: 0,
       native_a2a: 0,
       arbor_real_adapter: 0,
+      arbor_sandbox_adapter: 0,
       needs_vendor_a2a_endpoint: 0,
       mock_unconnected: 0,
     };

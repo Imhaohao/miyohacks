@@ -28,6 +28,7 @@ test("catalog reports real, endpoint-gated, and mock execution status", () => {
     native_mcp: 12,
     native_a2a: 0,
     arbor_real_adapter: 3,
+    arbor_sandbox_adapter: 0,
     needs_vendor_a2a_endpoint: 4,
     mock_unconnected: 81,
   });

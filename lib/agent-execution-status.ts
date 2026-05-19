@@ -35,10 +35,14 @@ const NEEDS_VENDOR_A2A = new Set<string>(
   VENDOR_A2A_ENDPOINT_REQUIRED_AGENT_IDS,
 );
 
+export const SANDBOX_DISCLOSURE_TEXT =
+  "Sandbox A2A adapter: Arbor produced this output via its own LLM in the agent's persona. It is not a vendor-native API call.";
+
 export const EXECUTION_STATUS_LABELS: Record<AgentExecutionStatus, string> = {
   native_mcp: "Native MCP",
   native_a2a: "Native A2A",
   arbor_real_adapter: "Arbor adapter",
+  arbor_sandbox_adapter: "Sandbox adapter",
   needs_vendor_a2a_endpoint: "Needs vendor A2A",
   mock_unconnected: "Mock only",
 };
@@ -51,6 +55,8 @@ export const EXECUTION_STATUS_DESCRIPTIONS: Record<
   native_a2a: "Backed by a real vendor A2A endpoint.",
   arbor_real_adapter:
     "Arbor exposes A2A, but execution calls a real underlying API or runner.",
+  arbor_sandbox_adapter:
+    "Sandbox A2A adapter: real bounded work via Arbor/OpenAI, disclosed as sandbox rather than vendor-native.",
   needs_vendor_a2a_endpoint:
     "A sponsor runner exists, but no real vendor A2A endpoint is configured.",
   mock_unconnected:
@@ -63,6 +69,59 @@ export function isRealExecutionStatus(status: AgentExecutionStatus): boolean {
     status === "native_a2a" ||
     status === "arbor_real_adapter"
   );
+}
+
+/**
+ * Whether this execution status is permitted to win an auction. Real
+ * connections are always selectable; the sandbox adapter is only selectable
+ * when sandbox A2A is explicitly enabled by the deployment.
+ */
+export function isSelectableExecutionStatus(
+  status: AgentExecutionStatus,
+): boolean {
+  if (isRealExecutionStatus(status)) return true;
+  if (status === "arbor_sandbox_adapter") return isSandboxA2AEnabled();
+  return false;
+}
+
+/** Read the env flag that gates sandbox A2A execution. */
+export function isSandboxA2AEnabled(): boolean {
+  const raw = process.env.ENABLE_SANDBOX_A2A;
+  return typeof raw === "string" && raw.toLowerCase() === "true";
+}
+
+/**
+ * Sandbox eligibility: only A2A-protocol contacts that lack a real connection
+ * may be promoted to a sandbox adapter. MCP agents and real adapters keep
+ * their intrinsic status; mock-only manual entries are never sandboxed.
+ */
+function isSandboxEligible(
+  intrinsic: AgentExecutionStatus,
+  subject: ExecutionSubject,
+): boolean {
+  if (intrinsic === "needs_vendor_a2a_endpoint") return true;
+  if (intrinsic === "mock_unconnected") {
+    if (subject.protocol === "a2a") return true;
+    if (subject.a2a_endpoint || subject.a2a_agent_card_url) return true;
+  }
+  return false;
+}
+
+/**
+ * The deployment-aware execution status used by auction selection, the agent
+ * card route, and admin surfaces. When sandbox A2A is enabled, otherwise
+ * inactive A2A contacts surface as `arbor_sandbox_adapter`.
+ */
+export function effectiveExecutionStatus(
+  subject: ExecutionSubject,
+  options?: { sandboxEnabled?: boolean },
+): AgentExecutionStatus {
+  const intrinsic = classifyAgentExecution(subject);
+  const sandboxEnabled = options?.sandboxEnabled ?? isSandboxA2AEnabled();
+  if (!sandboxEnabled) return intrinsic;
+  return isSandboxEligible(intrinsic, subject)
+    ? "arbor_sandbox_adapter"
+    : intrinsic;
 }
 
 export function isArborA2ABridgeUrl(url: string | undefined): boolean {
@@ -104,16 +163,23 @@ export function classifyAgentExecution(
 
 export function executionStatusCounts<T extends ExecutionSubject>(
   subjects: T[],
+  options?: { useEffective?: boolean },
 ): Record<AgentExecutionStatus, number> {
   const counts: Record<AgentExecutionStatus, number> = {
     native_mcp: 0,
     native_a2a: 0,
     arbor_real_adapter: 0,
+    arbor_sandbox_adapter: 0,
     needs_vendor_a2a_endpoint: 0,
     mock_unconnected: 0,
   };
+  const useEffective = options?.useEffective ?? false;
   for (const subject of subjects) {
-    counts[classifyAgentExecution(subject)] += 1;
+    counts[
+      useEffective
+        ? effectiveExecutionStatus(subject)
+        : classifyAgentExecution(subject)
+    ] += 1;
   }
   return counts;
 }

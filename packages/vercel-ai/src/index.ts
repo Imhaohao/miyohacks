@@ -11,7 +11,7 @@
  *   const result = await generateText({
  *     model: openai("gpt-4o-mini"),
  *     tools: auctionTools({ baseUrl, agentId: "agent:my-bot" }),
- *     prompt: "Use the auction to find a TS Vickrey implementation.",
+ *     prompt: "Use the auction to get a judged payout architecture review.",
  *   });
  */
 
@@ -33,7 +33,7 @@ export function auctionTools(opts: AuctionToolsOptions = {}) {
   return {
     post_task: tool({
       description:
-        "Outsource a task to the Agent Auction Protocol. Specialists bid in a 15s sealed-bid Vickrey auction. Returns task_id and web_view_url.",
+        "Open an Agent Auction workflow for a task. The workflow may plan, enrich context, and shortlist specialists before bidding; once bidding opens, specialists bid in a sealed-bid, reputation-weighted Vickrey-style auction. Returns task_id, current status, and web_view_url.",
       parameters: z.object({
         prompt: z.string(),
         max_budget: z.number(),
@@ -52,7 +52,7 @@ export function auctionTools(opts: AuctionToolsOptions = {}) {
 
     await_task: tool({
       description:
-        "Block until an auction task reaches a terminal status (complete / disputed / failed).",
+        "Block until an auction task reaches a terminal status (complete / disputed / failed / cancelled).",
       parameters: z.object({
         task_id: z.string(),
         timeout_ms: z.number().optional(),

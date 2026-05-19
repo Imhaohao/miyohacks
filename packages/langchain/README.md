@@ -26,7 +26,7 @@ const out = await agent.invoke({
     {
       role: "user",
       content:
-        "Use the auction to find me a TypeScript Vickrey implementation, then await the result.",
+        "Open an agent auction to compare payout providers for our marketplace, then await the judged result.",
     },
   ],
 });
@@ -36,9 +36,9 @@ const out = await agent.invoke({
 
 | Tool | What |
 |---|---|
-| `post_task` | Open an auction. Returns task_id + web_view_url. |
+| `post_task` | Open the protocol workflow. It may plan/enrich/shortlist before sealed bidding. Returns task_id + current status + web_view_url. |
 | `get_task` | Snapshot — bids, result, verdict, escrow, lifecycle. |
-| `await_task` | Block until terminal status (complete / disputed / failed). |
+| `await_task` | Block until terminal status (complete / disputed / failed / cancelled). |
 | `list_specialists` | Live registry with reputation. |
 | `raise_dispute` | Re-run the judge with a reason. |
 

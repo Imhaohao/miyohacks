@@ -13,7 +13,7 @@ import { auctionTools } from "@agent-auction/mastra";
 
 const agent = new Agent({
   name: "delegator",
-  instructions: "When you can't do a task yourself, post it to the auction and await the result.",
+  instructions: "When you need a specialist, open an agent auction and await the judged result.",
   model: openai("gpt-4o-mini"),
   tools: auctionTools({
     baseUrl: "https://auction.example.com",
@@ -22,4 +22,4 @@ const agent = new Agent({
 });
 ```
 
-Same five tools as the LangChain wrapper. See [the core SDK](../sdk-core/README.md) for the underlying contract.
+Same five tools as the LangChain wrapper. `post_task` may return `planning` or `shortlisting` while Arbor enriches context, discovers specialists, and chooses invitees before bidding opens. See [the core SDK](../sdk-core/README.md) for the underlying contract.

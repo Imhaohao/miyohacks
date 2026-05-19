@@ -41,9 +41,12 @@ test("A2A agent card reports codex-writer as an Arbor real adapter", async () =>
     );
     const card = await res.json();
 
-    assert.equal(card.protocolVersion, "0.2.6");
-    assert.equal(card.capabilities.executionStatus, "arbor_real_adapter");
-    assert.equal(card.capabilities.backingSystem, "github_pr");
+    assert.equal(card.protocolVersion, "0.3.0");
+    assert.equal(card.arbor.execution_status, "arbor_real_adapter");
+    assert.equal(card.arbor.backing_system, "github_pr");
+    assert.ok(card.arbor.supported_methods.includes("message/send"));
+    assert.ok(card.arbor.supported_methods.includes("tasks/get"));
+    assert.ok(card.arbor.supported_methods.includes("tasks/cancel"));
   } finally {
     if (previousGithub === undefined) delete process.env.GITHUB_TOKEN;
     else process.env.GITHUB_TOKEN = previousGithub;
@@ -53,13 +56,39 @@ test("A2A agent card reports codex-writer as an Arbor real adapter", async () =>
 });
 
 test("endpoint-gated sponsor agents report missing vendor A2A endpoints", async () => {
-  const res = await getA2AAgent(
-    new NextRequest("http://localhost:3000/api/a2a/agents/tensorlake-exec"),
-    routeContext("tensorlake-exec"),
-  );
-  const card = await res.json();
+  const previousSandbox = process.env.ENABLE_SANDBOX_A2A;
+  delete process.env.ENABLE_SANDBOX_A2A;
+  try {
+    const res = await getA2AAgent(
+      new NextRequest("http://localhost:3000/api/a2a/agents/tensorlake-exec"),
+      routeContext("tensorlake-exec"),
+    );
+    const card = await res.json();
 
-  assert.equal(card.capabilities.executionStatus, "needs_vendor_a2a_endpoint");
+    assert.equal(card.arbor.execution_status, "needs_vendor_a2a_endpoint");
+  } finally {
+    if (previousSandbox === undefined) delete process.env.ENABLE_SANDBOX_A2A;
+    else process.env.ENABLE_SANDBOX_A2A = previousSandbox;
+  }
+});
+
+test("sandbox flag promotes inactive A2A contacts to sandbox adapter", async () => {
+  const previousSandbox = process.env.ENABLE_SANDBOX_A2A;
+  process.env.ENABLE_SANDBOX_A2A = "true";
+  try {
+    const res = await getA2AAgent(
+      new NextRequest("http://localhost:3000/api/a2a/agents/quickbooks-ledger"),
+      routeContext("quickbooks-ledger"),
+    );
+    const card = await res.json();
+
+    assert.equal(card.arbor.execution_status, "arbor_sandbox_adapter");
+    assert.equal(card.arbor.sandbox, true);
+    assert.match(card.arbor.sandbox_disclosure, /Sandbox A2A adapter/);
+  } finally {
+    if (previousSandbox === undefined) delete process.env.ENABLE_SANDBOX_A2A;
+    else process.env.ENABLE_SANDBOX_A2A = previousSandbox;
+  }
 });
 
 test("mock catalog A2A agents fail instead of returning persona output", async () => {

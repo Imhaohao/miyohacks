@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "@/convex/_generated/api";
 import { corsPreflight, jsonError, jsonOk } from "@/lib/http";
 import {
   contactToSpecialistConfig,
@@ -7,10 +9,19 @@ import {
 import {
   EXECUTION_STATUS_DESCRIPTIONS,
   EXECUTION_STATUS_LABELS,
+  SANDBOX_DISCLOSURE_TEXT,
   classifyAgentExecution,
+  effectiveExecutionStatus,
+  isSandboxA2AEnabled,
 } from "@/lib/agent-execution-status";
 import { makeMcpForwardingSpecialist } from "@/lib/specialists/mcp-forwarding";
+import {
+  makeSandboxA2ASpecialist,
+  runSandboxA2AExecution,
+  type SandboxArtifact,
+} from "@/lib/specialists/sandbox-a2a-runner";
 import { SPECIALIST_RUNNERS } from "@/lib/specialists/registry";
+import { paymentServerSecret } from "@/lib/stripe";
 import type {
   AgentExecutionStatus,
   AgentId,
@@ -22,25 +33,45 @@ import type {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-interface A2ARequest {
-  id?: string | number;
+const A2A_PROTOCOL_VERSION = "0.3.0";
+
+interface JsonRpcRequest {
+  jsonrpc?: string;
+  id?: string | number | null;
   method?: string;
-  params?: {
-    message?: {
-      parts?: Array<{
-        kind?: string;
-        type?: string;
-        text?: string;
-      }>;
-    };
-    metadata?: Record<string, unknown>;
-  };
+  params?: unknown;
 }
 
-type A2ASupportedMethod = "message/send" | "tasks/send";
+interface MessagePart {
+  kind?: string;
+  type?: string;
+  text?: string;
+  data?: unknown;
+}
+
+interface MessageSendParams {
+  message?: {
+    parts?: MessagePart[];
+  };
+  metadata?: Record<string, unknown>;
+}
+
+interface TasksGetParams {
+  id?: string;
+}
+
+interface TasksCancelParams {
+  id?: string;
+}
 
 interface RouteContext {
   params: Promise<{ agentId: string }>;
+}
+
+function convex() {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!url) throw new Error("NEXT_PUBLIC_CONVEX_URL is not set");
+  return new ConvexHttpClient(url);
 }
 
 function agentUrl(req: NextRequest, agentId: string) {
@@ -50,9 +81,9 @@ function agentUrl(req: NextRequest, agentId: string) {
   return url.toString();
 }
 
-function promptFromMessage(body: A2ARequest) {
+function promptFromMessage(params: MessageSendParams | undefined) {
   return (
-    body.params?.message?.parts
+    params?.message?.parts
       ?.map((part) => part.text)
       .filter((text): text is string => Boolean(text?.trim()))
       .join("\n\n")
@@ -60,21 +91,21 @@ function promptFromMessage(body: A2ARequest) {
   );
 }
 
-function taskType(body: A2ARequest) {
-  const raw = body.params?.metadata?.task_type;
+function metadataValue(params: MessageSendParams | undefined): Record<string, unknown> {
+  return (params?.metadata ?? {}) as Record<string, unknown>;
+}
+
+function taskType(params: MessageSendParams | undefined) {
+  const raw = metadataValue(params).task_type;
   return typeof raw === "string" && raw.trim() ? raw : "general";
 }
 
-function executionTaskType(agentId: string, body: A2ARequest) {
-  const requested = taskType(body);
+function executionTaskType(agentId: string, params: MessageSendParams | undefined) {
+  const requested = taskType(params);
   if (agentId === "codex-writer" && requested === "general") {
     return "implementation";
   }
   return requested;
-}
-
-function supportedMethod(method: string | undefined): method is A2ASupportedMethod {
-  return method === "message/send" || method === "tasks/send";
 }
 
 function makeUnavailableRunner(
@@ -95,36 +126,58 @@ function makeUnavailableRunner(
   };
 }
 
-function bridgeRunner(config: SpecialistConfig): {
+interface ResolvedRunner {
   runner: SpecialistRunner;
   executionStatus: AgentExecutionStatus;
+  intrinsicStatus: AgentExecutionStatus;
   nativeConnection: boolean;
-} {
+  sandbox: boolean;
+}
+
+function bridgeRunner(config: SpecialistConfig): ResolvedRunner {
+  const intrinsicStatus = classifyAgentExecution(config);
+  const effective = effectiveExecutionStatus(config);
   const staticRunner = SPECIALIST_RUNNERS[config.agent_id as AgentId];
   if (staticRunner) {
     const realConfig = staticRunner.config;
-    const executionStatus = classifyAgentExecution(realConfig);
+    const realIntrinsic = classifyAgentExecution(realConfig);
+    const realEffective = effectiveExecutionStatus(realConfig);
     return {
       runner: staticRunner,
-      executionStatus,
+      executionStatus: realEffective,
+      intrinsicStatus: realIntrinsic,
       nativeConnection:
-        executionStatus === "native_mcp" || executionStatus === "native_a2a",
+        realEffective === "native_mcp" || realEffective === "native_a2a",
+      sandbox: realEffective === "arbor_sandbox_adapter",
     };
   }
 
-  const executionStatus = classifyAgentExecution(config);
   if (config.mcp_endpoint) {
     return {
       runner: makeMcpForwardingSpecialist(config),
-      executionStatus,
+      executionStatus: effective,
+      intrinsicStatus,
       nativeConnection: true,
+      sandbox: false,
+    };
+  }
+
+  if (effective === "arbor_sandbox_adapter") {
+    return {
+      runner: makeSandboxA2ASpecialist(config),
+      executionStatus: effective,
+      intrinsicStatus,
+      nativeConnection: false,
+      sandbox: true,
     };
   }
 
   return {
-    runner: makeUnavailableRunner(config, executionStatus),
-    executionStatus,
+    runner: makeUnavailableRunner(config, effective),
+    executionStatus: effective,
+    intrinsicStatus,
     nativeConnection: false,
+    sandbox: false,
   };
 }
 
@@ -137,44 +190,250 @@ function backingSystem(
   if (config.agent_id === "vercel-v0") return "v0_api";
   if (executionStatus === "native_mcp") return "mcp";
   if (executionStatus === "native_a2a") return "a2a";
+  if (executionStatus === "arbor_sandbox_adapter") return "arbor_sandbox";
   return "not_connected";
 }
 
-function a2aTaskResult(args: {
+function jsonRpcError(args: {
   id: string | number | null;
+  code: number;
+  message: string;
+  data?: unknown;
+  status?: number;
+}) {
+  return jsonOk(
+    {
+      jsonrpc: "2.0",
+      id: args.id,
+      error: {
+        code: args.code,
+        message: args.message,
+        ...(args.data ? { data: args.data } : {}),
+      },
+    },
+    args.status ?? 200,
+  );
+}
+
+function makeRunId(agentId: string) {
+  return `arbor-a2a-${agentId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+interface A2ATaskShape {
+  id: string;
+  kind: "task";
+  status: {
+    state: "submitted" | "working" | "completed" | "failed" | "canceled";
+    message?: { role: string; parts: Array<{ kind: "text"; text: string }> };
+  };
+  artifacts: Array<{
+    name?: string;
+    description?: string;
+    parts: Array<{ kind: "text" | "data"; text?: string; data?: unknown }>;
+  }>;
+  metadata?: Record<string, unknown>;
+}
+
+function buildSuccessTask(args: {
+  runId: string;
   agentId: string;
-  state: "completed" | "failed";
   text: string;
   description: string;
   artifactData?: unknown;
-}) {
+  metadata?: Record<string, unknown>;
+}): A2ATaskShape {
   return {
-    jsonrpc: "2.0",
-    id: args.id,
-    result: {
-      id: `arbor-a2a-${args.agentId}-${Date.now()}`,
-      status: {
-        state: args.state,
-        message: {
-          role: "agent",
-          parts: [{ kind: "text", text: args.text }],
-        },
+    id: args.runId,
+    kind: "task",
+    status: {
+      state: "completed",
+      message: {
+        role: "agent",
+        parts: [{ kind: "text", text: args.text }],
       },
-      artifacts:
-        args.state === "failed"
-          ? []
-          : [
-              {
-                name: `${args.agentId}-artifact`,
-                description: args.description,
-                parts: [
-                  { kind: "text", text: args.text },
-                  ...(args.artifactData === undefined
-                    ? []
-                    : [{ kind: "data", data: args.artifactData }]),
-                ],
-              },
-            ],
+    },
+    artifacts: [
+      {
+        name: `${args.agentId}-artifact`,
+        description: args.description,
+        parts: [
+          { kind: "text", text: args.text },
+          ...(args.artifactData === undefined
+            ? []
+            : [
+                {
+                  kind: "data" as const,
+                  data: args.artifactData,
+                },
+              ]),
+        ],
+      },
+    ],
+    metadata: args.metadata,
+  };
+}
+
+function buildFailureTask(args: {
+  runId: string;
+  text: string;
+  metadata?: Record<string, unknown>;
+}): A2ATaskShape {
+  return {
+    id: args.runId,
+    kind: "task",
+    status: {
+      state: "failed",
+      message: {
+        role: "agent",
+        parts: [{ kind: "text", text: args.text }],
+      },
+    },
+    artifacts: [],
+    metadata: args.metadata,
+  };
+}
+
+function persistRunStart(args: {
+  runId: string;
+  agentId: string;
+  executionStatus: AgentExecutionStatus;
+  method: string;
+  taskType: string;
+  prompt: string;
+  sandbox: boolean;
+}) {
+  // Best-effort persistence — failures (e.g. local dev without Convex)
+  // should never break the JSON-RPC response.
+  return convex()
+    .mutation(api.a2aTaskRuns.start, {
+      server_secret: paymentServerSecret(),
+      run_id: args.runId,
+      agent_id: args.agentId,
+      execution_status: args.executionStatus,
+      method: args.method,
+      task_type: args.taskType,
+      prompt: args.prompt,
+      sandbox_disclosure: args.sandbox ? SANDBOX_DISCLOSURE_TEXT : undefined,
+    })
+    .catch(() => undefined);
+}
+
+function persistRunWorking(runId: string) {
+  return convex()
+    .mutation(api.a2aTaskRuns.setWorking, {
+      server_secret: paymentServerSecret(),
+      run_id: runId,
+    })
+    .catch(() => undefined);
+}
+
+function persistRunComplete(args: { runId: string; artifact: unknown }) {
+  return convex()
+    .mutation(api.a2aTaskRuns.complete, {
+      server_secret: paymentServerSecret(),
+      run_id: args.runId,
+      artifact: args.artifact,
+    })
+    .catch(() => undefined);
+}
+
+function persistRunFailure(args: { runId: string; message: string }) {
+  return convex()
+    .mutation(api.a2aTaskRuns.fail, {
+      server_secret: paymentServerSecret(),
+      run_id: args.runId,
+      error_message: args.message,
+    })
+    .catch(() => undefined);
+}
+
+function buildAgentCard(args: {
+  req: NextRequest;
+  agentId: string;
+  config: SpecialistConfig;
+  resolved: ResolvedRunner;
+}) {
+  const { req, agentId, config, resolved } = args;
+  const contact = getAgentContact(agentId);
+  const url = agentUrl(req, agentId);
+  const intrinsic = resolved.intrinsicStatus;
+  const effective = resolved.executionStatus;
+
+  return {
+    protocolVersion: A2A_PROTOCOL_VERSION,
+    name: config.display_name,
+    description: config.one_liner,
+    url,
+    version: "1.0.0",
+    provider: {
+      organization: "Arbor",
+      url: new URL(req.url).origin,
+    },
+    // Per A2A v0.3.0, capabilities only describes protocol features.
+    // Arbor-specific execution metadata lives under the `arbor` extension key.
+    capabilities: {
+      streaming: false,
+      pushNotifications: false,
+      stateTransitionHistory: true,
+      extensions: [
+        {
+          uri: "https://arbor.dev/a2a/extensions/execution",
+          required: false,
+          description:
+            "Arbor execution metadata: execution_status, backing system, sandbox flag.",
+        },
+      ],
+    },
+    defaultInputModes: contact?.supported_input_modes ?? [
+      "text/plain",
+      "application/json",
+    ],
+    defaultOutputModes: contact?.supported_output_modes ?? [
+      "text/markdown",
+      "application/json",
+    ],
+    skills: (contact?.capabilities ?? config.capabilities).map((capability) => ({
+      id: capability,
+      name: capability,
+      description: `${config.display_name} can help with ${capability}.`,
+      tags: (contact?.domain_tags ?? []).slice(0, 8),
+      inputModes: contact?.supported_input_modes ?? ["text/plain"],
+      outputModes: contact?.supported_output_modes ?? ["text/markdown"],
+    })),
+    security:
+      config.mcp_api_key_env || config.auth_type === "api_key"
+        ? [{ bearer: [] }]
+        : [],
+    securitySchemes:
+      config.mcp_api_key_env || config.auth_type === "api_key"
+        ? {
+            bearer: {
+              type: "http",
+              scheme: "bearer",
+              description:
+                "Optional bearer token for sponsor authentication; sandbox runs ignore it.",
+            },
+          }
+        : {},
+    supportsAuthenticatedExtendedCard: false,
+    // Arbor-specific extension surface — explicitly namespaced so generic
+    // A2A clients can ignore it.
+    arbor: {
+      execution_status: effective,
+      intrinsic_execution_status: intrinsic,
+      execution_label: EXECUTION_STATUS_LABELS[effective],
+      execution_description: EXECUTION_STATUS_DESCRIPTIONS[effective],
+      backing_system: backingSystem(config, effective),
+      native_connection: resolved.nativeConnection,
+      sandbox: resolved.sandbox,
+      sandbox_enabled: isSandboxA2AEnabled(),
+      sandbox_disclosure: resolved.sandbox ? SANDBOX_DISCLOSURE_TEXT : null,
+      supported_methods: [
+        "message/send",
+        "tasks/send",
+        "tasks/get",
+        "tasks/cancel",
+      ],
     },
   };
 }
@@ -184,141 +443,323 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   const contact = getAgentContact(agentId);
   if (!contact) return jsonError("agent not found", 404);
   const config = contactToSpecialistConfig(contact);
-  const { executionStatus, nativeConnection } = bridgeRunner(config);
+  const resolved = bridgeRunner(config);
+  return jsonOk(buildAgentCard({ req, agentId, config, resolved }));
+}
+
+async function handleMessageSend(args: {
+  req: NextRequest;
+  agentId: string;
+  rpcId: string | number | null;
+  method: string;
+  params: MessageSendParams | undefined;
+}) {
+  const { agentId, rpcId, method, params } = args;
+  const contact = getAgentContact(agentId);
+  if (!contact) {
+    return jsonRpcError({
+      id: rpcId,
+      code: -32004,
+      message: "agent not found",
+      status: 404,
+    });
+  }
+  const prompt = promptFromMessage(params);
+  if (!prompt) {
+    return jsonRpcError({
+      id: rpcId,
+      code: -32602,
+      message: "message.parts text is required",
+    });
+  }
+  const config = contactToSpecialistConfig(contact);
+  const resolved = bridgeRunner(config);
+  const runId = makeRunId(agentId);
+  const tType = executionTaskType(agentId, params);
+
+  await persistRunStart({
+    runId,
+    agentId,
+    executionStatus: resolved.executionStatus,
+    method,
+    taskType: tType,
+    prompt,
+    sandbox: resolved.sandbox,
+  });
+
+  if (
+    resolved.executionStatus === "mock_unconnected" ||
+    resolved.executionStatus === "needs_vendor_a2a_endpoint"
+  ) {
+    const errorText = [
+      `# ${config.display_name} unavailable`,
+      "",
+      EXECUTION_STATUS_DESCRIPTIONS[resolved.executionStatus],
+      "",
+      `Execution status: ${resolved.executionStatus}`,
+      `Sandbox A2A enabled: ${isSandboxA2AEnabled()}`,
+      "",
+      "Arbor will not substitute a ChatGPT placeholder for this A2A request.",
+      "Set ENABLE_SANDBOX_A2A=true to allow a disclosed sandbox run instead.",
+    ].join("\n");
+    await persistRunFailure({ runId, message: errorText });
+    return jsonOk({
+      jsonrpc: "2.0",
+      id: rpcId,
+      result: buildFailureTask({
+        runId,
+        text: errorText,
+        metadata: {
+          execution: {
+            execution_status: resolved.executionStatus,
+            native_connection: resolved.nativeConnection,
+            sandbox: resolved.sandbox,
+          },
+        },
+      }),
+    });
+  }
+
+  await persistRunWorking(runId);
+
+  let sandboxArtifact: SandboxArtifact | undefined;
+  let text: string;
+  let runnerArtifact: unknown;
+  try {
+    if (resolved.sandbox) {
+      sandboxArtifact = await runSandboxA2AExecution({
+        config,
+        prompt,
+        taskType: tType,
+      });
+      text = sandboxArtifact.markdown;
+      runnerArtifact = sandboxArtifact;
+    } else {
+      const output = await resolved.runner.execute(prompt, tType);
+      if (typeof output === "string") {
+        text = output;
+      } else {
+        text = output.summary;
+        runnerArtifact = output;
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const errorText = [
+      `# ${config.display_name} execution failed`,
+      "",
+      "The Arbor A2A bridge accepted the task, but the configured execution runner could not complete it.",
+      "",
+      `Runner error: ${message}`,
+      "",
+      `Execution status: ${resolved.executionStatus}`,
+      `Sandbox: ${resolved.sandbox ? "yes" : "no"}`,
+      "",
+      "This failure is returned as an A2A failed task state instead of silently substituting placeholder work.",
+    ].join("\n");
+    await persistRunFailure({ runId, message: errorText });
+    return jsonOk({
+      jsonrpc: "2.0",
+      id: rpcId,
+      result: buildFailureTask({
+        runId,
+        text: errorText,
+        metadata: {
+          execution: {
+            execution_status: resolved.executionStatus,
+            native_connection: resolved.nativeConnection,
+            sandbox: resolved.sandbox,
+            error: message,
+          },
+        },
+      }),
+    });
+  }
+
+  const task = buildSuccessTask({
+    runId,
+    agentId,
+    text,
+    description: config.one_liner,
+    artifactData: {
+      execution: {
+        execution_status: resolved.executionStatus,
+        native_connection: resolved.nativeConnection,
+        sandbox: resolved.sandbox,
+        sandbox_disclosure: resolved.sandbox ? SANDBOX_DISCLOSURE_TEXT : null,
+        task_type: tType,
+        request_method: method,
+      },
+      artifact: runnerArtifact,
+    },
+    metadata: {
+      execution: {
+        execution_status: resolved.executionStatus,
+        sandbox: resolved.sandbox,
+      },
+    },
+  });
+
+  await persistRunComplete({ runId, artifact: task });
 
   return jsonOk({
-    protocolVersion: "0.2.6",
-    name: contact.display_name,
-    description: contact.one_liner,
-    url: agentUrl(req, agentId),
-    version: "1.0.0",
-    provider: {
-      organization: "Arbor",
-      url: new URL(req.url).origin,
+    jsonrpc: "2.0",
+    id: rpcId,
+    result: task,
+  });
+}
+
+async function handleTasksGet(args: {
+  rpcId: string | number | null;
+  params: TasksGetParams | undefined;
+}) {
+  const taskId = args.params?.id?.trim();
+  if (!taskId) {
+    return jsonRpcError({
+      id: args.rpcId,
+      code: -32602,
+      message: "tasks/get requires params.id",
+    });
+  }
+  const row = await convex()
+    .query(api.a2aTaskRuns.getByRunId, { run_id: taskId })
+    .catch(() => null);
+  if (!row) {
+    return jsonRpcError({
+      id: args.rpcId,
+      code: -32001,
+      message: `task ${taskId} not found`,
+      status: 404,
+    });
+  }
+  const state = row.state;
+  const text =
+    row.error_message ??
+    (row.artifact && typeof (row.artifact as { status?: { message?: unknown } }).status === "object"
+      ? // Stored artifact is the full A2A task shape; surface its message text.
+        promptFromMessage({
+          message: (row.artifact as { status?: { message?: { parts?: MessagePart[] } } }).status?.message,
+        })
+      : `Task ${taskId} is currently ${state}.`);
+  return jsonOk({
+    jsonrpc: "2.0",
+    id: args.rpcId,
+    result: {
+      id: row.run_id,
+      kind: "task",
+      status: {
+        state,
+        message: {
+          role: "agent",
+          parts: [{ kind: "text", text: text || `Task is ${state}.` }],
+        },
+      },
+      artifacts:
+        row.artifact &&
+        typeof (row.artifact as { artifacts?: unknown }).artifacts !== "undefined"
+          ? ((row.artifact as { artifacts: unknown }).artifacts as unknown[])
+          : [],
+      metadata: {
+        execution_status: row.execution_status,
+        sandbox: row.execution_status === "arbor_sandbox_adapter",
+        cancel_requested: row.cancel_requested,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
     },
-    capabilities: {
-      streaming: false,
-      pushNotifications: false,
-      stateTransitionHistory: false,
-      executionMode: executionStatus,
-      executionStatus,
-      executionLabel: EXECUTION_STATUS_LABELS[executionStatus],
-      executionDescription: EXECUTION_STATUS_DESCRIPTIONS[executionStatus],
-      backingSystem: backingSystem(config, executionStatus),
-      nativeConnection,
+  });
+}
+
+async function handleTasksCancel(args: {
+  rpcId: string | number | null;
+  params: TasksCancelParams | undefined;
+}) {
+  const taskId = args.params?.id?.trim();
+  if (!taskId) {
+    return jsonRpcError({
+      id: args.rpcId,
+      code: -32602,
+      message: "tasks/cancel requires params.id",
+    });
+  }
+  const result = await convex()
+    .mutation(api.a2aTaskRuns.cancel, { run_id: taskId })
+    .catch(() => null);
+  if (!result || result.notFound) {
+    return jsonRpcError({
+      id: args.rpcId,
+      code: -32001,
+      message: `task ${taskId} not found`,
+      status: 404,
+    });
+  }
+  if (result.terminal) {
+    return jsonRpcError({
+      id: args.rpcId,
+      code: -32002,
+      message: `task ${taskId} is already in terminal state ${result.state}`,
+    });
+  }
+  return jsonOk({
+    jsonrpc: "2.0",
+    id: args.rpcId,
+    result: {
+      id: taskId,
+      kind: "task",
+      status: {
+        state: "canceled",
+        message: {
+          role: "agent",
+          parts: [{ kind: "text", text: `Task ${taskId} canceled.` }],
+        },
+      },
+      artifacts: [],
     },
-    defaultInputModes: contact.supported_input_modes,
-    defaultOutputModes: contact.supported_output_modes,
-    skills: contact.capabilities.map((capability) => ({
-      id: capability,
-      name: capability,
-      description: `${contact.display_name} can help with ${capability}.`,
-      tags: contact.domain_tags.slice(0, 8),
-    })),
   });
 }
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { agentId } = await params;
-  const contact = getAgentContact(agentId);
-  if (!contact) return jsonError("agent not found", 404);
-
-  let body: A2ARequest;
+  let body: JsonRpcRequest;
   try {
-    body = (await req.json()) as A2ARequest;
+    body = (await req.json()) as JsonRpcRequest;
   } catch {
-    return jsonError("invalid JSON body", 400);
+    return jsonRpcError({
+      id: null,
+      code: -32700,
+      message: "invalid JSON body",
+      status: 400,
+    });
   }
+  const rpcId = body.id ?? null;
+  const method = body.method ?? "";
 
-  if (!supportedMethod(body.method)) {
-    return jsonError(`unsupported A2A method: ${body.method ?? "missing"}`, 400);
-  }
-
-  const prompt = promptFromMessage(body);
-  if (!prompt) return jsonError("message.parts text is required", 400);
-
-  const config = contactToSpecialistConfig(contact);
-  const { runner, executionStatus, nativeConnection } = bridgeRunner(config);
-  let text: string;
-  let artifact: unknown;
-  if (
-    executionStatus === "mock_unconnected" ||
-    executionStatus === "needs_vendor_a2a_endpoint"
-  ) {
-    const errorText = [
-      `# ${contact.display_name} unavailable`,
-      "",
-      EXECUTION_STATUS_DESCRIPTIONS[executionStatus],
-      "",
-      `Execution status: ${executionStatus}`,
-      `Native connection: ${nativeConnection ? "yes" : "no"}`,
-      "",
-      "Arbor will not substitute a ChatGPT placeholder for this A2A request.",
-    ].join("\n");
-    return jsonOk(
-      a2aTaskResult({
-        id: body.id ?? null,
-        agentId,
-        state: "failed",
-        text: errorText,
-        description: contact.one_liner,
-      }),
-    );
-  }
-
-  try {
-    const output = await runner.execute(prompt, executionTaskType(agentId, body));
-    if (typeof output === "string") {
-      text = output;
-    } else {
-      text = output.summary;
-      artifact = output;
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const errorText = [
-      `# ${contact.display_name} execution failed`,
-      "",
-      "The Arbor-hosted A2A bridge accepted the task, but the configured execution runner could not complete it.",
-      "",
-      `Runner error: ${message}`,
-      "",
-      `Execution status: ${executionStatus}`,
-      `Native connection: ${nativeConnection ? "yes" : "no"}`,
-      "",
-      "This failure is returned as an A2A failed task state instead of silently substituting placeholder work.",
-    ].join("\n");
-    return jsonOk(
-      a2aTaskResult({
-        id: body.id ?? null,
-        agentId,
-        state: "failed",
-        text: errorText,
-        description: contact.one_liner,
-      }),
-    );
-  }
-
-  return jsonOk(
-    a2aTaskResult({
-      id: body.id ?? null,
+  if (method === "message/send" || method === "tasks/send") {
+    return await handleMessageSend({
+      req,
       agentId,
-      state: "completed",
-      text,
-      description: contact.one_liner,
-      artifactData: {
-        execution: {
-          mode: executionStatus,
-          execution_status: executionStatus,
-          native_connection: nativeConnection,
-          task_type: executionTaskType(agentId, body),
-          requested_task_type: taskType(body),
-          request_method: body.method,
-        },
-        artifact,
-      },
-    }),
-  );
+      rpcId,
+      method,
+      params: body.params as MessageSendParams | undefined,
+    });
+  }
+  if (method === "tasks/get") {
+    return await handleTasksGet({
+      rpcId,
+      params: body.params as TasksGetParams | undefined,
+    });
+  }
+  if (method === "tasks/cancel") {
+    return await handleTasksCancel({
+      rpcId,
+      params: body.params as TasksCancelParams | undefined,
+    });
+  }
+  return jsonRpcError({
+    id: rpcId,
+    code: -32601,
+    message: `unsupported A2A method: ${method || "missing"}`,
+  });
 }
 
 export function OPTIONS() {

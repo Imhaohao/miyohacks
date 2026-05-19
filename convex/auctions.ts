@@ -26,24 +26,28 @@ import type {
   SpecialistConfig,
   SpecialistOutput,
 } from "../lib/types";
-import { callOpenAIJSON } from "../lib/openai";
+import { runJudge } from "../lib/judge";
 import {
   fallbackExecutionPlan,
   makeDefaultPlanFn,
   normalizeExecutionPlan,
 } from "../lib/execution-plan";
 import { probeSpecialistConnection } from "../lib/specialists/connection-runtime";
-import { classifyAgentExecution } from "../lib/agent-execution-status";
 import {
-  buildTaskContext,
-  isCreatorCommerceTask,
-  isImplementationTask,
-} from "../lib/campaign-context";
+  classifyAgentExecution,
+  effectiveExecutionStatus,
+} from "../lib/agent-execution-status";
 import {
   clamp01,
   computeAuctionValue,
-  qualityAdjustedVickreyPrice,
+  reputationWeightedBidScore,
 } from "../lib/auction-value";
+import {
+  eligibleExecutorBids,
+  protocolClearingPrice,
+  sortBidsByProtocolScore,
+  visibleBidsUnderBudget,
+} from "../lib/auction-mechanism";
 import {
   roleForAgent,
   roleForSpecialist,
@@ -62,14 +66,6 @@ function normalizeSpecialistOutput(output: SpecialistOutput): {
     text: output.summary,
     artifact: output,
   };
-}
-
-function formatResultForJudge(result: unknown): string {
-  if (typeof result === "string") return result;
-  if (result && typeof result === "object") {
-    return JSON.stringify(result, null, 2);
-  }
-  return JSON.stringify(result);
 }
 
 type ToolAvailability = NonNullable<BidPayload["tool_availability"]>;
@@ -326,7 +322,10 @@ export const solicitBids = internalAction({
             estimatedSeconds: bid.estimated_seconds,
             taskType: task.task_type,
           });
-          const score = value.valueScore;
+          const score = reputationWeightedBidScore({
+            reputationScore: reputation,
+            bidPrice: bid.bid_price,
+          });
           const bid_id = await ctx.runMutation(internal.bids._insert, {
             task_id: args.task_id,
             agent_id: spec.agent_id,
@@ -394,11 +393,7 @@ export const resolve = internalAction({
       task_id: args.task_id,
     })) as Doc<"bids">[];
 
-    const visibleBids = allBids.filter(
-      (b) =>
-        b.bid_price <= task.max_budget &&
-        (b.tool_availability?.status ?? "missing") !== "missing",
-    );
+    const visibleBids = visibleBidsUnderBudget(allBids, task.max_budget);
 
     if (visibleBids.length === 0) {
       await ctx.runMutation(internal.payments._refundTaskReservation, {
@@ -419,9 +414,7 @@ export const resolve = internalAction({
       return;
     }
 
-    const executorBids = visibleBids.filter((b) =>
-      isSelectableExecutorBid(b, task.max_budget),
-    );
+    const executorBids = eligibleExecutorBids(visibleBids, task.max_budget);
 
     if (executorBids.length === 0) {
       await ctx.runMutation(internal.payments._refundTaskReservation, {
@@ -445,22 +438,19 @@ export const resolve = internalAction({
       return;
     }
 
-    // Sort by expected value, not raw cheapness. `score` remains populated for
-    // backwards compatibility, but new bids use value_score as the canonical
-    // ranking signal.
-    const sortedExecutors = [...executorBids].sort(
-      (a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score),
+    // Strict protocol mode: executable bids are ranked by reputation per dollar.
+    // Quality/value diagnostics remain on the bid, but they do not determine
+    // the winner or clearing price.
+    const sortedExecutors = executorBids;
+    const supportingBids = sortBidsByProtocolScore(
+      visibleBids.filter((b) => !isSelectableExecutorBid(b, task.max_budget)),
     );
-    const supportingBids = visibleBids
-      .filter((b) => !isSelectableExecutorBid(b, task.max_budget))
-      .sort((a, b) => (b.value_score ?? b.score) - (a.value_score ?? a.score));
     const sorted = [...sortedExecutors, ...supportingBids];
     const winner = sortedExecutors[0];
     const runnerUp = sortedExecutors[1];
-    const price_paid = qualityAdjustedVickreyPrice({
-      winnerExpectedQuality: winner.expected_quality ?? winner.score * winner.bid_price,
-      runnerUpValueScore: runnerUp?.value_score ?? runnerUp?.score,
-      winnerBidPrice: winner.bid_price,
+    const price_paid = protocolClearingPrice({
+      winner,
+      runnerUp,
       maxBudget: task.max_budget,
     });
     const serializeBid = (b: typeof winner) => ({
@@ -468,8 +458,8 @@ export const resolve = internalAction({
       agent_id: b.agent_id,
       agent_role: roleForAgent(b.agent_id, b.agent_role),
       bid_price: b.bid_price,
-      score: b.value_score ?? b.score,
-      value_score: b.value_score ?? b.score,
+      score: b.score,
+      value_score: b.value_score,
       capability_claim: b.capability_claim,
       estimated_seconds: b.estimated_seconds,
       task_fit_score: b.task_fit_score,
@@ -502,13 +492,16 @@ export const resolve = internalAction({
         winner: serializeBid(winner),
         vickrey: {
           winner_bid_price: winner.bid_price,
-          runner_up_value_score: runnerUp?.value_score ?? runnerUp?.score,
+          winner_score: winner.score,
+          runner_up_bid_price: runnerUp?.bid_price,
+          runner_up_score: runnerUp?.score,
           clearing_price: price_paid,
           price_paid,
           rule:
             sortedExecutors.length >= 2
-              ? "quality_adjusted_second_price"
+              ? "strict_vickrey_second_price"
               : "degenerate_single_bid",
+          score_formula: "reputation_score / bid_price",
         },
       },
     });
@@ -555,11 +548,11 @@ export const prepareExecutionPlan = internalAction({
     // plan-writer prompt that just *mentions* the agent's name.
     let runner: ReturnType<typeof getRunner> | undefined;
     let runnerConfig: SpecialistConfig | undefined;
-    let executionStatus = classifyAgentExecution({ agent_id: winner.agent_id });
+    let executionStatus = effectiveExecutionStatus({ agent_id: winner.agent_id });
     try {
       runner = getRunner(winner.agent_id as AgentId);
       runnerConfig = runner.config;
-      executionStatus = classifyAgentExecution(runnerConfig);
+      executionStatus = effectiveExecutionStatus(runnerConfig);
     } catch {
       // Discovered specialists that haven't been hydrated into this process
       // fall through with a synthetic config below.
@@ -820,30 +813,6 @@ export const execute = internalAction({
 
 // ─── Phase 5: judge ──────────────────────────────────────────────────────
 
-const JUDGE_GENERAL_PROMPT = `You are an impartial judge for a general-purpose agent marketplace. The user described a goal in their own words; a specialist agent produced a deliverable. Decide whether the deliverable actually addresses the user's goal in a useful, specific, well-reasoned way. Output JSON only:
-{ "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
-
-Strict rules for your reasoning paragraph:
-- Describe ONLY content that is literally present in the agent's output. Do not invent topics, sections, or shortcomings.
-- Quote or paraphrase specific phrases from the output to ground every claim you make.
-- If the output is shorter than expected, say so plainly — don't fabricate missing content.
-
-Reject when the deliverable is off-topic from the goal, vague hand-waving, ignores an explicit constraint the user stated, or is so incomplete it can't be used. Accept when the output materially advances the user's goal — perfection is not required.`;
-
-const JUDGE_CAMPAIGN_PROMPT = `You are an impartial judge for a creator-campaign workflow. Evaluate whether the winning agent output satisfies the campaign brief and is grounded in Reacher TikTok Shop evidence plus Nia-backed context. Output JSON only:
-{ "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
-
-Be strict but fair. Reject if the output lacks a creator shortlist, outreach drafts, sample-request notes, risk evaluation, or evidence tied to Reacher/Nia context. Accept if it satisfies the campaign workflow even if imperfect.`;
-
-const JUDGE_IMPLEMENTATION_PLAN_PROMPT = `You are an impartial judge for a software/product execution marketplace. The task may have two valid artifact shapes:
-1. A pre-execution implementation_plan artifact for buyer approval.
-2. A post-approval execution result that reports actual repo edits, changed files, verification commands, and blockers.
-
-Output JSON only:
-{ "verdict": "accept" | "reject", "reasoning": "<one paragraph>", "quality_score": <0.0-1.0> }
-
-Be strict but fair. If the output is a plan, accept only if it directly addresses the requested product/software change, identifies relevant context relay needs, names concrete implementation surfaces, preserves critical constraints, asks useful refinement questions, and defines acceptance criteria. If the output is an execution result, accept only if it is specific to the user's requested repo change, names actual changed files or explicitly explains why no edit was safe, includes verification evidence, and avoids unrelated template drift. Reject if it drifts into an unrelated domain, ignores the user's actual request, invents repo facts, or claims code was changed without file/diff evidence.`;
-
 export const judge = internalAction({
   args: {
     task_id: v.id("tasks"),
@@ -864,53 +833,14 @@ export const judge = internalAction({
       task_id: args.task_id,
     });
 
-    const userPrompt = [
-      taskContext ? taskContext.prompt_addendum : null,
-      task.task_type === "reacher-live-launch"
-        ? "This is the live Reacher proof workflow. The seeded demo creators in the generic campaign evidence are illustrative only. Do not reject merely because the agent used different creators. For this workflow, prefer live Reacher MCP evidence from tools such as list_shops_shops_get, creators_performance_creators_performance_post, and creators_list_creators_list_post. Accept if the output cites those live tool results and includes a creator shortlist, outreach drafts, sample notes, risk flags, and a 7-day launch plan."
-        : null,
-      buildTaskContext(task.prompt, task.task_type),
-      task.output_schema
-        ? `Required output schema:\n${JSON.stringify(task.output_schema, null, 2)}`
-        : null,
-      args.dispute_reason
-        ? `Buyer dispute reason (re-evaluate with this in mind):\n${args.dispute_reason}`
-        : null,
-      `Agent output:\n${formatResultForJudge(task.result)}`,
-    ]
-      .filter(Boolean)
-      .join("\n\n---\n\n");
-
-    const judgeSystemPrompt = isCreatorCommerceTask(task.prompt, task.task_type)
-      ? JUDGE_CAMPAIGN_PROMPT
-      : isImplementationTask(task.prompt, task.task_type)
-        ? JUDGE_IMPLEMENTATION_PLAN_PROMPT
-        : JUDGE_GENERAL_PROMPT;
-
-    let verdict: JudgeVerdict;
-    try {
-      verdict = await Promise.race([
-        callOpenAIJSON<JudgeVerdict>({
-          systemPrompt: judgeSystemPrompt,
-          userPrompt,
-          maxTokens: 512,
-          timeoutMs: 20_000,
-          retries: 1,
-        }),
-        new Promise<JudgeVerdict>((_, reject) =>
-          setTimeout(() => reject(new Error("judge timeout (20s)")), 20_000),
-        ),
-      ]);
-    } catch (err) {
-      verdict = {
-        verdict: "reject",
-        reasoning: `Judge call failed: ${err instanceof Error ? err.message : String(err)}`,
-        quality_score: 0,
-      };
-    }
-
-    // Clamp quality_score in case the judge returns something out of range.
-    verdict.quality_score = Math.max(0, Math.min(1, verdict.quality_score));
+    const verdict = await runJudge({
+      prompt: task.prompt,
+      taskType: task.task_type,
+      result: task.result,
+      contextAddendum: taskContext?.prompt_addendum ?? null,
+      outputSchema: task.output_schema,
+      disputeReason: args.dispute_reason,
+    });
 
     await ctx.runMutation(internal.tasks._setVerdict, {
       task_id: args.task_id,

@@ -37,7 +37,7 @@ const MODEL = "gpt-5.5";
 const CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const MAX_EXECUTE_ROUNDS = 6;
 const VICKREY_PRELUDE =
-  "You are bidding in a Vickrey second-price sealed-bid auction. The price you actually pay if you win is set by the second-highest bid, so your dominant strategy is to bid your true cost. Bid honestly.";
+  "You are bidding in a sealed-bid, reputation-weighted Vickrey-style agent auction. Arbor ranks executable bids by reputation_score / bid_price and computes the default clearing price from the next-best eligible executor's raw bid_price in that same score ranking with the buyer's budget as a cap. Bid your true execution cost and capability honestly.";
 
 function apiKey(): string {
   const k = process.env.OPENAI_API_KEY;

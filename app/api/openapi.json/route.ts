@@ -21,20 +21,20 @@ export async function GET(req: NextRequest) {
   const spec = {
     openapi: "3.1.0",
     info: {
-      title: "TikTok Shop Launch Desk for Startups",
+      title: "Arbor Agent Auction Protocol",
       version: "0.1.0",
       description:
-        "Self-improving agent marketplace for TikTok Shop startup launches. Startups submit product launch briefs; the system routes across a broad MCP specialist market, invites relevant agents to bid, and assigns creator scouting, audience fit, outreach, samples, and risk work using Reacher social intelligence and Nia-backed context.",
-      contact: { name: "TikTok Shop Launch Desk" },
+        "MCP-first agent auction protocol for discovery, sealed-bid price formation, judge verification, escrow settlement, and portable reputation. Buyer agents post work briefs; Arbor enriches context, shortlists specialist agents, runs the auction, returns a web view, and records the outcome for future routing. Reacher/TikTok Shop is one demo workflow on top of the protocol, not the API boundary.",
+      contact: { name: "Arbor" },
     },
     servers: [{ url: base }],
     paths: {
       "/api/v1/tasks": {
         post: {
           operationId: "post_task",
-          summary: "Post a startup TikTok Shop launch brief to the auction.",
+          summary: "Post a task brief to the agent auction.",
           description:
-            "Growth specialists bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins, produces a creator shortlist plus outreach drafts and launch plan, and pays the second-highest bid price. Returns a task_id and web_view_url for humans.",
+            "Specialist agents bid privately during the auction window. Arbor ranks eligible executable bids by reputation_score / bid_price, assigns the highest-scoring executor by default, prices from the next-best eligible executor's raw bid (or the winner's bid when only one is eligible), verifies the result with a judge, settles escrow, and updates reputation. Returns a task_id and web_view_url for humans or supervising agents.",
           requestBody: {
             required: true,
             content: {
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
           operationId: "get_task",
           summary: "Fetch task state.",
           description:
-            "Returns the campaign auction, bids (sealed until window closes), creator shortlist/output, judge verdict, escrow, and lifecycle events. Poll until status is complete, disputed, or failed.",
+            "Returns the task, bids (sealed until the window closes), output, judge verdict, escrow state, reputation effects, and lifecycle events. Poll until status is complete, disputed, failed, or cancelled.",
           parameters: [
             {
               name: "id",
@@ -232,7 +232,8 @@ export async function GET(req: NextRequest) {
           properties: {
             prompt: {
               type: "string",
-              description: "Startup product launch brief and desired TikTok Shop growth outcome.",
+              description:
+                "Plain-language work brief for the buyer agent to subcontract.",
             },
             max_budget: {
               type: "number",
@@ -241,7 +242,7 @@ export async function GET(req: NextRequest) {
             task_type: {
               type: "string",
               description:
-                "Optional workflow hint, e.g. 'startup-launch-plan', 'creator-scouting', 'outreach-drafting', or 'end-to-end-campaign'.",
+                "Optional workflow hint, e.g. 'implementation', 'research', 'design', 'creator-campaign', or another domain-specific task class.",
             },
             output_schema: {
               type: "object",

@@ -1,6 +1,7 @@
 import {
   classifyAgentExecution,
-  isRealExecutionStatus,
+  isSandboxA2AEnabled,
+  isSelectableExecutionStatus,
 } from "./agent-execution-status";
 import { isExecutableAgent } from "./agent-roles";
 import type { AgentExecutionStatus, AgentRole } from "./types";
@@ -31,7 +32,7 @@ export function isSelectableExecutorBid(
   if (bid.bid_price > maxBudget) return false;
   if (!isExecutableAgent(bid.agent_id, bid.agent_role)) return false;
   if (bid.tool_availability?.status !== "available") return false;
-  return isRealExecutionStatus(bidExecutionStatus(bid));
+  return isSelectableExecutionStatus(bidExecutionStatus(bid));
 }
 
 export function explainUnselectableExecutorBid(
@@ -45,7 +46,11 @@ export function explainUnselectableExecutorBid(
   if (bid.tool_availability?.status !== "available") {
     return `tools are ${bid.tool_availability?.status ?? "unknown"}`;
   }
-  if (!isRealExecutionStatus(bidExecutionStatus(bid))) {
+  const status = bidExecutionStatus(bid);
+  if (!isSelectableExecutionStatus(status)) {
+    if (status === "arbor_sandbox_adapter" && !isSandboxA2AEnabled()) {
+      return "sandbox A2A is disabled (set ENABLE_SANDBOX_A2A=true to allow)";
+    }
     return "agent has no verified external execution connection";
   }
   return null;

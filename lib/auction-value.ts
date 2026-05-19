@@ -21,6 +21,11 @@ export interface AuctionValueResult {
   valueScore: number;
 }
 
+export interface ReputationWeightedBidScoreInput {
+  reputationScore: number;
+  bidPrice: number;
+}
+
 const QUALITY_WEIGHTS = {
   taskFit: 0.28,
   historicalQuality: 0.24,
@@ -81,16 +86,22 @@ export function computeAuctionValue(inputs: AuctionValueInputs): AuctionValueRes
   };
 }
 
-export function qualityAdjustedVickreyPrice(args: {
-  winnerExpectedQuality: number;
-  runnerUpValueScore?: number;
+export function reputationWeightedBidScore(
+  args: ReputationWeightedBidScoreInput,
+): number {
+  const price = Math.max(0.01, roundMoney(args.bidPrice));
+  return clamp01(args.reputationScore) / price;
+}
+
+export function strictVickreySecondPrice(args: {
   winnerBidPrice: number;
+  runnerUpBidPrice?: number;
   maxBudget: number;
 }): number {
-  if (!Number.isFinite(args.runnerUpValueScore) || !args.runnerUpValueScore) {
-    return Math.min(args.maxBudget, roundMoney(args.winnerBidPrice));
-  }
-
-  const clearingPrice = args.winnerExpectedQuality / args.runnerUpValueScore;
-  return Math.min(args.maxBudget, roundMoney(Math.max(0.01, clearingPrice)));
+  const clearingBid =
+    typeof args.runnerUpBidPrice === "number" &&
+    Number.isFinite(args.runnerUpBidPrice)
+      ? args.runnerUpBidPrice
+      : args.winnerBidPrice;
+  return Math.min(args.maxBudget, roundMoney(Math.max(0.01, clearingBid)));
 }

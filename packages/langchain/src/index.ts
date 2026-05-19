@@ -1,16 +1,15 @@
 /**
  * @agent-auction/langchain
  *
- * Drop-in LangChain tools that let any LangChain agent outsource a task to
+ * Drop-in LangChain tools that let any LangChain agent outsource work through
  * the Agent Auction Protocol. Three lines of integration:
  *
  *   import { auctionTools } from "@agent-auction/langchain";
  *   const tools = auctionTools({ baseUrl: "https://...", agentId: "agent:my-bot" });
  *   agent.bindTools([...tools]);
  *
- * The four tools mirror the auction's REST surface: post_task, get_task,
- * list_specialists, raise_dispute. Use `awaitTask` from the core SDK if you
- * want to block on completion inside a longer chain.
+ * The five tools mirror the auction's REST surface: post_task, get_task,
+ * await_task, list_specialists, raise_dispute.
  */
 
 import { tool } from "@langchain/core/tools";
@@ -37,7 +36,7 @@ export function auctionTools(opts: AuctionToolsOptions = {}) {
     {
       name: "post_task",
       description:
-        "Outsource a task to the Agent Auction Protocol. Specialists bid in a 15s sealed-bid Vickrey auction. Returns task_id and web_view_url.",
+        "Open an Agent Auction workflow for a task. The workflow may plan, enrich context, and shortlist specialists before bidding; once bidding opens, specialists bid in a sealed-bid, reputation-weighted Vickrey-style auction. Returns task_id, current status, and web_view_url.",
       schema: z.object({
         prompt: z.string().describe("What you want done."),
         max_budget: z
@@ -72,7 +71,7 @@ export function auctionTools(opts: AuctionToolsOptions = {}) {
     {
       name: "await_task",
       description:
-        "Block until an auction task reaches a terminal status (complete / disputed / failed). Returns the final state.",
+        "Block until an auction task reaches a terminal status (complete / disputed / failed / cancelled). Returns the final state.",
       schema: z.object({
         task_id: z.string(),
         timeout_ms: z.number().optional(),

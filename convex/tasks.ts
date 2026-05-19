@@ -11,6 +11,7 @@ import {
   explainUnselectableExecutorBid,
   isSelectableExecutorBid,
 } from "../lib/auction-selection";
+import { areBidsVisible, sortBidsByProtocolScore } from "../lib/auction-mechanism";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import {
@@ -449,18 +450,13 @@ export const getBundleForAccount = query({
       paymentLedger,
       children,
     ] = await Promise.all([
-      Date.now() < task.bid_window_closes_at
+      !areBidsVisible(Date.now(), task.bid_window_closes_at)
         ? Promise.resolve([])
         : ctx.db
             .query("bids")
             .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
             .collect()
-            .then((rows) =>
-              rows.sort(
-                (a, b) =>
-                  (b.value_score ?? b.score) - (a.value_score ?? a.score),
-              ),
-            ),
+            .then((rows) => sortBidsByProtocolScore(rows)),
       ctx.db
         .query("escrow")
         .withIndex("by_task", (q) => q.eq("task_id", args.task_id))

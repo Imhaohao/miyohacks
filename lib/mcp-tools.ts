@@ -173,12 +173,22 @@ function requireIdentity(identity: ApiCallerIdentity | null | undefined) {
 export interface ToolDefinition {
   name: string;
   description: string;
+  category:
+    | "protocol_core"
+    | "billing"
+    | "registry"
+    | "context"
+    | "planning"
+    | "admin";
   inputSchema: Record<string, unknown>;
 }
+
+export type McpToolSurface = "core" | "extensions";
 
 export const TOOLS: ToolDefinition[] = [
   {
     name: "get_wallet",
+    category: "billing",
     description:
       "Fetch a buyer's Arbor credit wallet, including available and reserved credits.",
     inputSchema: {
@@ -193,6 +203,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "create_credit_checkout",
+    category: "billing",
     description:
       "Create a Stripe Checkout URL for buying Arbor credits. Credits are added only after the Stripe webhook confirms payment.",
     inputSchema: {
@@ -212,6 +223,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "get_agent_earnings",
+    category: "billing",
     description:
       "Fetch an agent's available earnings and Stripe Connect payout readiness.",
     inputSchema: {
@@ -224,6 +236,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "list_agent_contacts",
+    category: "registry",
     description:
       "List the 100-agent cross-industry registry. Every contact is connected through either a native MCP endpoint or Arbor-hosted A2A bridge, with protocol, health, verification, capabilities, and live reputation.",
     inputSchema: {
@@ -247,6 +260,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "suggest_agent_contacts",
+    category: "registry",
     description:
       "Run the deterministic broker ranker over the 100 connected MCP/A2A agents and return the best-fit contacts for a task.",
     inputSchema: {
@@ -264,6 +278,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "upsert_product_context",
+    category: "context",
     description:
       "Save reusable product/business/repo context for a buyer. Future post_task calls from the same agent_id automatically attach this Hyperspell/Nia context before specialists bid.",
     inputSchema: {
@@ -307,8 +322,9 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "post_task",
+    category: "protocol_core",
     description:
-      "Post work for specialist agents. Agents bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring fit wins and returns either a product artifact, an implementation plan for approval, or a domain-specific deliverable. Returns a task_id and web_view_url.",
+      "Post work for specialist agents. Arbor may enrich context and shortlist before specialists enter a sealed-bid, reputation-weighted Vickrey-style auction; the highest reputation-per-bid executable specialist wins by default, and the clearing price comes from the next-best eligible executor's raw bid. Returns a task_id and web_view_url.",
     inputSchema: {
       type: "object",
       required: ["prompt", "max_budget"],
@@ -334,7 +350,7 @@ export const TOOLS: ToolDefinition[] = [
         agent_id: {
           type: "string",
           description:
-            "Optional caller identifier. Defaults to 'agent:mcp'. No auth in v0.",
+            "Optional legacy caller identifier. Authenticated callers should send an Arbor API key.",
         },
         target_repo: {
           type: "string",
@@ -367,6 +383,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "get_task",
+    category: "protocol_core",
     description:
       "Fetch current task state: status, bids (only after window closes), output artifact, judge verdict, context packet, wallet-backed escrow status, and payment ledger.",
     inputSchema: {
@@ -379,6 +396,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "list_specialists",
+    category: "protocol_core",
     description:
       "List specialist agents with reputation, capabilities, MCP/A2A connection status, and cost baselines.",
     inputSchema: {
@@ -393,6 +411,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "suggest_specialists",
+    category: "registry",
     description:
       "Given a free-form goal, return the top specialist agents ranked by literal fit, with reasoning. Flags low-confidence matches so the caller knows when to use discover_specialist.",
     inputSchema: {
@@ -413,6 +432,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "discover_specialist",
+    category: "registry",
     description:
       "Synthesize a brand-new specialist agent tailored to a goal that the existing roster cannot cover well. Persists the new specialist so it can compete in future auctions. Use this when suggest_specialists returns low_confidence: true.",
     inputSchema: {
@@ -434,6 +454,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "approve_execution_plan",
+    category: "planning",
     description:
       "Approve the winning executor's execution plan so the task can move from plan_review to execution.",
     inputSchema: {
@@ -447,6 +468,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "request_plan_revision",
+    category: "planning",
     description:
       "Ask the winning executor to revise the execution plan before approval. Execution does not start.",
     inputSchema: {
@@ -461,8 +483,9 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "cancel_task",
+    category: "planning",
     description:
-      "Cancel a task before execution approval. Simulated escrow is refunded and no agent executes.",
+      "Cancel a task before execution approval. Reserved wallet escrow is refunded and no agent executes.",
     inputSchema: {
       type: "object",
       required: ["task_id"],
@@ -475,6 +498,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "raise_dispute",
+    category: "protocol_core",
     description:
       "Raise a dispute on a completed task. The judge re-evaluates with the dispute reason injected; reputation and escrow flow accordingly.",
     inputSchema: {
@@ -491,6 +515,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "override_judge",
+    category: "admin",
     description:
       "Human override for a judge verdict. Records an auditable override and updates settlement without re-running the model judge.",
     inputSchema: {
@@ -515,6 +540,55 @@ export const TOOLS: ToolDefinition[] = [
     },
   },
 ];
+
+export const CORE_MCP_TOOLS = TOOLS.filter(
+  (tool) => tool.category === "protocol_core",
+);
+
+export const PRODUCT_EXTENSION_TOOLS = TOOLS.filter(
+  (tool) => tool.category !== "protocol_core",
+);
+
+export function extensionToolName(tool: ToolDefinition) {
+  if (tool.category === "protocol_core") return tool.name;
+  return `${tool.category}.${tool.name}`;
+}
+
+/**
+ * Public extension endpoint tools are explicitly namespaced so MCP-first
+ * clients can tell protocol tools from Arbor product/admin affordances.
+ */
+export const EXTENSION_MCP_TOOLS: ToolDefinition[] = PRODUCT_EXTENSION_TOOLS.map(
+  (tool) => ({
+    ...tool,
+    name: extensionToolName(tool),
+  }),
+);
+
+const CORE_TOOL_NAMES = new Set(CORE_MCP_TOOLS.map((tool) => tool.name));
+const EXTENSION_BASE_TOOL_NAMES = new Set(
+  PRODUCT_EXTENSION_TOOLS.map((tool) => tool.name),
+);
+const EXTENSION_NAMESPACED_TO_BASE = new Map(
+  PRODUCT_EXTENSION_TOOLS.map((tool) => [extensionToolName(tool), tool.name]),
+);
+
+export function isCoreMcpToolName(name: string) {
+  return CORE_TOOL_NAMES.has(name);
+}
+
+export function resolveExtensionMcpToolName(name: string) {
+  return EXTENSION_NAMESPACED_TO_BASE.get(name) ??
+    (EXTENSION_BASE_TOOL_NAMES.has(name) ? name : null);
+}
+
+export function isExtensionMcpToolName(name: string) {
+  return resolveExtensionMcpToolName(name) !== null;
+}
+
+export function getMcpSurfaceTools(surface: McpToolSurface) {
+  return surface === "core" ? CORE_MCP_TOOLS : EXTENSION_MCP_TOOLS;
+}
 
 // ─── tool handlers ────────────────────────────────────────────────────────
 
@@ -1076,4 +1150,60 @@ export async function dispatchTool(
     default:
       throw new Error(`unknown tool: ${name}`);
   }
+}
+
+export async function dispatchCoreTool(
+  name: string,
+  args: Record<string, unknown>,
+  identity?: ApiCallerIdentity | null,
+): Promise<unknown> {
+  if (!isCoreMcpToolName(name)) {
+    const extensionName = resolveExtensionMcpToolName(name);
+    if (extensionName) {
+      const extensionTool = PRODUCT_EXTENSION_TOOLS.find(
+        (tool) => tool.name === extensionName,
+      );
+      throw new Error(
+        `${name} is an Arbor extension tool. Use /api/mcp/extensions and call ${
+          extensionTool ? extensionToolName(extensionTool) : extensionName
+        }.`,
+      );
+    }
+    throw new Error(`unknown core MCP tool: ${name}`);
+  }
+  return await dispatchTool(name, args, identity);
+}
+
+export async function dispatchExtensionTool(
+  name: string,
+  args: Record<string, unknown>,
+  identity?: ApiCallerIdentity | null,
+): Promise<unknown> {
+  const resolvedName = resolveExtensionMcpToolName(name);
+  if (!resolvedName) {
+    throw new Error(`unknown extension MCP tool: ${name}`);
+  }
+  return await dispatchTool(resolvedName, args, identity);
+}
+
+export async function dispatchMcpSurfaceTool(
+  surface: McpToolSurface,
+  name: string,
+  args: Record<string, unknown>,
+  identity?: ApiCallerIdentity | null,
+  options: { allowLegacyExtensionsOnCore?: boolean } = {},
+): Promise<unknown> {
+  if (surface === "extensions") {
+    return await dispatchExtensionTool(name, args, identity);
+  }
+
+  if (isCoreMcpToolName(name)) {
+    return await dispatchCoreTool(name, args, identity);
+  }
+
+  if (options.allowLegacyExtensionsOnCore !== false && isExtensionMcpToolName(name)) {
+    return await dispatchExtensionTool(name, args, identity);
+  }
+
+  return await dispatchCoreTool(name, args, identity);
 }

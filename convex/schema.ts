@@ -216,12 +216,14 @@ export default defineSchema({
             v.literal("native_mcp"),
             v.literal("native_a2a"),
             v.literal("arbor_real_adapter"),
+            v.literal("arbor_sandbox_adapter"),
             v.literal("needs_vendor_a2a_endpoint"),
             v.literal("mock_unconnected"),
           ),
         ),
         endpoint_host: v.optional(v.string()),
         proof: v.optional(v.string()),
+        sandbox: v.optional(v.boolean()),
       }),
     ),
   }).index("by_task", ["task_id"]),
@@ -536,4 +538,88 @@ export default defineSchema({
   })
     .index("by_account", ["account_id"])
     .index("by_token_hash", ["token_hash"]),
+
+  /**
+   * Per-agent acceptance harness readiness snapshots. The CLI script
+   * `scripts/acceptance-run.ts --write-snapshot` writes a row here after each
+   * run; the admin dashboard reads `latestForAgent` / `latestSummary`.
+   *
+   * Stored as `any` payloads (rather than mapped onto strict schemas) so the
+   * harness output shape can evolve without a migration. The dashboard
+   * widens carefully when reading.
+   */
+  acceptance_snapshots: defineTable({
+    /** Same content for every row in a single run, used for grouping. */
+    run_id: v.string(),
+    generated_at: v.number(),
+    judge_mode: v.union(v.literal("rubric"), v.literal("llm")),
+    agent_id: v.string(),
+    display_name: v.string(),
+    sponsor: v.string(),
+    readiness: v.union(
+      v.literal("ready"),
+      v.literal("blocked"),
+      v.literal("needs_fix"),
+      v.literal("untested"),
+    ),
+    in_domain: v.any(),
+    out_of_domain: v.any(),
+    notes: v.optional(v.string()),
+  })
+    .index("by_agent", ["agent_id"])
+    .index("by_run", ["run_id"]),
+
+  acceptance_runs: defineTable({
+    run_id: v.string(),
+    generated_at: v.number(),
+    judge_mode: v.union(v.literal("rubric"), v.literal("llm")),
+    summary: v.object({
+      total: v.number(),
+      ready: v.number(),
+      blocked: v.number(),
+      needs_fix: v.number(),
+      untested: v.number(),
+    }),
+  }).index("by_run", ["run_id"]),
+
+  /**
+   * A2A task runs persisted by /api/a2a/agents/[agentId]. Each call to
+   * `message/send` or legacy `tasks/send` writes a row here; `tasks/get` reads
+   * it; `tasks/cancel` patches state. Sandbox runs use this table to surface
+   * canonical A2A task lifecycle states without inventing vendor data.
+   *
+   * `run_id` is the public-facing A2A task id; we keep it unique-by-agent via
+   * the by_run_id index so cancel/get can find it without a scan.
+   */
+  a2a_task_runs: defineTable({
+    run_id: v.string(),
+    agent_id: v.string(),
+    state: v.union(
+      v.literal("submitted"),
+      v.literal("working"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("canceled"),
+    ),
+    /** Whether this was produced by the sandbox adapter (vs a real bridge). */
+    execution_status: v.union(
+      v.literal("native_mcp"),
+      v.literal("native_a2a"),
+      v.literal("arbor_real_adapter"),
+      v.literal("arbor_sandbox_adapter"),
+      v.literal("needs_vendor_a2a_endpoint"),
+      v.literal("mock_unconnected"),
+    ),
+    method: v.string(),
+    task_type: v.string(),
+    prompt: v.string(),
+    artifact: v.optional(v.any()),
+    error_message: v.optional(v.string()),
+    sandbox_disclosure: v.optional(v.string()),
+    cancel_requested: v.boolean(),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_run_id", ["run_id"])
+    .index("by_agent", ["agent_id"]),
 });

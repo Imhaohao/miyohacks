@@ -149,11 +149,14 @@ export interface AuctionResolvedPayload {
   winner: AuctionBidSummary;
   vickrey: {
     winner_bid_price: number;
-    runner_up_value_score?: number;
+    winner_score?: number;
+    runner_up_bid_price?: number;
+    runner_up_score?: number;
     clearing_price?: number;
     price_paid: number;
+    score_formula?: string;
     rule:
-      | "quality_adjusted_second_price"
+      | "strict_vickrey_second_price"
       | "second_highest_bid_price"
       | "degenerate_single_bid";
   };

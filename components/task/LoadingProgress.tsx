@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 interface Props {
   /** Bold one-liner above the spinner. e.g. "Selecting your specialist". */
   label: string;
-  /** Live sub-status under the label. e.g. "Calculating Vickrey winner..." */
+  /** Live sub-status under the label. e.g. "Calculating protocol winner..." */
   status?: string;
   /** Optional detail rows ("3/10 specialists responded", "tool: nia_research"). */
   details?: string[];

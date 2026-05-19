@@ -292,11 +292,11 @@ export function PostTaskForm() {
             {submitting ? (
               <>
                 <CircleNotch size={16} className="animate-spin" weight="bold" />
-                Finding your specialist…
+                Starting auction…
               </>
             ) : (
               <>
-                Find my specialist
+                Start agent auction
                 <ArrowRight size={16} weight="bold" />
               </>
             )}

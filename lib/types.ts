@@ -60,6 +60,7 @@ export type AgentExecutionStatus =
   | "native_mcp"
   | "native_a2a"
   | "arbor_real_adapter"
+  | "arbor_sandbox_adapter"
   | "needs_vendor_a2a_endpoint"
   | "mock_unconnected";
 
@@ -149,6 +150,7 @@ export interface BidPayload {
   estimated_seconds: number;
   agent_role?: AgentRole;
   execution_preview?: string;
+  sandbox_disclosure?: string;
   tool_availability?: {
     status: "available" | "manual" | "mock" | "missing";
     checked: string[];
@@ -158,6 +160,7 @@ export interface BidPayload {
     execution_status?: AgentExecutionStatus;
     endpoint_host?: string;
     proof?: string;
+    sandbox?: boolean;
   };
 }
 

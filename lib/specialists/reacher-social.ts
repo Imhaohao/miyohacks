@@ -81,7 +81,14 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function parseToolData(text: string): ToolData {
-  const parsed = asRecord(JSON.parse(text));
+  // The Reacher MCP wraps tool errors inside the success envelope as a plain
+  // text payload (e.g. "API error 401: Invalid API key"). Detect that before
+  // JSON.parse blows up so the runner can surface an actionable message.
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+    throw new Error(`Reacher MCP returned non-JSON content: ${trimmed.slice(0, 200)}`);
+  }
+  const parsed = asRecord(JSON.parse(trimmed));
   const rawData = Array.isArray(parsed.data) ? parsed.data : [];
   return {
     data: rawData.map(asRecord),
@@ -265,9 +272,22 @@ export const reacherSocial: SpecialistRunner = {
       ),
     ]);
 
-    const shops = parseToolData(flattenToolResult(shopsResult));
-    const performance = parseToolData(flattenToolResult(performanceResult));
-    const creators = parseToolData(flattenToolResult(creatorsResult));
+    let shops: ToolData;
+    let performance: ToolData;
+    let creators: ToolData;
+    try {
+      shops = parseToolData(flattenToolResult(shopsResult));
+      performance = parseToolData(flattenToolResult(performanceResult));
+      creators = parseToolData(flattenToolResult(creatorsResult));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // Most common cause: REACHER_API_KEY is set but unauthorized for the
+      // configured MCP endpoint. Surface a credential-shaped message so the
+      // acceptance harness buckets this as blocked_credential, not error.
+      throw new Error(
+        `Reacher MCP rejected the request (check REACHER_API_KEY): ${message}`,
+      );
+    }
     const rows = performance.data.length > 0 ? performance.data : creators.data;
     const top = rows.slice(0, 3);
     const currency = performance.currency ?? creators.currency ?? "USD";

@@ -140,6 +140,7 @@ const EXECUTION_STATUS_BOOST: Record<AgentExecutionStatus, number> = {
   native_mcp: 0.6,
   native_a2a: 0.6,
   arbor_real_adapter: 0.4,
+  arbor_sandbox_adapter: 0.1,
   needs_vendor_a2a_endpoint: -20,
   mock_unconnected: -100,
 };
