@@ -1,5 +1,10 @@
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
+import {
+  LEGACY_TASK_CLASS,
+  normalizeTaskClass,
+  type ReputationSummaryLike,
+} from "../lib/task-class-reputation";
 
 const WEIGHT = {
   quality: 0.45,
@@ -52,6 +57,7 @@ export const _record = internalMutation({
   args: {
     agent_id: v.string(),
     task_id: v.id("tasks"),
+    task_type: v.string(),
     actual_seconds: v.number(),
     estimated_seconds: v.number(),
     quality_score: v.number(),
@@ -60,6 +66,7 @@ export const _record = internalMutation({
     price_paid: v.number(),
   },
   handler: async (ctx, args) => {
+    const task_class = normalizeTaskClass(args.task_type);
     const speed = computeSpeedScore(args.actual_seconds, args.estimated_seconds);
     const estimate = computeEstimateAccuracy(
       args.actual_seconds,
@@ -77,6 +84,8 @@ export const _record = internalMutation({
     await ctx.db.insert("reputation_dimensions", {
       agent_id: args.agent_id,
       task_id: args.task_id,
+      task_type: args.task_type,
+      task_class,
       actual_seconds: args.actual_seconds,
       estimated_seconds: args.estimated_seconds,
       speed_score: speed,
@@ -93,6 +102,65 @@ export const _record = internalMutation({
     return { speed, estimate, quality, value, overall };
   },
 });
+
+type DimensionRow = {
+  agent_id: string;
+  task_class?: string;
+  speed_score: number;
+  estimate_accuracy: number;
+  quality_score: number;
+  value_score: number;
+  overall: number;
+  accepted: boolean;
+};
+
+function emptySummary(args: {
+  agent_id: string;
+  task_class?: string;
+}): ReputationSummaryLike & { agent_id: string } {
+  return {
+    agent_id: args.agent_id,
+    task_class: args.task_class,
+    tasks: 0,
+    speed: 0.65,
+    estimate: 0.65,
+    quality: 0.65,
+    value: 0.65,
+    overall: 0.65,
+    acceptance_rate: 0.65,
+  };
+}
+
+function summarizeRows(args: {
+  agent_id: string;
+  task_class?: string;
+  rows: DimensionRow[];
+}): ReputationSummaryLike & { agent_id: string } {
+  if (args.rows.length === 0) return emptySummary(args);
+  const totals = args.rows.reduce(
+    (acc, r) => {
+      acc.speed += r.speed_score;
+      acc.estimate += r.estimate_accuracy;
+      acc.quality += r.quality_score;
+      acc.value += r.value_score;
+      acc.overall += r.overall;
+      acc.accepted += r.accepted ? 1 : 0;
+      return acc;
+    },
+    { speed: 0, estimate: 0, quality: 0, value: 0, overall: 0, accepted: 0 },
+  );
+  return {
+    agent_id: args.agent_id,
+    task_class: args.task_class,
+    tasks: args.rows.length,
+    speed: totals.speed / args.rows.length,
+    estimate: totals.estimate / args.rows.length,
+    quality: totals.quality / args.rows.length,
+    value: totals.value / args.rows.length,
+    overall: totals.overall / args.rows.length,
+    acceptance_rate: totals.accepted / args.rows.length,
+  };
+}
 
 export const forAgent = query({
   args: { agent_id: v.string() },
@@ -112,43 +180,41 @@ export const _summaryForAgent = internalQuery({
       .query("reputation_dimensions")
       .withIndex("by_agent", (q) => q.eq("agent_id", args.agent_id))
       .collect();
+    return summarizeRows({ agent_id: args.agent_id, rows });
+  },
+});
 
-    if (rows.length === 0) {
-      return {
-        agent_id: args.agent_id,
-        tasks: 0,
-        speed: 0.65,
-        estimate: 0.65,
-        quality: 0.65,
-        value: 0.65,
-        overall: 0.65,
-        acceptance_rate: 0.65,
-      };
+export const _summaryForAgentTaskClass = internalQuery({
+  args: { agent_id: v.string(), task_type: v.string() },
+  handler: async (ctx, args) => {
+    const task_class = normalizeTaskClass(args.task_type);
+    const rows = await ctx.db
+      .query("reputation_dimensions")
+      .withIndex("by_agent_and_task_class", (q) =>
+        q.eq("agent_id", args.agent_id).eq("task_class", task_class),
+      )
+      .collect();
+    return summarizeRows({ agent_id: args.agent_id, task_class, rows });
+  },
+});
+
+export const summariesByTaskClass = query({
+  args: { task_type: v.string() },
+  handler: async (ctx, args) => {
+    const task_class = normalizeTaskClass(args.task_type);
+    const rows = await ctx.db
+      .query("reputation_dimensions")
+      .withIndex("by_task_class", (q) => q.eq("task_class", task_class))
+      .collect();
+    const byAgent = new Map<string, DimensionRow[]>();
+    for (const row of rows) {
+      const bucket = byAgent.get(row.agent_id) ?? [];
+      bucket.push(row);
+      byAgent.set(row.agent_id, bucket);
     }
-
-    const totals = rows.reduce(
-      (acc, r) => {
-        acc.speed += r.speed_score;
-        acc.estimate += r.estimate_accuracy;
-        acc.quality += r.quality_score;
-        acc.value += r.value_score;
-        acc.overall += r.overall;
-        acc.accepted += r.accepted ? 1 : 0;
-        return acc;
-      },
-      { speed: 0, estimate: 0, quality: 0, value: 0, overall: 0, accepted: 0 },
+    return Array.from(byAgent.entries()).map(([agent_id, agentRows]) =>
+      summarizeRows({ agent_id, task_class, rows: agentRows }),
     );
-
-    return {
-      agent_id: args.agent_id,
-      tasks: rows.length,
-      speed: totals.speed / rows.length,
-      estimate: totals.estimate / rows.length,
-      quality: totals.quality / rows.length,
-      value: totals.value / rows.length,
-      overall: totals.overall / rows.length,
-      acceptance_rate: totals.accepted / rows.length,
-    };
   },
 });
 
@@ -160,6 +226,7 @@ export const summaries = query({
       string,
       {
         agent_id: string;
+        task_class?: string;
         tasks: number;
         speed: number;
         estimate: number;
@@ -171,6 +238,7 @@ export const summaries = query({
     for (const r of rows) {
       const cur = byAgent.get(r.agent_id) ?? {
         agent_id: r.agent_id,
+        task_class: undefined,
         tasks: 0,
         speed: 0,
         estimate: 0,
@@ -188,6 +256,7 @@ export const summaries = query({
     }
     return Array.from(byAgent.values()).map((s) => ({
       agent_id: s.agent_id,
+      task_class: s.task_class,
       tasks: s.tasks,
       speed: s.speed / s.tasks,
       estimate: s.estimate / s.tasks,

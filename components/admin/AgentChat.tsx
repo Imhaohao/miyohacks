@@ -28,6 +28,13 @@ interface AgentCard {
     backingSystem?: string;
     nativeConnection?: boolean;
   };
+  arbor?: {
+    execution_status?: string;
+    execution_label?: string;
+    execution_description?: string;
+    backing_system?: string;
+    native_connection?: boolean;
+  };
   defaultInputModes?: string[];
   defaultOutputModes?: string[];
   skills?: Array<{ id?: string; name?: string; description?: string; tags?: string[] }>;
@@ -216,7 +223,7 @@ export function AgentChat({ agents }: { agents: AgentSummary[] }) {
   }
 
   const turns = (selected && history[selected]) || [];
-  const status = card?.capabilities?.executionStatus;
+  const status = card?.arbor?.execution_status ?? card?.capabilities?.executionStatus;
   const statusTone =
     status === "native_a2a" ||
     status === "native_mcp" ||
@@ -275,11 +282,11 @@ export function AgentChat({ agents }: { agents: AgentSummary[] }) {
               status ? (
                 <span className="inline-flex items-center gap-2">
                   <Pill tone={statusTone}>
-                    {card?.capabilities?.executionLabel ?? status}
+                    {card?.arbor?.execution_label ?? card?.capabilities?.executionLabel ?? status}
                   </Pill>
-                  {card?.capabilities?.backingSystem && (
+                  {(card?.arbor?.backing_system ?? card?.capabilities?.backingSystem) && (
                     <span className="font-mono text-[11px] text-ink-muted">
-                      {card.capabilities.backingSystem}
+                      {card.arbor?.backing_system ?? card?.capabilities?.backingSystem}
                     </span>
                   )}
                 </span>
@@ -299,9 +306,9 @@ export function AgentChat({ agents }: { agents: AgentSummary[] }) {
           {card?.description && (
             <p className="text-sm text-ink-muted">{card.description}</p>
           )}
-          {card?.capabilities?.executionDescription && (
+          {(card?.arbor?.execution_description ?? card?.capabilities?.executionDescription) && (
             <p className="mt-2 text-xs text-ink-subtle">
-              {card.capabilities.executionDescription}
+              {card?.arbor?.execution_description ?? card?.capabilities?.executionDescription}
             </p>
           )}
           {card?.skills && card.skills.length > 0 && (

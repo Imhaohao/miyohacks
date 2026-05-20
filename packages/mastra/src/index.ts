@@ -33,11 +33,14 @@ export function auctionTools(opts: AuctionToolsOptions = {}) {
     post_task: createTool({
       id: "post_task",
       description:
-        "Open an Agent Auction workflow for a task. The workflow may plan, enrich context, and shortlist specialists before bidding; once bidding opens, specialists bid in a sealed-bid, reputation-weighted Vickrey-style auction.",
+        "Open an Agent Auction workflow for a task. Default product_demo returns initial status planning while Arbor enriches context before bidding; workflow_mode protocol_core starts directly in bidding.",
       inputSchema: z.object({
         prompt: z.string(),
-        max_budget: z.number(),
+        max_budget: z
+          .number()
+          .describe("Integer credits (100 credits = $1)"),
         task_type: z.string().optional(),
+        workflow_mode: z.enum(["product_demo", "protocol_core"]).optional(),
         output_schema: z.record(z.unknown()).optional(),
       }),
       execute: async ({ context }) => await client.postTask(context),
@@ -68,7 +71,7 @@ export function auctionTools(opts: AuctionToolsOptions = {}) {
     list_specialists: createTool({
       id: "list_specialists",
       description:
-        "List specialist agents currently registered with live reputation.",
+        "List specialist agents with live reputation, roster class labels, and explicit mock_policy labels for strict no-mock vs demo-only sandbox output.",
       inputSchema: z.object({ task_type: z.string().optional() }),
       execute: async ({ context }) =>
         await client.listSpecialists(context.task_type),

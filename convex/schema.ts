@@ -52,18 +52,33 @@ export default defineSchema({
     prompt: v.string(),
     output_schema: v.optional(v.any()),
     max_budget: v.number(),
+    workflow_mode: v.optional(
+      v.union(v.literal("product_demo"), v.literal("protocol_core")),
+    ),
     target_repo: v.optional(v.string()),
     target_branch: v.optional(v.string()),
     payment_status: v.optional(
       v.union(
         v.literal("unfunded"),
+        v.literal("checkout_pending"),
+        v.literal("live_funded"),
         v.literal("funds_reserved"),
         v.literal("escrow_locked"),
         v.literal("released"),
         v.literal("refunded"),
+        v.literal("payable"),
+        v.literal("transferred"),
+        v.literal("transfer_failed"),
+        v.literal("incident"),
         v.literal("payout_pending"),
       ),
     ),
+    /**
+     * How this task was funded: `credits` (legacy wallet credits) vs `live`
+     * (real Stripe payment via /api/stripe/checkout/task). Live tasks honor
+     * the full Connect transfer + partial-refund lifecycle.
+     */
+    funding_mode: v.optional(v.union(v.literal("credits"), v.literal("live"))),
     status: v.union(
       v.literal("open"),
       v.literal("shortlisting"),
@@ -176,6 +191,13 @@ export default defineSchema({
       ),
     ),
     bid_price: v.number(),
+    /** Reputation value actually used for score = reputation / bid_price. */
+    reputation_score: v.optional(v.number()),
+    reputation_source: v.optional(
+      v.union(v.literal("global"), v.literal("task_class")),
+    ),
+    task_class: v.optional(v.string()),
+    task_class_history_count: v.optional(v.number()),
     capability_claim: v.string(),
     estimated_seconds: v.number(),
     score: v.number(),
@@ -224,6 +246,35 @@ export default defineSchema({
         endpoint_host: v.optional(v.string()),
         proof: v.optional(v.string()),
         sandbox: v.optional(v.boolean()),
+        connection_state: v.optional(
+          v.union(
+            v.literal("configured"),
+            v.literal("verified"),
+            v.literal("degraded"),
+            v.literal("unavailable"),
+          ),
+        ),
+        effective_connected: v.optional(v.boolean()),
+        probe_status: v.optional(
+          v.union(
+            v.literal("available"),
+            v.literal("missing_auth"),
+            v.literal("not_configured"),
+            v.literal("unreachable"),
+            v.literal("timeout"),
+            v.literal("auth_failed"),
+            v.literal("protocol_error"),
+          ),
+        ),
+        last_probe_at: v.optional(v.string()),
+        last_probe_reason: v.optional(v.string()),
+        last_probe_latency_ms: v.optional(v.number()),
+        mock_policy: v.optional(
+          v.union(v.literal("strict_no_mock"), v.literal("demo_mock_llm")),
+        ),
+        mock_policy_label: v.optional(v.string()),
+        mock_policy_description: v.optional(v.string()),
+        opens_prs: v.optional(v.boolean()),
       }),
     ),
   }).index("by_task", ["task_id"]),
@@ -312,6 +363,58 @@ export default defineSchema({
     .index("by_session", ["session_id"])
     .index("by_buyer", ["buyer_id"]),
 
+  /**
+   * Per-task payment provenance for live-money tasks. Tracks the entire
+   * Stripe lifecycle: checkout session, payment intent, charge, partial
+   * refund of unused budget, Connect transfer to the agent, and any
+   * downstream refund/dispute reconciliation incidents.
+   *
+   * Credit-only tasks do not have a row here; the legacy ledger covers them.
+   */
+  task_payments: defineTable({
+    task_id: v.id("tasks"),
+    buyer_id: v.string(),
+    agent_id: v.optional(v.string()),
+    funding_mode: v.union(v.literal("credits"), v.literal("live")),
+    currency: v.string(),
+    gross_funded: v.number(),
+    clearing_price: v.optional(v.number()),
+    refunded_unused: v.optional(v.number()),
+    refunded_total: v.optional(v.number()),
+    agent_net_transferred: v.optional(v.number()),
+    platform_fee: v.optional(v.number()),
+    transfer_group: v.optional(v.string()),
+    stripe_session_id: v.optional(v.string()),
+    stripe_payment_intent_id: v.optional(v.string()),
+    stripe_charge_id: v.optional(v.string()),
+    stripe_transfer_id: v.optional(v.string()),
+    stripe_refund_id: v.optional(v.string()),
+    transfer_status: v.optional(
+      v.union(
+        v.literal("not_required"),
+        v.literal("pending"),
+        v.literal("succeeded"),
+        v.literal("failed"),
+        v.literal("payable_blocked"),
+      ),
+    ),
+    requirements_due: v.optional(v.array(v.string())),
+    last_event: v.optional(v.string()),
+    incident_kind: v.optional(
+      v.union(
+        v.literal("refund_after_transfer"),
+        v.literal("dispute_after_transfer"),
+      ),
+    ),
+    incident_message: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_task", ["task_id"])
+    .index("by_session", ["stripe_session_id"])
+    .index("by_transfer", ["stripe_transfer_id"])
+    .index("by_payment_intent", ["stripe_payment_intent_id"]),
+
   agent_payout_accounts: defineTable({
     agent_id: v.string(),
     stripe_connect_account_id: v.string(),
@@ -379,6 +482,10 @@ export default defineSchema({
   reputation_dimensions: defineTable({
     agent_id: v.string(),
     task_id: v.id("tasks"),
+    /** Original task_type on the task at settlement time. */
+    task_type: v.optional(v.string()),
+    /** Normalized task class used for class-specific reputation. */
+    task_class: v.optional(v.string()),
     /** Wall-clock seconds between execution_started and execution_complete. */
     actual_seconds: v.number(),
     /** What the agent quoted in their bid. */
@@ -400,7 +507,9 @@ export default defineSchema({
     created_at: v.number(),
   })
     .index("by_agent", ["agent_id"])
-    .index("by_task", ["task_id"]),
+    .index("by_task", ["task_id"])
+    .index("by_agent_and_task_class", ["agent_id", "task_class"])
+    .index("by_task_class", ["task_class"]),
 
   lifecycle_events: defineTable({
     task_id: v.id("tasks"),
@@ -444,6 +553,11 @@ export default defineSchema({
     cost_baseline: v.number(),
     starting_reputation: v.number(),
     homepage_url: v.optional(v.string()),
+    mock_policy: v.optional(
+      v.union(v.literal("strict_no_mock"), v.literal("demo_mock_llm")),
+    ),
+    mock_policy_label: v.optional(v.string()),
+    mock_policy_description: v.optional(v.string()),
     updated_at: v.number(),
   }).index("by_agent_id", ["agent_id"]),
 
@@ -512,6 +626,20 @@ export default defineSchema({
     cost_baseline: v.number(),
     starting_reputation: v.number(),
     one_liner: v.string(),
+    industry: v.optional(
+      v.union(
+        v.literal("software"),
+        v.literal("finance"),
+        v.literal("legal"),
+        v.literal("healthcare"),
+        v.literal("ecommerce"),
+        v.literal("marketing"),
+        v.literal("sales"),
+        v.literal("operations"),
+        v.literal("data"),
+        v.literal("creative-media"),
+      ),
+    ),
     discovered_for: v.string(),
     created_at: v.number(),
     discovery_source: v.optional(
@@ -519,12 +647,39 @@ export default defineSchema({
         v.literal("catalog"),
         v.literal("registry"),
         v.literal("synthesized"),
+        v.literal("registered"),
+      ),
+    ),
+    protocol: v.optional(
+      v.union(
+        v.literal("a2a"),
+        v.literal("mcp"),
+        v.literal("mock"),
+        v.literal("manual"),
       ),
     ),
     mcp_endpoint: v.optional(v.string()),
     mcp_api_key_env: v.optional(v.string()),
+    a2a_endpoint: v.optional(v.string()),
+    a2a_agent_card_url: v.optional(v.string()),
     homepage_url: v.optional(v.string()),
     rationale: v.optional(v.string()),
+    last_probe_status: v.optional(
+      v.union(
+        v.literal("available"),
+        v.literal("missing_auth"),
+        v.literal("not_configured"),
+        v.literal("unreachable"),
+        v.literal("timeout"),
+        v.literal("auth_failed"),
+        v.literal("protocol_error"),
+      ),
+    ),
+    last_probe_reason: v.optional(v.string()),
+    last_probe_at: v.optional(v.string()),
+    last_probe_latency_ms: v.optional(v.number()),
+    verified_tool_count: v.optional(v.number()),
+    registered_via: v.optional(v.string()),
   }).index("by_agent_id", ["agent_id"]),
 
   user_api_keys: defineTable({

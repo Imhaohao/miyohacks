@@ -1,9 +1,10 @@
 import {
   internalMutation,
+  internalQuery,
   mutation,
   query,
 } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -366,9 +367,14 @@ export const _grantTrialCreditsIfNeeded = internalMutation({
     amount: v.number(),
   },
   handler: async (ctx, args) => {
-    const amount = roundMoney(args.amount);
+    const amount = Math.round(args.amount);
     if (amount <= 0) throw new Error("trial grant must be positive");
-    const idempotencyKey = `trial:${args.account_id}:${amount.toFixed(2)}`;
+    // Idempotency is keyed by account only — every account gets exactly one
+    // trial grant for its lifetime. The amount intentionally does NOT factor
+    // in so that future changes to FREE_TRIAL_CREDITS don't accidentally
+    // re-grant credits to existing users (which would happen with an
+    // amount-keyed idempotency).
+    const idempotencyKey = `trial:${args.account_id}`;
     if (await existingLedger(ctx, idempotencyKey)) {
       return { granted: false, idempotent: true };
     }
@@ -395,15 +401,15 @@ export const grantTrialCreditsIfNeeded = mutation({
   handler: async (ctx): Promise<{ granted: boolean; idempotent: boolean }> => {
     const accountId = await requireAccountId(ctx);
     const wallet = await ensureBuyerWallet(ctx, accountId);
-    const missingTrialCredits = roundMoney(
-      FREE_TRIAL_CREDITS - (wallet.lifetime_granted ?? 0),
-    );
-    if (missingTrialCredits <= 0) {
+    // Skip when this account already has any trial grant on file. This is
+    // stricter than the old "top up to FREE_TRIAL_CREDITS" behavior — see
+    // `_grantTrialCreditsIfNeeded` for the reasoning.
+    if ((wallet.lifetime_granted ?? 0) > 0) {
       return { granted: false, idempotent: true };
     }
     return (await ctx.runMutation(internal.payments._grantTrialCreditsIfNeeded, {
       account_id: accountId,
-      amount: missingTrialCredits,
+      amount: FREE_TRIAL_CREDITS,
     })) as { granted: boolean; idempotent: boolean };
   },
 });
@@ -896,5 +902,393 @@ export const markPayoutFailed = mutation({
       idempotency_key: `payout:${args.payout_id}:failed`,
     });
     return { ok: true, idempotent: false };
+  },
+});
+
+// ─── live-money task payments (Stripe-funded tasks) ──────────────────────
+
+async function taskPaymentByTask(
+  ctx: MutationCtx | QueryCtx,
+  taskId: Id<"tasks">,
+) {
+  return await ctx.db
+    .query("task_payments")
+    .withIndex("by_task", (q) => q.eq("task_id", taskId))
+    .first();
+}
+
+export const recordTaskCheckoutCreated = mutation({
+  args: {
+    server_secret: v.optional(v.string()),
+    task_id: v.id("tasks"),
+    buyer_id: v.string(),
+    max_budget: v.number(),
+    stripe_session_id: v.string(),
+    transfer_group: v.string(),
+  },
+  handler: async (ctx, args) => {
+    requirePaymentServer(args.server_secret);
+    const now = Date.now();
+    const existing = await taskPaymentByTask(ctx, args.task_id);
+    const gross = roundMoney(args.max_budget);
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        stripe_session_id: args.stripe_session_id,
+        transfer_group: args.transfer_group,
+        gross_funded: gross,
+        last_event: "checkout.session.created",
+        updated_at: now,
+      });
+    } else {
+      await ctx.db.insert("task_payments", {
+        task_id: args.task_id,
+        buyer_id: args.buyer_id,
+        funding_mode: "live",
+        currency: CREDIT_CURRENCY,
+        gross_funded: gross,
+        stripe_session_id: args.stripe_session_id,
+        transfer_group: args.transfer_group,
+        last_event: "checkout.session.created",
+        created_at: now,
+        updated_at: now,
+      });
+    }
+    await ctx.db.patch(args.task_id, {
+      payment_status: "checkout_pending",
+      funding_mode: "live",
+    });
+    return { ok: true };
+  },
+});
+
+export const fulfillTaskFunding = mutation({
+  args: {
+    server_secret: v.optional(v.string()),
+    task_id: v.id("tasks"),
+    buyer_id: v.string(),
+    stripe_event_id: v.string(),
+    stripe_session_id: v.string(),
+    stripe_payment_intent_id: v.optional(v.string()),
+    stripe_charge_id: v.optional(v.string()),
+    // Integer credits funded (== Stripe `amount_total` cents). The webhook
+    // pipes this through 1:1.
+    gross_credits: v.number(),
+  },
+  handler: async (ctx, args) => {
+    requirePaymentServer(args.server_secret);
+    const idempotencyKey = `stripe:${args.stripe_event_id}:task_funding`;
+    if (await existingLedger(ctx, idempotencyKey)) {
+      return { ok: true, idempotent: true };
+    }
+    const now = Date.now();
+    const payment = await taskPaymentByTask(ctx, args.task_id);
+    if (!payment) {
+      throw new Error(`task_payments row missing for ${args.task_id}`);
+    }
+    const gross = Math.round(args.gross_credits);
+    await ctx.db.patch(payment._id, {
+      stripe_payment_intent_id: args.stripe_payment_intent_id,
+      stripe_charge_id: args.stripe_charge_id,
+      gross_funded: gross,
+      last_event: "checkout.session.completed",
+      updated_at: now,
+    });
+    await ctx.db.patch(args.task_id, {
+      payment_status: "live_funded",
+      funding_mode: "live",
+    });
+    await insertLedger(ctx, {
+      account_id: args.buyer_id,
+      account_type: "buyer",
+      entry_type: "credit_purchase",
+      amount: gross,
+      task_id: args.task_id,
+      stripe_event_id: args.stripe_event_id,
+      stripe_session_id: args.stripe_session_id,
+      idempotency_key: idempotencyKey,
+    });
+    await ctx.runMutation(internal.lifecycle.log, {
+      task_id: args.task_id,
+      event_type: "payment_reserved",
+      payload: {
+        buyer_id: args.buyer_id,
+        amount: gross,
+        mode: "live",
+        stripe_session_id: args.stripe_session_id,
+        stripe_payment_intent_id: args.stripe_payment_intent_id,
+      },
+    });
+    return { ok: true, idempotent: false };
+  },
+});
+
+export const _recordClearingPrice = internalMutation({
+  args: {
+    task_id: v.id("tasks"),
+    clearing_price: v.number(),
+    refunded_unused: v.number(),
+    agent_id: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const payment = await taskPaymentByTask(ctx, args.task_id);
+    if (!payment) return { ok: false };
+    await ctx.db.patch(payment._id, {
+      clearing_price: roundMoney(args.clearing_price),
+      refunded_unused: roundMoney(args.refunded_unused),
+      agent_id: args.agent_id ?? payment.agent_id,
+      last_event: "clearing_price_set",
+      updated_at: Date.now(),
+    });
+    return { ok: true };
+  },
+});
+
+export const _recordUnusedRefund = internalMutation({
+  args: {
+    task_id: v.id("tasks"),
+    refunded_unused: v.number(),
+    stripe_refund_id: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const payment = await taskPaymentByTask(ctx, args.task_id);
+    if (!payment) return { ok: false };
+    await ctx.db.patch(payment._id, {
+      refunded_unused: roundMoney(args.refunded_unused),
+      stripe_refund_id: args.stripe_refund_id ?? payment.stripe_refund_id,
+      last_event: "partial_refund_unused",
+      updated_at: Date.now(),
+    });
+    return { ok: true };
+  },
+});
+
+export const _recordTransfer = internalMutation({
+  args: {
+    task_id: v.id("tasks"),
+    agent_id: v.string(),
+    stripe_transfer_id: v.string(),
+    amount: v.number(),
+    platform_fee: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const payment = await taskPaymentByTask(ctx, args.task_id);
+    if (payment) {
+      await ctx.db.patch(payment._id, {
+        agent_id: args.agent_id,
+        stripe_transfer_id: args.stripe_transfer_id,
+        agent_net_transferred: roundMoney(args.amount),
+        platform_fee: roundMoney(args.platform_fee),
+        transfer_status: "succeeded",
+        last_event: "transfer.created",
+        updated_at: Date.now(),
+      });
+    }
+    await ctx.db.patch(args.task_id, { payment_status: "transferred" });
+    await insertLedger(ctx, {
+      account_id: args.agent_id,
+      account_type: "agent",
+      entry_type: "agent_payout",
+      amount: -roundMoney(args.amount),
+      task_id: args.task_id,
+      stripe_transfer_id: args.stripe_transfer_id,
+      idempotency_key: `task:${args.task_id}:transfer:${args.stripe_transfer_id}`,
+    });
+    await insertLedger(ctx, {
+      account_id: "platform",
+      account_type: "platform",
+      entry_type: "platform_fee",
+      amount: roundMoney(args.platform_fee),
+      task_id: args.task_id,
+      stripe_transfer_id: args.stripe_transfer_id,
+      idempotency_key: `task:${args.task_id}:platform_fee:${args.stripe_transfer_id}`,
+    });
+    await ctx.runMutation(internal.lifecycle.log, {
+      task_id: args.task_id,
+      event_type: "payment_released",
+      payload: {
+        seller_id: args.agent_id,
+        stripe_transfer_id: args.stripe_transfer_id,
+        agent_net: roundMoney(args.amount),
+        platform_fee: roundMoney(args.platform_fee),
+        mode: "live",
+      },
+    });
+    return { ok: true };
+  },
+});
+
+export const _markPayableBlocked = internalMutation({
+  args: {
+    task_id: v.id("tasks"),
+    agent_id: v.string(),
+    amount: v.number(),
+    requirements_due: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const payment = await taskPaymentByTask(ctx, args.task_id);
+    if (payment) {
+      await ctx.db.patch(payment._id, {
+        agent_id: args.agent_id,
+        agent_net_transferred: 0,
+        transfer_status: "payable_blocked",
+        requirements_due: args.requirements_due,
+        last_event: "payable_blocked",
+        updated_at: Date.now(),
+      });
+    }
+    await ctx.db.patch(args.task_id, { payment_status: "payable" });
+    // Stash the unpayable earning so the admin can see and unblock it.
+    const wallet = await ensureAgentWallet(ctx, args.agent_id);
+    await ctx.db.patch(wallet._id, {
+      pending_earnings: roundMoney(wallet.pending_earnings + args.amount),
+      updated_at: Date.now(),
+    });
+    await ctx.runMutation(internal.lifecycle.log, {
+      task_id: args.task_id,
+      event_type: "settled",
+      payload: {
+        seller_id: args.agent_id,
+        agent_net: roundMoney(args.amount),
+        payable_blocked: true,
+        requirements_due: args.requirements_due,
+      },
+    });
+    return { ok: true };
+  },
+});
+
+export const _markTransferFailed = internalMutation({
+  args: {
+    task_id: v.id("tasks"),
+    agent_id: v.string(),
+    failure_reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const payment = await taskPaymentByTask(ctx, args.task_id);
+    if (payment) {
+      await ctx.db.patch(payment._id, {
+        transfer_status: "failed",
+        last_event: "transfer.failed",
+        incident_message: args.failure_reason,
+        updated_at: Date.now(),
+      });
+    }
+    await ctx.db.patch(args.task_id, { payment_status: "transfer_failed" });
+    return { ok: true };
+  },
+});
+
+export const _refundLiveTaskFunding = internalMutation({
+  args: {
+    task_id: v.id("tasks"),
+    refund_amount: v.number(),
+    stripe_refund_id: v.optional(v.string()),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const payment = await taskPaymentByTask(ctx, args.task_id);
+    if (payment) {
+      await ctx.db.patch(payment._id, {
+        refunded_total: roundMoney(
+          (payment.refunded_total ?? 0) + args.refund_amount,
+        ),
+        stripe_refund_id: args.stripe_refund_id ?? payment.stripe_refund_id,
+        last_event: "refund.created",
+        updated_at: Date.now(),
+      });
+    }
+    await ctx.db.patch(args.task_id, { payment_status: "refunded" });
+    await ctx.runMutation(internal.lifecycle.log, {
+      task_id: args.task_id,
+      event_type: "payment_refunded",
+      payload: {
+        amount: roundMoney(args.refund_amount),
+        reason: args.reason,
+        mode: "live",
+      },
+    });
+    return { ok: true };
+  },
+});
+
+export const recordTaskIncident = mutation({
+  args: {
+    server_secret: v.optional(v.string()),
+    task_id: v.optional(v.id("tasks")),
+    stripe_transfer_id: v.optional(v.string()),
+    stripe_payment_intent_id: v.optional(v.string()),
+    incident_kind: v.union(
+      v.literal("refund_after_transfer"),
+      v.literal("dispute_after_transfer"),
+    ),
+    incident_message: v.string(),
+  },
+  handler: async (ctx, args) => {
+    requirePaymentServer(args.server_secret);
+    const now = Date.now();
+    let payment: Awaited<ReturnType<typeof taskPaymentByTask>> = null;
+    if (args.task_id) {
+      payment = await taskPaymentByTask(ctx, args.task_id);
+    } else if (args.stripe_transfer_id) {
+      payment = await ctx.db
+        .query("task_payments")
+        .withIndex("by_transfer", (q) =>
+          q.eq("stripe_transfer_id", args.stripe_transfer_id!),
+        )
+        .first();
+    } else if (args.stripe_payment_intent_id) {
+      payment = await ctx.db
+        .query("task_payments")
+        .withIndex("by_payment_intent", (q) =>
+          q.eq("stripe_payment_intent_id", args.stripe_payment_intent_id!),
+        )
+        .first();
+    }
+    if (!payment) return { ok: false, notFound: true };
+    await ctx.db.patch(payment._id, {
+      incident_kind: args.incident_kind,
+      incident_message: args.incident_message,
+      last_event: args.incident_kind,
+      updated_at: now,
+    });
+    await ctx.db.patch(payment.task_id, { payment_status: "incident" });
+    await ctx.runMutation(internal.admin._logEvent, {
+      actor: "stripe_webhook",
+      action: "payment_incident",
+      target_type: "task",
+      target_id: String(payment.task_id),
+      reason: args.incident_message,
+      payload: {
+        kind: args.incident_kind,
+        stripe_transfer_id: args.stripe_transfer_id,
+        stripe_payment_intent_id: args.stripe_payment_intent_id,
+      },
+    });
+    return { ok: true };
+  },
+});
+
+export const taskPaymentForTask = query({
+  args: { task_id: v.id("tasks") },
+  handler: async (ctx, args) => {
+    await assertTaskReadable(ctx, args.task_id);
+    return await taskPaymentByTask(ctx, args.task_id);
+  },
+});
+
+export const _taskPaymentForTask = internalQuery({
+  args: { task_id: v.id("tasks") },
+  handler: async (ctx, args) => {
+    return await taskPaymentByTask(ctx, args.task_id);
+  },
+});
+
+export const _payoutAccountForAgent = internalQuery({
+  args: { agent_id: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("agent_payout_accounts")
+      .withIndex("by_agent", (q) => q.eq("agent_id", args.agent_id))
+      .first();
   },
 });

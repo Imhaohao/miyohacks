@@ -44,6 +44,8 @@ export type DirectionState =
   | "blocked_credential"
   /** Agent is endpoint-gated and no A2A endpoint is configured. */
   | "blocked_endpoint"
+  /** Vendor returned 429/5xx/timeout/unreachable — not the agent's fault. */
+  | "blocked_provider"
   /** Runner threw during bid/execute/judge. */
   | "error"
   /** No fixture defined for this agent. */
@@ -124,6 +126,11 @@ const CREDENTIAL_HINTS = [
   "needs github_token",
   "needs openai_api_key",
   "credentials are missing",
+  "401",
+  "unauthorized",
+  "invalid api key",
+  "forbidden",
+  "403",
 ];
 
 const ENDPOINT_HINTS = [
@@ -134,13 +141,41 @@ const ENDPOINT_HINTS = [
   "endpoint not configured",
 ];
 
-function classifyDecline(reason: string, fixture: AcceptanceFixture): {
-  state: DirectionState;
-  reason: string;
-} {
+const PROVIDER_HINTS = [
+  "429",
+  "rate limit",
+  "rate-limit",
+  "rate_limit",
+  "too_many_requests",
+  "too many requests",
+  "quota",
+  "daily message limit",
+  "daily limit",
+  "fetch failed",
+  "etimedout",
+  "econnreset",
+  "econnrefused",
+  "tool discovery is unavailable",
+  "tool discovery unavailable",
+  "service unavailable",
+  "gateway timeout",
+  "bad gateway",
+  "500 internal",
+  "502 bad",
+  "503 service",
+  "504 gateway",
+];
+
+function classifyByHints(
+  reason: string,
+  fixture: AcceptanceFixture,
+): { state: DirectionState; reason: string } {
   const lower = reason.toLowerCase();
   if (ENDPOINT_HINTS.some((needle) => lower.includes(needle))) {
     return { state: "blocked_endpoint", reason };
+  }
+  if (PROVIDER_HINTS.some((needle) => lower.includes(needle))) {
+    return { state: "blocked_provider", reason };
   }
   if (CREDENTIAL_HINTS.some((needle) => lower.includes(needle))) {
     return { state: "blocked_credential", reason };
@@ -149,6 +184,13 @@ function classifyDecline(reason: string, fixture: AcceptanceFixture): {
     return { state: "blocked_endpoint", reason };
   }
   return { state: "declined_in_domain", reason };
+}
+
+function classifyDecline(reason: string, fixture: AcceptanceFixture): {
+  state: DirectionState;
+  reason: string;
+} {
+  return classifyByHints(reason, fixture);
 }
 
 function isDecline(decision: SpecialistDecision): decision is { decline: true; reason: string } {
@@ -236,21 +278,13 @@ async function runDirection(args: {
     output = await runner.execute(task.prompt, task.taskType, task.opts);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const lower = message.toLowerCase();
-    // Re-bucket credential/endpoint errors that surface at execute time so
-    // they look the same as the bid-time decline path. The dashboard needs
-    // to call out "fix your key" vs "your runner is broken."
-    if (ENDPOINT_HINTS.some((needle) => lower.includes(needle))) {
+    // Re-bucket vendor / credential / endpoint errors that surface at execute
+    // time so they look the same as the bid-time decline path. The dashboard
+    // shows "fix your key" vs "vendor is down" vs "your runner is broken."
+    const classified = classifyByHints(message, fixture);
+    if (classified.state !== "declined_in_domain") {
       return {
-        state: "blocked_endpoint",
-        reason: message,
-        bid,
-        duration_ms: Date.now() - started,
-      };
-    }
-    if (CREDENTIAL_HINTS.some((needle) => lower.includes(needle))) {
-      return {
-        state: "blocked_credential",
+        state: classified.state,
         reason: message,
         bid,
         duration_ms: Date.now() - started,
@@ -296,7 +330,11 @@ async function runDirection(args: {
 
 function rollUp(inDir: DirectionResult, outDir: DirectionResult): AgentReadiness {
   if (inDir.state === "untested") return "untested";
-  if (inDir.state === "blocked_credential" || inDir.state === "blocked_endpoint") {
+  if (
+    inDir.state === "blocked_credential" ||
+    inDir.state === "blocked_endpoint" ||
+    inDir.state === "blocked_provider"
+  ) {
     return "blocked";
   }
   if (inDir.state === "accepted" && outDir.state === "declined_correctly") {

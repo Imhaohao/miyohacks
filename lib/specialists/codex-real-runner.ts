@@ -18,6 +18,11 @@ import type {
   SpecialistOutput,
   SpecialistRunner,
 } from "../types";
+import { usdToCredits } from "../payments";
+
+function baselineCredits(raw: number): number {
+  return raw < 10 ? usdToCredits(raw) : Math.round(raw);
+}
 
 function configuredMode() {
   if (process.env.GITHUB_TOKEN?.trim() && process.env.OPENAI_API_KEY?.trim()) {
@@ -84,7 +89,7 @@ export function makeCodexWriterSpecialist(
       }
 
       const bid: BidPayload = {
-        bid_price: config.cost_baseline,
+        bid_price: baselineCredits(config.cost_baseline),
         capability_claim: `I will use ${mode} to generate scoped repo edits and open a pull request for buyer review.`,
         estimated_seconds: 1800,
         agent_role: roleForSpecialist(config),
@@ -98,6 +103,7 @@ export function makeCodexWriterSpecialist(
           execution_status: "arbor_real_adapter",
           endpoint_host: "api.github.com",
           proof: mode,
+          opens_prs: true,
         },
       };
       return bid;

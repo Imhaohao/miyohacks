@@ -5,8 +5,9 @@ export function implementationPlanFromText(args: {
   prompt: string;
   text: string;
 }): ImplementationPlanArtifact {
+  const agentReport = args.text.trim();
   const summary =
-    args.text
+    agentReport
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 260) ||
@@ -16,6 +17,7 @@ export function implementationPlanFromText(args: {
     kind: "implementation_plan",
     title: "Implementation Approval Plan",
     summary,
+    agent_report: agentReport || undefined,
     agent_id: args.config.agent_id,
     mode: "plan_for_approval",
     user_goal: args.prompt,

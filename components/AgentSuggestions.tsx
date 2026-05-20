@@ -6,7 +6,13 @@ import { Pill, type PillTone } from "@/components/ui/Pill";
 import { formatMoney, formatScore } from "@/lib/utils";
 import { Sparkle, CircleNotch, Lightning } from "@phosphor-icons/react";
 import { EXECUTION_STATUS_LABELS } from "@/lib/agent-execution-status";
-import type { AgentExecutionStatus, AgentRole } from "@/lib/types";
+import type {
+  AgentConnectionState,
+  AgentExecutionStatus,
+  AgentMockPolicy,
+  AgentRole,
+  AgentRosterClass,
+} from "@/lib/types";
 
 type DiscoverySource = "catalog" | "registry" | "synthesized";
 
@@ -21,8 +27,27 @@ interface SuggestionItem {
   fit_reasoning: string;
   discovered: boolean;
   discovery_source?: DiscoverySource;
+  roster_class?: AgentRosterClass;
+  roster_label?: string;
+  roster_description?: string;
+  canonical_v0?: boolean;
+  mock_policy?: AgentMockPolicy;
+  mock_policy_label?: string;
+  mock_policy_description?: string;
   mcp_endpoint?: string;
   execution_status: AgentExecutionStatus;
+  execution_connection_state?: AgentConnectionState;
+  effective_connected?: boolean;
+  probe_status?:
+    | "available"
+    | "missing_auth"
+    | "not_configured"
+    | "unreachable"
+    | "timeout"
+    | "auth_failed"
+    | "protocol_error";
+  last_probe_at?: string;
+  last_probe_reason?: string;
   agent_role?: AgentRole;
   homepage_url?: string;
 }
@@ -181,7 +206,24 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
                     source={s.discovery_source}
                     hasEndpoint={!!s.mcp_endpoint}
                     executionStatus={s.execution_status}
+                    connectionState={s.execution_connection_state}
                   />
+                  {s.roster_label && (
+                    <Pill
+                      tone={s.canonical_v0 ? "success" : "neutral"}
+                      title={s.roster_description}
+                    >
+                      {s.roster_label}
+                    </Pill>
+                  )}
+                  {s.mock_policy_label && (
+                    <Pill
+                      tone={s.mock_policy === "demo_mock_llm" ? "warning" : "neutral"}
+                      title={s.mock_policy_description}
+                    >
+                      {s.mock_policy_label}
+                    </Pill>
+                  )}
                   {s.agent_role && s.agent_role !== "executor" && (
                     <Pill tone="warning">{s.agent_role} support</Pill>
                   )}
@@ -232,8 +274,8 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
         <div className="mt-4 animate-fade-up rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-medium">No strong match in the current roster.</p>
           <p className="mt-1 text-xs text-amber-800">
-            Spawn a tailor-made specialist for this task. It joins the registry
-            and competes alongside the existing specialists.
+            Spawn a tailor-made specialist for this task. It joins the expanded
+            registry outside the canonical v0 roster.
           </p>
           <button
             type="button"
@@ -269,6 +311,26 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
               hasEndpoint={!!discovered.specialist.mcp_endpoint}
               executionStatus={discovered.specialist.execution_status}
             />
+            {discovered.specialist.roster_label && (
+              <Pill
+                tone={discovered.specialist.canonical_v0 ? "success" : "neutral"}
+                title={discovered.specialist.roster_description}
+              >
+                {discovered.specialist.roster_label}
+              </Pill>
+            )}
+            {discovered.specialist.mock_policy_label && (
+              <Pill
+                tone={
+                  discovered.specialist.mock_policy === "demo_mock_llm"
+                    ? "warning"
+                    : "neutral"
+                }
+                title={discovered.specialist.mock_policy_description}
+              >
+                {discovered.specialist.mock_policy_label}
+              </Pill>
+            )}
           </div>
           <p className="mt-1 text-xs text-ink-muted">
             {discovered.specialist.sponsor} ·{" "}
@@ -326,12 +388,26 @@ function SourceBadge({
   source,
   hasEndpoint,
   executionStatus,
+  connectionState,
 }: {
   discovered: boolean;
   source?: DiscoverySource;
   hasEndpoint: boolean;
   executionStatus?: AgentExecutionStatus;
+  connectionState?: AgentConnectionState;
 }) {
+  if (connectionState === "verified") {
+    return <Pill tone="success">Verified</Pill>;
+  }
+  if (connectionState === "degraded") {
+    return <Pill tone="warning">Degraded</Pill>;
+  }
+  if (connectionState === "configured") {
+    return <Pill tone="neutral">Configured</Pill>;
+  }
+  if (connectionState === "unavailable") {
+    return <Pill tone="danger">Unavailable</Pill>;
+  }
   if (executionStatus === "mock_unconnected") {
     return <Pill tone="danger">Mock only</Pill>;
   }

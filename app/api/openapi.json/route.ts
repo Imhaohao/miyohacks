@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
           operationId: "raise_dispute",
           summary: "Raise a dispute on a completed task.",
           description:
-            "The judge re-evaluates with the dispute reason injected; reputation and escrow flow accordingly.",
+            "The canonical judge re-evaluates with the dispute reason injected; reputation and escrow flow from that new judge-derived settlement. Human/admin overrides live on the extension surface and are audited governance actions, not canonical reputation updates.",
           parameters: [
             {
               name: "id",
@@ -134,7 +134,10 @@ export async function GET(req: NextRequest) {
       "/api/v1/specialists": {
         get: {
           operationId: "list_specialists",
-          summary: "List specialist agents with live reputation.",
+          summary:
+            "List specialist agents with live reputation, roster class, and mock policy.",
+          description:
+            "Returns the canonical v0 protocol roster plus explicitly labeled demo extensions, discovered contacts, and post-v0 integrations. Canonical v0 agents are nia-context, hyperspell-brain, tensorlake-exec, codex-writer, and devin-engineer. Mock policy is explicit: strict_no_mock by default, or demo_mock_llm for disclosed sandbox artifacts.",
           parameters: [
             {
               name: "task_type",
@@ -155,11 +158,88 @@ export async function GET(req: NextRequest) {
                         type: "array",
                         items: { $ref: "#/components/schemas/Specialist" },
                       },
+                      roster_class_counts: {
+                        type: "object",
+                        additionalProperties: { type: "number" },
+                      },
+                      roster_class_labels: {
+                        type: "object",
+                        additionalProperties: { type: "string" },
+                      },
+                      mock_policy: { type: "string" },
+                      mock_policy_label: { type: "string" },
+                      mock_policy_description: { type: "string" },
                     },
                   },
                 },
               },
             },
+          },
+        },
+      },
+      "/api/v1/specialists/register": {
+        post: {
+          operationId: "register_specialist",
+          summary: "Register and probe an MCP/A2A specialist endpoint.",
+          description:
+            "Adds an endpoint-backed specialist as a discovered contact. Arbor immediately probes the MCP tools/list or A2A agent card and stores the readiness result, so list_specialists can disclose whether the agent is verified, configured, missing auth, or not ready.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: [
+                    "agent_id",
+                    "display_name",
+                    "protocol",
+                    "endpoint_url",
+                    "capabilities",
+                  ],
+                  properties: {
+                    agent_id: {
+                      type: "string",
+                      description: "Kebab-case id, e.g. acme-research.",
+                    },
+                    display_name: { type: "string" },
+                    sponsor: { type: "string" },
+                    protocol: { type: "string", enum: ["mcp", "a2a"] },
+                    endpoint_url: { type: "string", format: "uri" },
+                    agent_card_url: {
+                      type: "string",
+                      format: "uri",
+                      description: "Required for A2A verification.",
+                    },
+                    auth_env: {
+                      type: "string",
+                      description:
+                        "Optional environment variable name for bearer-token auth.",
+                    },
+                    capabilities: {
+                      oneOf: [
+                        { type: "string" },
+                        { type: "array", items: { type: "string" } },
+                      ],
+                    },
+                    cost_baseline: { type: "number", minimum: 0.01 },
+                    starting_reputation: {
+                      type: "number",
+                      minimum: 0.05,
+                      maximum: 1,
+                    },
+                    one_liner: { type: "string" },
+                    industry: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Specialist persisted with probe readiness.",
+              content: { "application/json": { schema: { type: "object" } } },
+            },
+            "400": { $ref: "#/components/responses/BadRequest" },
           },
         },
       },
@@ -236,17 +316,25 @@ export async function GET(req: NextRequest) {
                 "Plain-language work brief for the buyer agent to subcontract.",
             },
             max_budget: {
-              type: "number",
-              description: "Maximum USD willing to pay. Bids above this are rejected.",
+              type: "integer",
+              description:
+                "Maximum budget in integer credits (100 credits = $1). Bids above this are rejected.",
             },
             task_type: {
               type: "string",
               description:
                 "Optional workflow hint, e.g. 'implementation', 'research', 'design', 'creator-campaign', or another domain-specific task class.",
             },
+            workflow_mode: {
+              type: "string",
+              enum: ["product_demo", "protocol_core"],
+              description:
+                "Optional lifecycle mode. Use 'protocol_core' for the original fast path: post -> bidding -> resolve -> execute -> judge -> settle. Defaults to 'product_demo', which includes planning, context enrichment, shortlisting, and plan approval.",
+            },
             output_schema: {
               type: "object",
-              description: "Optional JSON schema the result should conform to.",
+              description:
+                "Optional JSON Schema the result must conform to. Arbor validates the winner's delivered artifact or JSON text after execution and before judging/settlement; invalid output fails the task and refunds escrow.",
               additionalProperties: true,
             },
             agent_id: {
@@ -259,7 +347,17 @@ export async function GET(req: NextRequest) {
           type: "object",
           properties: {
             task_id: { type: "string" },
-            status: { type: "string", example: "bidding" },
+            status: {
+              type: "string",
+              enum: ["planning", "bidding"],
+              example: "planning",
+              description:
+                "Initial status after post_task. Defaults to planning for product_demo; protocol_core starts directly in bidding.",
+            },
+            workflow_mode: {
+              type: "string",
+              enum: ["product_demo", "protocol_core"],
+            },
             bid_window_closes_at: {
               type: "number",
               description: "Unix epoch ms.",
@@ -295,6 +393,23 @@ export async function GET(req: NextRequest) {
             one_liner: { type: "string" },
             reputation_score: { type: "number" },
             total_tasks_completed: { type: "integer" },
+            roster_class: {
+              type: "string",
+              enum: [
+                "canonical_v0",
+                "demo_extension",
+                "discovered_contact",
+                "post_v0_integration",
+              ],
+            },
+            roster_label: { type: "string" },
+            roster_description: { type: "string" },
+            canonical_v0: { type: "boolean" },
+            execution_status: { type: "string" },
+            execution_status_label: { type: "string" },
+            mock_policy: { type: "string" },
+            mock_policy_label: { type: "string" },
+            mock_policy_description: { type: "string" },
           },
         },
         Error: {

@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
         "Fetch task state — bids, result, verdict, escrow, lifecycle.",
       "POST /api/v1/tasks/:id/dispute": "Raise a dispute; judge re-runs.",
       "GET /api/v1/specialists": "List specialists with live reputation.",
+      "POST /api/v1/specialists/register":
+        "Register and probe a public MCP/A2A specialist endpoint.",
       "GET /api/a2a/agents/:agentId":
         "Fetch an Arbor-hosted A2A agent card for any housed specialist.",
       "POST /api/a2a/agents/:agentId":

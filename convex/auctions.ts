@@ -48,20 +48,93 @@ import {
   sortBidsByProtocolScore,
   visibleBidsUnderBudget,
 } from "../lib/auction-mechanism";
+import { isProtocolCoreWorkflow } from "../lib/task-workflow";
 import {
   roleForAgent,
   roleForSpecialist,
 } from "../lib/agent-roles";
-import { isSelectableExecutorBid } from "../lib/auction-selection";
+import {
+  bidCanOpenPullRequest,
+  isSelectableExecutorBid,
+} from "../lib/auction-selection";
+import { isImplementationTask } from "../lib/campaign-context";
 import { configuredConnectionAvailability } from "../lib/specialists/connection-runtime";
+import {
+  mockPolicyForExecutionStatus,
+  mockPolicyMetadata,
+} from "../lib/mock-policy";
+import {
+  appendOutputSchemaInstructions,
+  formatOutputSchemaValidationError,
+  validateOutputAgainstSchema,
+} from "../lib/output-schema";
+import {
+  normalizeTaskClass,
+  taskClassReputationForScoring,
+} from "../lib/task-class-reputation";
+import {
+  refundFullTaskCharge,
+  refundUnusedBudget,
+  transferAgentNetOrPayable,
+  type LiveTaskPaymentSnapshot,
+  type PayoutAccountSnapshot,
+} from "../lib/stripe-task-payments";
+import type { ActionCtx } from "./_generated/server";
 
 const BUYER_ID = "buyer:default";
+
+async function fetchLiveTaskPayment(
+  ctx: ActionCtx,
+  taskId: Doc<"tasks">["_id"],
+): Promise<LiveTaskPaymentSnapshot | null> {
+  const row = (await ctx.runQuery(internal.payments._taskPaymentForTask, {
+    task_id: taskId,
+  })) as Doc<"task_payments"> | null;
+  if (!row || row.funding_mode !== "live") return null;
+  return {
+    task_id: String(row.task_id),
+    buyer_id: row.buyer_id,
+    agent_id: row.agent_id ?? undefined,
+    gross_funded: row.gross_funded,
+    clearing_price: row.clearing_price ?? undefined,
+    refunded_unused: row.refunded_unused ?? undefined,
+    refunded_total: row.refunded_total ?? undefined,
+    stripe_payment_intent_id: row.stripe_payment_intent_id ?? undefined,
+    stripe_charge_id: row.stripe_charge_id ?? undefined,
+    stripe_transfer_id: row.stripe_transfer_id ?? undefined,
+    transfer_group: row.transfer_group ?? undefined,
+  };
+}
+
+async function fetchPayoutAccount(
+  ctx: ActionCtx,
+  agentId: string,
+): Promise<PayoutAccountSnapshot | null> {
+  const row = (await ctx.runQuery(internal.payments._payoutAccountForAgent, {
+    agent_id: agentId,
+  })) as Doc<"agent_payout_accounts"> | null;
+  if (!row) return null;
+  return {
+    stripe_connect_account_id: row.stripe_connect_account_id,
+    charges_enabled: row.charges_enabled,
+    payouts_enabled: row.payouts_enabled,
+    requirements_due: row.requirements_due ?? [],
+  };
+}
 
 function normalizeSpecialistOutput(output: SpecialistOutput): {
   text: string;
   artifact?: ExecutionArtifact;
 } {
   if (typeof output === "string") return { text: output };
+  if (output.kind === "implementation_plan") {
+    const report =
+      output.agent_report?.trim() || output.summary?.trim() || "";
+    return {
+      text: report,
+      artifact: output,
+    };
+  }
   return {
     text: output.summary,
     artifact: output,
@@ -72,6 +145,19 @@ type ToolAvailability = NonNullable<BidPayload["tool_availability"]>;
 
 function checkToolAvailability(spec: SpecialistConfig): ToolAvailability {
   return configuredConnectionAvailability(spec);
+}
+
+function withMockPolicyDisclosure(
+  availability: ToolAvailability,
+  spec: SpecialistConfig,
+): ToolAvailability {
+  const executionStatus =
+    availability.execution_status ?? effectiveExecutionStatus(spec);
+  return {
+    ...availability,
+    execution_status: executionStatus,
+    ...mockPolicyMetadata(mockPolicyForExecutionStatus(executionStatus)),
+  };
 }
 
 function isHardUnavailable(spec: SpecialistConfig, availability: ToolAvailability) {
@@ -257,7 +343,10 @@ export const solicitBids = internalAction({
           agent_id: spec.agent_id,
         });
         const reputation = agent?.reputation_score ?? spec.starting_reputation;
-        const toolAvailability = checkToolAvailability(spec);
+        const toolAvailability = withMockPolicyDisclosure(
+          checkToolAvailability(spec),
+          spec,
+        );
 
         if (isHardUnavailable(spec, toolAvailability)) {
           await ctx.runMutation(internal.lifecycle.log, {
@@ -283,7 +372,10 @@ export const solicitBids = internalAction({
             return;
           }
           const bid = decision satisfies BidPayload;
-          const bidAvailability = bid.tool_availability ?? toolAvailability;
+          const bidAvailability = withMockPolicyDisclosure(
+            bid.tool_availability ?? toolAvailability,
+            spec,
+          );
           const reputationSummary = await ctx.runQuery(
             internal.reputationDimensions._summaryForAgent,
             { agent_id: spec.agent_id },
@@ -414,9 +506,9 @@ export const resolve = internalAction({
       return;
     }
 
-    const executorBids = eligibleExecutorBids(visibleBids, task.max_budget);
+    const allExecutorBids = eligibleExecutorBids(visibleBids, task.max_budget);
 
-    if (executorBids.length === 0) {
+    if (allExecutorBids.length === 0) {
       await ctx.runMutation(internal.payments._refundTaskReservation, {
         task_id: args.task_id,
         buyer_id: task.posted_by || BUYER_ID,
@@ -433,6 +525,46 @@ export const resolve = internalAction({
         payload: {
           reason: "no executable bids under budget",
           all_bids: allBids,
+        },
+      });
+      return;
+    }
+
+    // Implementation tasks must produce a real code change (PR), so the
+    // executor pool is narrowed to PR-capable adapters (codex-writer today).
+    // Without this guard, MCP-only specialists like github-engineering win on
+    // reputation/price but can only call read-style tools — the buyer ends up
+    // with a research write-up where they asked for code.
+    const requiresPullRequest = isImplementationTask(task.prompt, task.task_type);
+    const executorBids = requiresPullRequest
+      ? allExecutorBids.filter(bidCanOpenPullRequest)
+      : allExecutorBids;
+
+    if (executorBids.length === 0) {
+      await ctx.runMutation(internal.payments._refundTaskReservation, {
+        task_id: args.task_id,
+        buyer_id: task.posted_by || BUYER_ID,
+        amount: task.max_budget,
+        reason:
+          "auction failed: no PR-capable executor bid for an implementation task",
+      });
+      await ctx.runMutation(internal.tasks._setStatus, {
+        task_id: args.task_id,
+        status: "failed",
+      });
+      await ctx.runMutation(internal.lifecycle.log, {
+        task_id: args.task_id,
+        event_type: "auction_failed",
+        payload: {
+          reason: "no PR-capable executor available for implementation task",
+          all_bids: allBids,
+          eligible_executors: allExecutorBids.map((b) => ({
+            agent_id: b.agent_id,
+            bid_price: b.bid_price,
+            can_open_pr: bidCanOpenPullRequest(b),
+          })),
+          hint:
+            "codex-writer must bid and be eligible (GITHUB_TOKEN + OPENAI_API_KEY + target_repo) to win.",
         },
       });
       return;
@@ -482,6 +614,44 @@ export const resolve = internalAction({
       price_paid,
     });
 
+    // Live-money tasks: now that the Vickrey clearing price is known, refund
+    // the unused portion of the buyer's prepaid charge so we never hold more
+    // than the actual escrow amount.
+    const livePayment = await fetchLiveTaskPayment(ctx, args.task_id);
+    if (livePayment) {
+      const unused = Math.max(0, livePayment.gross_funded - price_paid);
+      await ctx.runMutation(internal.payments._recordClearingPrice, {
+        task_id: args.task_id,
+        clearing_price: price_paid,
+        refunded_unused: unused,
+        agent_id: winner.agent_id,
+      });
+      if (unused > 0) {
+        try {
+          const refund = await refundUnusedBudget({
+            payment: livePayment,
+            clearingPrice: price_paid,
+          });
+          await ctx.runMutation(internal.payments._recordUnusedRefund, {
+            task_id: args.task_id,
+            refunded_unused: refund.refunded_amount,
+            stripe_refund_id: refund.stripe_refund_id,
+          });
+        } catch (err) {
+          await ctx.runMutation(internal.lifecycle.log, {
+            task_id: args.task_id,
+            event_type: "payment_refunded",
+            payload: {
+              mode: "live",
+              partial_refund_failed: true,
+              reason: err instanceof Error ? err.message : String(err),
+              amount: unused,
+            },
+          });
+        }
+      }
+    }
+
     await ctx.runMutation(internal.lifecycle.log, {
       task_id: args.task_id,
       event_type: "auction_resolved",
@@ -505,9 +675,29 @@ export const resolve = internalAction({
         },
       },
     });
-    await ctx.scheduler.runAfter(0, internal.auctions.prepareExecutionPlan, {
-      task_id: args.task_id,
-    });
+    if (isProtocolCoreWorkflow(task.workflow_mode)) {
+      await ctx.runMutation(internal.escrow._lock, {
+        task_id: args.task_id,
+        buyer_id: task.posted_by,
+        seller_id: winner.agent_id,
+        locked_amount: price_paid,
+      });
+      await ctx.runMutation(internal.lifecycle.log, {
+        task_id: args.task_id,
+        event_type: "protocol_fast_path_execution_queued",
+        payload: {
+          agent_id: winner.agent_id,
+          price_paid,
+        },
+      });
+      await ctx.scheduler.runAfter(0, internal.auctions.execute, {
+        task_id: args.task_id,
+      });
+    } else {
+      await ctx.scheduler.runAfter(0, internal.auctions.prepareExecutionPlan, {
+        task_id: args.task_id,
+      });
+    }
   },
 });
 
@@ -586,15 +776,45 @@ export const prepareExecutionPlan = internalAction({
       // Probe so we can surface honestly whether the specialist's backing
       // system was reachable when the plan was drafted. Probe failures do not
       // block plan generation — they just downgrade the provenance.
+      await ctx.runMutation(internal.lifecycle.log, {
+        task_id: args.task_id,
+        event_type: "connection_probe_started",
+        payload: {
+          agent_id: winner.agent_id,
+          protocol: runnerConfig.protocol ?? "unknown",
+        },
+      });
       try {
+        const probeStartedAt = Date.now();
         const probe = await probeSpecialistConnection(runnerConfig);
+        const latencyMs = Date.now() - probeStartedAt;
         probeStatus = probe.status;
+        await ctx.runMutation(internal.lifecycle.log, {
+          task_id: args.task_id,
+          event_type: "connection_probe_result",
+          payload: {
+            agent_id: winner.agent_id,
+            status: probe.status,
+            reason: probe.reason,
+            checked_at: probe.checkedAt,
+            latency_ms: probe.latencyMs ?? latencyMs,
+          },
+        });
         if (probe.status !== "available") {
           provenanceNote = `probe: ${probe.reason}`;
         }
       } catch (err) {
         probeStatus = "unreachable";
         provenanceNote = err instanceof Error ? err.message : String(err);
+        await ctx.runMutation(internal.lifecycle.log, {
+          task_id: args.task_id,
+          event_type: "connection_probe_result",
+          payload: {
+            agent_id: winner.agent_id,
+            status: "unreachable",
+            reason: provenanceNote,
+          },
+        });
       }
 
       const planFn = runner.plan ?? makeDefaultPlanFn(runnerConfig);
@@ -683,9 +903,13 @@ export const execute = internalAction({
     const taskContext = await ctx.runQuery(internal.taskContexts._latestForTask, {
       task_id: args.task_id,
     });
-    const promptForExecution = taskContext
+    const basePromptForExecution = taskContext
       ? `${task.prompt}\n\n---\n\n${taskContext.prompt_addendum}`
       : task.prompt;
+    const promptForExecution = appendOutputSchemaInstructions(
+      basePromptForExecution,
+      task.output_schema,
+    );
     const winner = await ctx.runQuery(internal.bids._get, {
       bid_id: task.winning_bid_id,
     });
@@ -751,19 +975,56 @@ export const execute = internalAction({
         ),
       ]);
       const normalized = normalizeSpecialistOutput(result);
+      const schemaValidation = validateOutputAgainstSchema(
+        {
+          text: normalized.text,
+          artifact: normalized.artifact,
+        },
+        task.output_schema,
+      );
+      if (!schemaValidation.ok) {
+        await ctx.runMutation(internal.lifecycle.log, {
+          task_id: args.task_id,
+          event_type: "output_schema_validation_failed",
+          payload: {
+            agent_id: winner.agent_id,
+            candidate: schemaValidation.candidate,
+            errors: schemaValidation.errors,
+          },
+        });
+        throw new Error(formatOutputSchemaValidationError(schemaValidation));
+      }
 
+      const schemaValidationPayload =
+        task.output_schema === undefined
+          ? null
+          : {
+              candidate: schemaValidation.candidate,
+              ok: true,
+            };
       await ctx.runMutation(internal.tasks._setResult, {
         task_id: args.task_id,
         result: {
           text: normalized.text,
           agent_id: winner.agent_id,
-          artifact: normalized.artifact,
+          ...(normalized.artifact === undefined
+            ? {}
+            : { artifact: normalized.artifact }),
+          ...(schemaValidationPayload
+            ? { output_schema_validation: schemaValidationPayload }
+            : {}),
         },
       });
       await ctx.runMutation(internal.lifecycle.log, {
         task_id: args.task_id,
         event_type: "execution_complete",
-        payload: { agent_id: winner.agent_id, length: normalized.text.length },
+        payload: {
+          agent_id: winner.agent_id,
+          length: normalized.text.length,
+          ...(schemaValidationPayload
+            ? { output_schema_validation: schemaValidationPayload }
+            : {}),
+        },
       });
       const prUrlMatch =
         typeof normalized.text === "string"
@@ -791,10 +1052,35 @@ export const execute = internalAction({
         task_id: args.task_id,
       });
     } catch (err) {
-      await ctx.runMutation(internal.escrow._settle, {
-        task_id: args.task_id,
-        status: "refunded",
-      });
+      const livePayment = await fetchLiveTaskPayment(ctx, args.task_id);
+      if (livePayment) {
+        try {
+          const refund = await refundFullTaskCharge({
+            payment: livePayment,
+            reason: "arbor_live_execution_failed",
+          });
+          await ctx.runMutation(internal.payments._refundLiveTaskFunding, {
+            task_id: args.task_id,
+            refund_amount: refund.refunded_amount,
+            stripe_refund_id: refund.stripe_refund_id,
+            reason: "execution failed",
+          });
+        } catch (refundErr) {
+          await ctx.runMutation(internal.payments._markTransferFailed, {
+            task_id: args.task_id,
+            agent_id: winner.agent_id,
+            failure_reason:
+              refundErr instanceof Error
+                ? refundErr.message
+                : String(refundErr),
+          });
+        }
+      } else {
+        await ctx.runMutation(internal.escrow._settle, {
+          task_id: args.task_id,
+          status: "refunded",
+        });
+      }
       await ctx.runMutation(internal.tasks._setStatus, {
         task_id: args.task_id,
         status: "failed",
@@ -841,15 +1127,22 @@ export const judge = internalAction({
       outputSchema: task.output_schema,
       disputeReason: args.dispute_reason,
     });
+    const canonicalVerdict: JudgeVerdict = {
+      ...verdict,
+      source: "llm_judge",
+      affects_reputation: true,
+      reputation_authority: "llm_judge",
+      settlement_authority: "llm_judge",
+    };
 
     await ctx.runMutation(internal.tasks._setVerdict, {
       task_id: args.task_id,
-      verdict,
+      verdict: canonicalVerdict,
     });
     await ctx.runMutation(internal.lifecycle.log, {
       task_id: args.task_id,
       event_type: "judge_verdict",
-      payload: verdict,
+      payload: canonicalVerdict,
     });
 
     await ctx.scheduler.runAfter(0, internal.auctions.settle, {
@@ -924,10 +1217,46 @@ export const settle = internalAction({
     });
 
     if (verdict.verdict === "accept") {
-      await ctx.runMutation(internal.escrow._settle, {
-        task_id: args.task_id,
-        status: "released",
-      });
+      const livePayment = await fetchLiveTaskPayment(ctx, args.task_id);
+      if (livePayment) {
+        // Live mode: skip credit-wallet escrow release; instead transfer the
+        // agent's net via Stripe Connect (or stash as payable if Connect is
+        // not ready).
+        const payoutAccount = await fetchPayoutAccount(ctx, winner.agent_id);
+        const outcome = await transferAgentNetOrPayable({
+          payment: livePayment,
+          agentId: winner.agent_id,
+          payoutAccount,
+        });
+        if (outcome.status === "succeeded" && outcome.stripe_transfer_id) {
+          await ctx.runMutation(internal.payments._recordTransfer, {
+            task_id: args.task_id,
+            agent_id: winner.agent_id,
+            stripe_transfer_id: outcome.stripe_transfer_id,
+            amount: outcome.agent_net,
+            platform_fee: outcome.platform_fee,
+          });
+        } else if (outcome.status === "payable_blocked") {
+          await ctx.runMutation(internal.payments._markPayableBlocked, {
+            task_id: args.task_id,
+            agent_id: winner.agent_id,
+            amount: outcome.agent_net,
+            requirements_due: outcome.requirements_due ?? [],
+          });
+        } else {
+          await ctx.runMutation(internal.payments._markTransferFailed, {
+            task_id: args.task_id,
+            agent_id: winner.agent_id,
+            failure_reason:
+              outcome.failure_reason ?? "Stripe transfer failed",
+          });
+        }
+      } else {
+        await ctx.runMutation(internal.escrow._settle, {
+          task_id: args.task_id,
+          status: "released",
+        });
+      }
       const delta = 0.05 * verdict.quality_score;
       const { new_score } = await ctx.runMutation(
         internal.agents._applyReputationDelta,
@@ -950,7 +1279,7 @@ export const settle = internalAction({
         event_type: "settled",
         payload: {
           verdict: "accept",
-          escrow: "released",
+          escrow: livePayment ? "live_transfer" : "released",
           seller_id: winner.agent_id,
           delta,
           new_score,
@@ -958,10 +1287,32 @@ export const settle = internalAction({
         },
       });
     } else {
-      await ctx.runMutation(internal.escrow._settle, {
-        task_id: args.task_id,
-        status: "refunded",
-      });
+      const livePayment = await fetchLiveTaskPayment(ctx, args.task_id);
+      if (livePayment) {
+        try {
+          const refund = await refundFullTaskCharge({
+            payment: livePayment,
+            reason: "arbor_live_rejected",
+          });
+          await ctx.runMutation(internal.payments._refundLiveTaskFunding, {
+            task_id: args.task_id,
+            refund_amount: refund.refunded_amount,
+            stripe_refund_id: refund.stripe_refund_id,
+            reason: "judge rejected",
+          });
+        } catch (err) {
+          await ctx.runMutation(internal.payments._markTransferFailed, {
+            task_id: args.task_id,
+            agent_id: winner.agent_id,
+            failure_reason: err instanceof Error ? err.message : String(err),
+          });
+        }
+      } else {
+        await ctx.runMutation(internal.escrow._settle, {
+          task_id: args.task_id,
+          status: "refunded",
+        });
+      }
       const delta = -0.10;
       const { new_score } = await ctx.runMutation(
         internal.agents._applyReputationDelta,

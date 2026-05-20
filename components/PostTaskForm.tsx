@@ -22,6 +22,8 @@ import {
   requiredContextForPrompt,
   type RequiredContext,
 } from "@/lib/context-readiness";
+import { isImplementationTask } from "@/lib/campaign-context";
+import { usdToCredits } from "@/lib/payments";
 
 // task_type is still used by some legacy code paths (the reacher-live-launch
 // demo and the campaign-context evidence injection). For the human form we
@@ -79,6 +81,7 @@ export function PostTaskForm() {
   const [targetRepo, setTargetRepo] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const budgetCredits = usdToCredits(Number(budget || "0"));
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,12 +89,15 @@ export function PostTaskForm() {
     setError(null);
     try {
       if (!projectId) throw new Error("Project is still being created.");
+      if (!Number.isFinite(budgetCredits) || budgetCredits <= 0) {
+        throw new Error("Budget must be a positive dollar amount.");
+      }
       if (isAuthenticated) {
         const { task_id } = await post({
           project_id: projectId,
           task_type: DEFAULT_TASK_TYPE,
           prompt,
-          max_budget: Number(budget),
+          max_budget: budgetCredits,
           target_repo: targetRepo.trim() || undefined,
         });
         router.push(`/task/${task_id}`);
@@ -103,7 +109,7 @@ export function PostTaskForm() {
             project_id: projectId,
             task_type: DEFAULT_TASK_TYPE,
             prompt,
-            max_budget: Number(budget),
+            max_budget: budgetCredits,
             target_repo: targetRepo.trim() || undefined,
           }),
         });
@@ -137,6 +143,9 @@ export function PostTaskForm() {
   const requiredContext = requiredContextForPrompt(prompt);
   const needsRepoContext = requiredContext.includes("nia_repo");
   const likelySoftwareTask = isSoftwareEngineeringTask(prompt);
+  const likelyImplementation = isImplementationTask(prompt, DEFAULT_TASK_TYPE);
+  const repoFieldRequired = likelyImplementation || likelySoftwareTask;
+  const missingTargetRepo = repoFieldRequired && !targetRepo.trim();
   const missingBusinessContext =
     contextReadiness !== undefined && !contextReadiness.has_business_context;
   const missingRepoContext =
@@ -149,7 +158,10 @@ export function PostTaskForm() {
     !prompt.trim() ||
     !projectId ||
     contextReadiness === undefined ||
-    missingContext;
+    missingContext ||
+    missingTargetRepo ||
+    !Number.isFinite(budgetCredits) ||
+    budgetCredits <= 0;
 
   if ((isLoading || !clerkLoaded) && !signedIn) {
     return (
@@ -248,7 +260,9 @@ export function PostTaskForm() {
             <label htmlFor="target-repo" className={fieldLabel}>
               GitHub repo{" "}
               <span className="font-normal text-ink-subtle">
-                (optional, for code tasks)
+                {repoFieldRequired
+                  ? "(required — codex-writer opens a PR here)"
+                  : "(optional, for code tasks)"}
               </span>
             </label>
             <input
@@ -257,7 +271,16 @@ export function PostTaskForm() {
               onChange={(e) => setTargetRepo(e.target.value)}
               placeholder="owner/repo or https://github.com/owner/repo"
               className={inputBase}
+              required={repoFieldRequired}
+              aria-invalid={missingTargetRepo}
             />
+            {missingTargetRepo && (
+              <p className="mt-1.5 text-xs text-rose-700">
+                This looks like an implementation task. Add the GitHub repo so a
+                PR-opening agent (codex-writer) can deliver code instead of a
+                research write-up.
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="budget" className={fieldLabel}>
@@ -279,7 +302,9 @@ export function PostTaskForm() {
                 />
               </div>
               <div className="pb-2 text-xs text-ink-muted">
-                Credits are checked when the task starts.
+                {Number.isFinite(budgetCredits) && budgetCredits > 0
+                  ? `Converted to ${budgetCredits.toLocaleString("en-US")} credits when posted (100 credits = $1).`
+                  : "Credits are checked when the task starts."}
               </div>
             </div>
           </div>

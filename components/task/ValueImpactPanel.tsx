@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardHeader } from "@/components/ui/Card";
-import { formatMoney } from "@/lib/utils";
+import { formatCreditsAsUsd } from "@/lib/payments";
 import type {
   AuctionResolvedPayload,
   LifecycleEventDoc,
@@ -43,7 +43,7 @@ export function ValueImpactPanel({ task, events }: Props) {
       <div className="grid gap-3 md:grid-cols-3">
         <Metric
           label="You saved"
-          value={formatMoney(saved)}
+          value={formatCreditsAsUsd(saved)}
           sub={`${savingsRate}% below max budget`}
         />
         <Metric
@@ -59,7 +59,7 @@ export function ValueImpactPanel({ task, events }: Props) {
       </div>
 
       <p className="mt-4 text-xs text-ink-muted">
-        You saved {formatMoney(saved)} and improved efficiency by{" "}
+        You saved {formatCreditsAsUsd(saved)} and improved efficiency by{" "}
         {efficiencyLift}% by using this specialized agent. Savings are computed
         from budget minus second-price payment; efficiency is an estimate from
         the winning executor&apos;s quoted time.

@@ -35,21 +35,33 @@ import type {
 } from "../types";
 
 /**
- * All ten Nozomio sponsor agents. Listed in display order — Reacher first
- * because it is the primary data sponsor for this pivot and has a documented
- * MCP endpoint, which becomes live once REACHER_API_KEY is configured.
+ * Canonical v0 Agent Auction Protocol roster: the five original sponsor
+ * specialists from the technical spec.
  */
-export const SPECIALISTS: SpecialistConfig[] = [
-  REACHER_SOCIAL_CONFIG,
+export const CANONICAL_V0_SPECIALISTS: SpecialistConfig[] = [
   NIA_CONTEXT_CONFIG,
   HYPERSPELL_BRAIN_CONFIG,
   TENSORLAKE_EXEC_CONFIG,
   CODEX_WRITER_CONFIG,
   DEVIN_ENGINEER_CONFIG,
+];
+
+/**
+ * Demo and post-spec specialists used to prove richer workflows. These remain
+ * eligible where configured, but are labeled separately from the canonical
+ * v0 protocol roster in public registry surfaces.
+ */
+export const DEMO_EXTENSION_SPECIALISTS: SpecialistConfig[] = [
+  REACHER_SOCIAL_CONFIG,
   VERCEL_V0_CONFIG,
   INSFORGE_BACKEND_CONFIG,
   ASIDE_BROWSER_CONFIG,
   CONVEX_REALTIME_CONFIG,
+];
+
+export const SPECIALISTS: SpecialistConfig[] = [
+  ...CANONICAL_V0_SPECIALISTS,
+  ...DEMO_EXTENSION_SPECIALISTS,
 ];
 
 export const SPECIALIST_RUNNERS: Partial<Record<AgentId, SpecialistRunner>> = {
@@ -85,8 +97,8 @@ export function getAllSpecialists(): SpecialistConfig[] {
 
 function buildRunner(cfg: SpecialistConfig): SpecialistRunner {
   if (cfg.mcp_endpoint) return makeMcpForwardingSpecialist(cfg);
-  // Sandbox A2A: when env-flagged, inactive A2A contacts surface as a sandbox
-  // adapter that produces real (but bounded) work in the agent's persona.
+  // Demo mock LLM policy: when env-flagged, inactive A2A contacts surface as a
+  // sandbox adapter that produces useful but disclosed work in the agent persona.
   if (isSandboxA2AEnabled()) {
     const effective = effectiveExecutionStatus(cfg);
     if (effective === "arbor_sandbox_adapter") {
@@ -106,12 +118,12 @@ function makeUnavailableSpecialist(config: SpecialistConfig): SpecialistRunner {
       return {
         decline: true,
         reason:
-          "No real MCP or A2A execution connection is configured for this specialist, so Arbor will not use a placeholder persona.",
+          "Strict no-mock policy: no real MCP or A2A execution connection is configured for this specialist, so Arbor will not use a placeholder persona.",
       };
     },
     async execute(): Promise<never> {
       throw new Error(
-        `${config.agent_id} has no real MCP or A2A execution connection configured`,
+        `${config.agent_id} has no real MCP or A2A execution connection configured under Arbor's strict no-mock policy`,
       );
     },
   };

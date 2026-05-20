@@ -1,51 +1,95 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  CREDITS_PER_USD,
   CREDIT_PACKS,
   FREE_TRIAL_CREDITS,
-  amountToCents,
   calculateEscrowSettlement,
-  centsToAmount,
+  calculatePlatformFee,
   checkoutMetadata,
   creditPackForCredits,
-  roundMoney,
+  creditsToUsd,
+  formatCredits,
+  formatCreditsAsUsd,
+  formatUsd,
+  usdToCredits,
 } from "../lib/payments";
 import { generateApiKey, hashApiKey } from "../lib/api-keys";
 import { paymentServerSecret } from "../lib/stripe";
 
-test("credit packs are fixed purchase units", () => {
+test("1 credit equals 1 cent of USD", () => {
+  assert.equal(CREDITS_PER_USD, 100);
+  assert.equal(usdToCredits(1), 100);
+  assert.equal(usdToCredits(2.35), 235);
+  assert.equal(creditsToUsd(235), 2.35);
+});
+
+test("usdToCredits rounds half-up so cents never disappear", () => {
+  // 0.005 USD would be half a cent — round up to 1 credit, never 0.
+  assert.equal(usdToCredits(0.005), 1);
+  assert.equal(usdToCredits(0.014), 1);
+  assert.equal(usdToCredits(0.015), 2);
+});
+
+test("credit packs are fixed integer-credit purchase units", () => {
   assert.deepEqual(
     CREDIT_PACKS.map((pack) => pack.credits),
-    [10, 25, 100, 250],
+    [1000, 2500, 10000, 25000],
   );
-  assert.equal(creditPackForCredits(25)?.amountUsd, 25);
-  assert.equal(creditPackForCredits(11), null);
+  assert.equal(creditPackForCredits(2500)?.amountUsd, 25);
+  assert.equal(creditPackForCredits(1100), null);
 });
 
-test("free trial starts every account with five credits", () => {
-  assert.equal(FREE_TRIAL_CREDITS, 5);
+test("each credit pack charges its USD price 1:1 in credits", () => {
+  for (const pack of CREDIT_PACKS) {
+    assert.equal(
+      pack.credits,
+      usdToCredits(pack.amountUsd),
+      `pack ${pack.label} should equal usdToCredits(${pack.amountUsd})`,
+    );
+  }
 });
 
-test("money conversion stays in two-decimal precision", () => {
-  assert.equal(roundMoney(1.005), 1.01);
-  assert.equal(amountToCents(12.345), 1235);
-  assert.equal(centsToAmount(1235), 12.35);
+test("free trial starts every account with 500 credits ($5.00)", () => {
+  assert.equal(FREE_TRIAL_CREDITS, 500);
+  assert.equal(creditsToUsd(FREE_TRIAL_CREDITS), 5);
 });
 
-test("escrow settlement splits gross into platform fee and agent net", () => {
-  assert.deepEqual(calculateEscrowSettlement(2.35), {
-    gross: 2.35,
-    platformFee: 0.24,
-    agentNet: 2.11,
+test("formatters render credits as integers and USD as two-decimal dollars", () => {
+  assert.equal(formatCredits(500), "500 credits");
+  assert.equal(formatCredits(1000), "1,000 credits");
+  // Stored credits are always integer, but a stray fractional input
+  // must still render cleanly (no ".00 credits").
+  assert.equal(formatCredits(499.6), "500 credits");
+  assert.equal(formatUsd(5), "$5.00");
+  assert.equal(formatCreditsAsUsd(235), "$2.35");
+});
+
+test("platform fee is a 10% integer-credit cut, rounded half-up", () => {
+  assert.equal(calculatePlatformFee(100), 10);
+  assert.equal(calculatePlatformFee(235), 24); // 23.5 → 24
+  assert.equal(calculatePlatformFee(7), 1); // 0.7 → 1
+  assert.equal(calculatePlatformFee(0), 0);
+});
+
+test("escrow settlement splits gross into integer fee + integer agent net", () => {
+  assert.deepEqual(calculateEscrowSettlement(235), {
+    gross: 235,
+    platformFee: 24,
+    agentNet: 211,
   });
 });
 
-test("settlement never creates or destroys credits through rounding", () => {
-  for (const amount of [0.01, 0.1, 0.99, 1, 2.35, 12.49, 99.99]) {
-    const settlement = calculateEscrowSettlement(amount);
+test("settlement is exact in integer math — fee + net always equals gross", () => {
+  // The old decimal model could lose or invent half-cents at this step.
+  // Integer credits make the invariant trivial; assert it across the
+  // full range we expect to see in production.
+  for (const credits of [1, 7, 10, 99, 100, 235, 1249, 9999, 25000]) {
+    const settlement = calculateEscrowSettlement(credits);
     assert.equal(
-      roundMoney(settlement.platformFee + settlement.agentNet),
+      settlement.platformFee + settlement.agentNet,
       settlement.gross,
+      `settlement should sum exactly for ${credits} credits`,
     );
   }
 });
@@ -55,13 +99,13 @@ test("checkout metadata binds Stripe credits to authenticated accounts", () => {
     checkoutMetadata({
       buyerId: "clerk:user_123",
       clerkUserId: "user_123",
-      credits: 10,
+      credits: 1000,
     }),
     {
       buyer_id: "clerk:user_123",
       account_id: "clerk:user_123",
       clerk_user_id: "user_123",
-      credits: "10",
+      credits: "1000",
       product: "arbor_credits",
     },
   );

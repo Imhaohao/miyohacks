@@ -2,7 +2,8 @@
  * Example MCP client — proves the agent-to-agent flow.
  *
  * Run:
- *   npx tsx examples/mcp-client.ts "your task brief here" 2.00
+ *   npx tsx examples/mcp-client.ts "your task brief here" 200
+ *   WORKFLOW_MODE=protocol_core npx tsx examples/mcp-client.ts "your task" 200
  *
  * What it does:
  *   1. POSTs `tools/call` with `post_task` to /api/mcp.
@@ -65,11 +66,18 @@ async function main() {
   const prompt =
     process.argv[2] ??
     "Compare three ways to add Stripe Connect payouts to our agent marketplace, recommend the safest path, and produce an implementation plan with risks and acceptance criteria.";
-  const max_budget = Number(process.argv[3] ?? "2.00");
+  const max_budget = Number(process.argv[3] ?? "200");
+  const workflow_mode =
+    process.env.WORKFLOW_MODE === "protocol_core"
+      ? "protocol_core"
+      : "product_demo";
 
   console.log(`endpoint: ${ENDPOINT}`);
   console.log(`prompt:   ${prompt}`);
-  console.log(`budget:   $${max_budget.toFixed(2)}\n`);
+  console.log(
+    `budget:   ${max_budget} credits ($${(max_budget / 100).toFixed(2)})\n`,
+  );
+  console.log(`workflow: ${workflow_mode}\n`);
 
   // 1. handshake (optional for stateless server, but conventional)
   await rpc("initialize", {
@@ -81,22 +89,25 @@ async function main() {
   // 2. post the task
   const posted = await callTool<{
     task_id: string;
-    status: string;
+    status: "planning" | "bidding";
+    workflow_mode: "product_demo" | "protocol_core";
     bid_window_closes_at: number;
     web_view_url: string;
   }>("post_task", {
     prompt,
     max_budget,
     task_type: process.env.TASK_TYPE ?? "general",
+    workflow_mode,
   });
 
   console.log(`task posted: ${posted.task_id}`);
   console.log(`initial status: ${posted.status}`);
+  console.log(`workflow mode: ${posted.workflow_mode}`);
   console.log(`watch live: ${posted.web_view_url}\n`);
 
   // 3. poll for completion
   const terminalStatuses = new Set(["complete", "disputed", "failed", "cancelled"]);
-  let lastStatus = posted.status;
+  let lastStatus: string = posted.status;
   let lastPricePaid: number | undefined;
   for (;;) {
     await new Promise((r) => setTimeout(r, 2000));
@@ -112,7 +123,9 @@ async function main() {
     }
     const pricePaid = state.task?.price_paid;
     if (pricePaid !== undefined && pricePaid !== lastPricePaid) {
-      console.log(`price paid (protocol clearing): $${pricePaid.toFixed(2)}`);
+      console.log(
+        `price paid (protocol clearing): ${pricePaid} credits ($${(pricePaid / 100).toFixed(2)})`,
+      );
       lastPricePaid = pricePaid;
     }
     if (terminalStatuses.has(status)) {

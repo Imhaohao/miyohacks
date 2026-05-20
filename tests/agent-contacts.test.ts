@@ -17,16 +17,16 @@ test("all housed specialists have an MCP or A2A connection", () => {
   );
 
   assert.equal(connected.length, 100);
-  assert.equal(AGENT_CONTACT_CATALOG.filter((c) => c.protocol === "mcp").length, 10);
-  assert.equal(AGENT_CONTACT_CATALOG.filter((c) => c.protocol === "a2a").length, 90);
+  assert.equal(AGENT_CONTACT_CATALOG.filter((c) => c.protocol === "mcp").length, 9);
+  assert.equal(AGENT_CONTACT_CATALOG.filter((c) => c.protocol === "a2a").length, 91);
 });
 
 test("catalog reports real, endpoint-gated, and mock execution status", () => {
   const counts = executionStatusCounts(AGENT_CONTACT_CATALOG);
 
   assert.deepEqual(counts, {
-    native_mcp: 12,
-    native_a2a: 0,
+    native_mcp: 11,
+    native_a2a: 1,
     arbor_real_adapter: 3,
     arbor_sandbox_adapter: 0,
     needs_vendor_a2a_endpoint: 4,
@@ -42,6 +42,11 @@ test("catalog reports real, endpoint-gated, and mock execution status", () => {
     AGENT_CONTACT_CATALOG.find((c) => c.agent_id === "quickbooks-ledger")
       ?.execution_status,
     "mock_unconnected",
+  );
+  assert.equal(
+    AGENT_CONTACT_CATALOG.find((c) => c.agent_id === "quickbooks-ledger")
+      ?.mock_policy,
+    "strict_no_mock",
   );
 });
 
@@ -61,8 +66,10 @@ test("sponsor roster identifies all agents needing vendor A2A endpoints", () => 
 });
 
 test("Arbor-hosted A2A bridges are labeled by execution truth", () => {
-  const bridged = AGENT_CONTACT_CATALOG.filter((contact) => contact.protocol === "a2a");
-  assert.ok(bridged.length >= 90);
+  const bridged = AGENT_CONTACT_CATALOG.filter((contact) =>
+    contact.endpoint_url?.includes("/api/a2a/agents/"),
+  );
+  assert.ok(bridged.length >= 89);
 
   for (const contact of bridged) {
     assert.match(contact.endpoint_url ?? "", /\/api\/a2a\/agents\//);

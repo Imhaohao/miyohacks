@@ -1,4 +1,5 @@
-const MODEL = "gpt-5.5";
+import { defaultLLMModel } from "./llm-provider";
+
 const CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 const RESPONSES_URL = "https://api.openai.com/v1/responses";
 
@@ -105,7 +106,7 @@ export async function callOpenAI(opts: CallOptions): Promise<string> {
   const {
     systemPrompt,
     userPrompt,
-    model = MODEL,
+    model = defaultLLMModel(),
     maxTokens = 1024,
     timeoutMs = 20_000,
     retries = 1,
@@ -160,9 +161,9 @@ export async function callOpenAI(opts: CallOptions): Promise<string> {
               { role: "user", content: userPrompt },
             ],
             max_completion_tokens: maxTokens,
-            // gpt-5.5 spends completion tokens on internal reasoning by default;
-            // "minimal" keeps tokens going to the visible answer so bid JSON and
-            // execute markdown are non-empty within our caps.
+            // The default GPT model spends completion tokens on internal
+            // reasoning by default; "none" keeps bid JSON and execute markdown
+            // non-empty within our caps.
             reasoning_effort: "none",
           }),
         }),

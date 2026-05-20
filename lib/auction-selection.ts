@@ -13,7 +13,15 @@ export interface SelectableBidLike {
   tool_availability?: {
     status?: "available" | "manual" | "mock" | "missing";
     execution_status?: AgentExecutionStatus;
+    opens_prs?: boolean;
   };
+}
+
+const PR_CAPABLE_AGENT_IDS = new Set<string>(["codex-writer"]);
+
+export function bidCanOpenPullRequest(bid: SelectableBidLike): boolean {
+  if (bid.tool_availability?.opens_prs === true) return true;
+  return PR_CAPABLE_AGENT_IDS.has(bid.agent_id);
 }
 
 export function bidExecutionStatus(
@@ -49,7 +57,7 @@ export function explainUnselectableExecutorBid(
   const status = bidExecutionStatus(bid);
   if (!isSelectableExecutionStatus(status)) {
     if (status === "arbor_sandbox_adapter" && !isSandboxA2AEnabled()) {
-      return "sandbox A2A is disabled (set ENABLE_SANDBOX_A2A=true to allow)";
+      return "demo mock LLM policy is disabled (set ARBOR_MOCK_POLICY=demo_mock_llm to allow)";
     }
     return "agent has no verified external execution connection";
   }

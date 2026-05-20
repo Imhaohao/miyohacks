@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { formatMoney, formatScore, cn } from "@/lib/utils";
+import { formatScore, cn } from "@/lib/utils";
+import { formatCreditsAsUsd } from "@/lib/payments";
 import { isExecutableAgent, roleForAgent } from "@/lib/agent-roles";
 import {
   bidExecutionStatus,
@@ -227,11 +228,11 @@ export function AuctionResolution({
               <span className="font-mono">{winner.agent_id}</span> executor bid
             </span>
             <span className="text-2xl text-ink-subtle line-through decoration-rose-400 decoration-2">
-              {formatMoney(vickrey.winner_bid_price)}
+              {formatCreditsAsUsd(vickrey.winner_bid_price)}
             </span>
             <ArrowRight size={18} weight="bold" className="text-ink-subtle" />
             <span className="animate-value-pop font-display text-3xl font-semibold tracking-tight text-brand-700 sm:text-4xl">
-              pays {formatMoney(vickrey.price_paid)}
+              pays {formatCreditsAsUsd(vickrey.price_paid)}
             </span>
           </div>
           <p className="mt-2 text-xs text-ink-muted">
@@ -258,7 +259,7 @@ export function AuctionResolution({
               label="Runner-up bid"
               value={
                 typeof vickrey.runner_up_bid_price === "number"
-                  ? formatMoney(vickrey.runner_up_bid_price)
+                  ? formatCreditsAsUsd(vickrey.runner_up_bid_price)
                   : "n/a"
               }
             />
@@ -367,6 +368,14 @@ export function AuctionResolution({
                         {EXECUTION_STATUS_LABELS[b.tool_availability.execution_status]}
                       </span>
                     )}
+                    {b.tool_availability?.mock_policy_label && (
+                      <span
+                        className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium text-ink-muted"
+                        title={b.tool_availability.mock_policy_description}
+                      >
+                        {b.tool_availability.mock_policy_label}
+                      </span>
+                    )}
                   </div>
                   <p
                     className={cn(
@@ -399,12 +408,15 @@ export function AuctionResolution({
                         ? ` · ${b.tool_availability.endpoint_host}`
                         : ""}
                     </span>
+                    {b.tool_availability?.mock_policy_label && (
+                      <span>policy {b.tool_availability.mock_policy_label}</span>
+                    )}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <div className="text-[10px] text-ink-subtle">Bid</div>
                   <div className="font-mono text-sm text-ink">
-                    {formatMoney(b.bid_price)}
+                    {formatCreditsAsUsd(b.bid_price)}
                   </div>
                 </div>
               </div>
@@ -478,7 +490,7 @@ function TopChoice({
           </div>
         </div>
         <div className="text-right font-mono text-ink">
-          {formatMoney(bid.bid_price)}
+          {formatCreditsAsUsd(bid.bid_price)}
         </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-ink-muted">
@@ -491,6 +503,9 @@ function TopChoice({
             ? ` · ${bid.tool_availability.endpoint_host}`
             : ""}
         </span>
+        {bid.tool_availability?.mock_policy_label && (
+          <span>policy {bid.tool_availability.mock_policy_label}</span>
+        )}
       </div>
       {canChoose && (
         <Button
@@ -527,6 +542,9 @@ function SupportBid({ bid }: { bid: AuctionBidSummary }) {
               ? EXECUTION_STATUS_LABELS[bid.tool_availability.execution_status]
               : "Unverified"}{" "}
             · tools {bid.tool_availability?.status ?? "unknown"}
+            {bid.tool_availability?.mock_policy_label
+              ? ` · policy ${bid.tool_availability.mock_policy_label}`
+              : ""}
           </p>
         </div>
         <div className="shrink-0 text-right font-mono text-ink">

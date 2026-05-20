@@ -8,6 +8,14 @@ import type {
   SpecialistConfig,
 } from "./types";
 import { classifyAgentExecution } from "./agent-execution-status";
+import {
+  mockPolicyForExecutionStatus,
+  mockPolicyMetadata,
+} from "./mock-policy";
+import {
+  CONTACT_CATALOG_DISCOVERED_FOR,
+  rosterMetadataFor,
+} from "./specialists/roster";
 
 interface ContactBlueprint {
   id: string;
@@ -39,9 +47,20 @@ const DEFAULT_INPUT_MODES = ["text/plain", "application/json"];
 const ARBOR_A2A_ORIGIN = (
   process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
 ).replace(/\/+$/, "");
+const JIRA_AGENT_BASE_URL = (
+  process.env.JIRA_AGENT_BASE_URL ?? "http://localhost:4001"
+).replace(/\/+$/, "");
 
 function arborA2AEndpoint(agentId: string) {
   return `${ARBOR_A2A_ORIGIN}/api/a2a/agents/${agentId}`;
+}
+
+function jiraAgentMessageEndpoint() {
+  return `${JIRA_AGENT_BASE_URL}/message/send`;
+}
+
+function jiraAgentCardUrl() {
+  return `${JIRA_AGENT_BASE_URL}/agent-card`;
 }
 
 const CLUSTERS: IndustryCluster[] = [
@@ -720,11 +739,12 @@ const CLUSTERS: IndustryCluster[] = [
         one_liner: "Jira, Confluence, sprints, issue workflows, and team docs.",
         capabilities: ["jira-issue-ops", "confluence-docs", "sprint-planning", "ticketing"],
         domain_tags: ["jira", "confluence", "atlassian", "ticket", "sprint"],
-        protocol: "mcp",
-        endpoint_url: "https://mcp.atlassian.com/v1/mcp",
-        auth_env: "ATLASSIAN_API_TOKEN",
+        protocol: "a2a",
+        endpoint_url: jiraAgentMessageEndpoint(),
+        agent_card_url: jiraAgentCardUrl(),
+        auth_type: "oauth",
         verification_status: "configured",
-        health_status: "auth_required",
+        health_status: "healthy",
         homepage_url: "https://www.atlassian.com/",
       },
       {
@@ -999,12 +1019,13 @@ export const AGENT_CONTACT_CATALOG: AgentContact[] = CLUSTERS.flatMap(
           : hasNativeA2A
             ? (contact.health_status ?? "unknown")
             : "healthy";
-      const executionStatus = classifyAgentExecution({
+      const executionSubject = {
         agent_id: contact.id,
         protocol,
         endpoint_url: endpointUrl,
         agent_card_url: agentCardUrl,
-      });
+      };
+      const executionStatus = classifyAgentExecution(executionSubject);
       return {
         agent_id: contact.id,
         display_name: contact.name,
@@ -1049,6 +1070,12 @@ export const AGENT_CONTACT_CATALOG: AgentContact[] = CLUSTERS.flatMap(
         cost_baseline: contact.cost_baseline ?? 0.45,
         starting_reputation: contact.starting_reputation ?? 0.55,
         homepage_url: contact.homepage_url,
+        ...mockPolicyMetadata(mockPolicyForExecutionStatus(executionStatus)),
+        ...rosterMetadataFor({
+          agent_id: contact.id,
+          discovered: true,
+          discovered_for: CONTACT_CATALOG_DISCOVERED_FOR,
+        }),
       };
     }),
 );
@@ -1058,6 +1085,11 @@ export function getAgentContact(agentId: string): AgentContact | undefined {
 }
 
 export function contactToSpecialistConfig(contact: AgentContact): SpecialistConfig {
+  const roster = rosterMetadataFor({
+    agent_id: contact.agent_id,
+    discovered: true,
+    discovered_for: CONTACT_CATALOG_DISCOVERED_FOR,
+  });
   return {
     agent_id: contact.agent_id,
     display_name: contact.display_name,
@@ -1086,8 +1118,10 @@ export function contactToSpecialistConfig(contact: AgentContact): SpecialistConf
     verification_status: contact.verification_status,
     is_verified: contact.verification_status === "verified",
     homepage_url: contact.homepage_url,
+    ...mockPolicyMetadata(mockPolicyForExecutionStatus(contact.execution_status)),
+    ...roster,
     discovered: true,
     discovery_source: "catalog",
-    discovered_for: "100-agent contact catalog",
+    discovered_for: CONTACT_CATALOG_DISCOVERED_FOR,
   };
 }

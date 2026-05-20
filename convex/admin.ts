@@ -9,6 +9,15 @@ import type { MutationCtx } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
+import {
+  CONTACT_CATALOG_DISCOVERED_FOR,
+  rosterMetadataFor,
+} from "../lib/specialists/roster";
+import {
+  mockPolicyForExecutionStatus,
+  mockPolicyMetadata,
+} from "../lib/mock-policy";
+import type { AgentExecutionStatus } from "../lib/types";
 
 function requireAdmin(secret: string | undefined) {
   const expected = process.env.ADMIN_DASHBOARD_SECRET;
@@ -115,6 +124,39 @@ export const overview = query({
   },
 });
 
+export const _debugTaskEvents = query({
+  args: { admin_secret: v.string(), task_id: v.id("tasks") },
+  handler: async (ctx, args) => {
+    requireAdmin(args.admin_secret);
+    const task = await ctx.db.get(args.task_id);
+    const events = await ctx.db
+      .query("lifecycle_events")
+      .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+      .collect();
+    const bids = await ctx.db
+      .query("bids")
+      .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+      .collect();
+    const plan = await ctx.db
+      .query("execution_plans")
+      .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+      .order("desc")
+      .first();
+    return {
+      task,
+      events: events.sort((a, b) => a.timestamp - b.timestamp),
+      bids: bids.map((b) => ({
+        agent_id: b.agent_id,
+        agent_role: b.agent_role,
+        bid_price: b.bid_price,
+        score: b.score,
+        tool_availability: b.tool_availability,
+      })),
+      plan,
+    };
+  },
+});
+
 export const tasks = query({
   args: {
     admin_secret: v.string(),
@@ -192,13 +234,17 @@ export const agents = query({
   args: { admin_secret: v.string() },
   handler: async (ctx, args) => {
     requireAdmin(args.admin_secret);
-    const [agents, contacts, wallets, payoutAccounts] = await Promise.all([
+    const [agents, contacts, discovered, wallets, payoutAccounts] = await Promise.all([
       ctx.db.query("agents").collect(),
       ctx.db.query("agent_contacts").collect(),
+      ctx.db.query("discovered_specialists").collect(),
       ctx.db.query("agent_wallets").collect(),
       ctx.db.query("agent_payout_accounts").collect(),
     ]);
     const contactsById = new Map(contacts.map((contact) => [contact.agent_id, contact]));
+    const discoveredById = new Map(
+      discovered.map((row) => [row.agent_id, row]),
+    );
     const walletsById = new Map(wallets.map((wallet) => [wallet.agent_id, wallet]));
     const payoutById = new Map(
       payoutAccounts.map((account) => [account.agent_id, account]),
@@ -207,21 +253,42 @@ export const agents = query({
       agents: agents
         .map((agent) => {
           const contact = contactsById.get(agent.agent_id);
+          const discoveredRow = discoveredById.get(agent.agent_id);
           const wallet = walletsById.get(agent.agent_id);
           const payout = payoutById.get(agent.agent_id);
+          const roster = rosterMetadataFor({
+            agent_id: agent.agent_id,
+            discovered: Boolean(contact || discoveredRow),
+            discovery_source: discoveredRow?.discovery_source,
+            discovered_for: contact
+              ? CONTACT_CATALOG_DISCOVERED_FOR
+              : discoveredRow?.discovered_for,
+          });
+          const executionStatus = contact?.execution_status as
+            | AgentExecutionStatus
+            | undefined;
           return {
             agent_id: agent.agent_id,
             display_name: agent.display_name,
             sponsor: agent.sponsor,
+            ...roster,
             industry: contact?.industry,
             protocol: contact?.protocol,
             health_status: contact?.health_status,
             verification_status: contact?.verification_status,
+            execution_status: executionStatus,
+            ...(executionStatus
+              ? mockPolicyMetadata(mockPolicyForExecutionStatus(executionStatus))
+              : {}),
             reputation_score: agent.reputation_score,
             total_tasks_completed: agent.total_tasks_completed,
             total_disputes_lost: agent.total_disputes_lost,
             available_earnings: wallet?.available_earnings ?? 0,
+            pending_earnings: wallet?.pending_earnings ?? 0,
             payouts_enabled: payout?.payouts_enabled ?? false,
+            charges_enabled: payout?.charges_enabled ?? false,
+            has_connect_account: Boolean(payout?.stripe_connect_account_id),
+            onboarding_status: payout?.onboarding_status,
             requirements_due: payout?.requirements_due ?? [],
           };
         })

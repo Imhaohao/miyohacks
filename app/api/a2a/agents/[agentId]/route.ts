@@ -14,7 +14,13 @@ import {
   effectiveExecutionStatus,
   isSandboxA2AEnabled,
 } from "@/lib/agent-execution-status";
+import {
+  currentMockPolicy,
+  mockPolicyForExecutionStatus,
+  mockPolicyMetadata,
+} from "@/lib/mock-policy";
 import { makeMcpForwardingSpecialist } from "@/lib/specialists/mcp-forwarding";
+import { makeA2AForwardingSpecialist } from "@/lib/specialists/a2a-forwarding";
 import {
   makeSandboxA2ASpecialist,
   runSandboxA2AExecution,
@@ -162,6 +168,19 @@ function bridgeRunner(config: SpecialistConfig): ResolvedRunner {
     };
   }
 
+  // Native A2A vendor: forward to the real endpoint. When the vendor fails
+  // (unreachable, missing creds) and sandbox is enabled, message/send will
+  // catch the error and fall back to the sandbox runner.
+  if (effective === "native_a2a" && (config.a2a_endpoint || config.a2a_agent_card_url)) {
+    return {
+      runner: makeA2AForwardingSpecialist(config),
+      executionStatus: effective,
+      intrinsicStatus,
+      nativeConnection: true,
+      sandbox: false,
+    };
+  }
+
   if (effective === "arbor_sandbox_adapter") {
     return {
       runner: makeSandboxA2ASpecialist(config),
@@ -217,6 +236,15 @@ function jsonRpcError(args: {
 
 function makeRunId(agentId: string) {
   return `arbor-a2a-${agentId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function logPersistenceWarning(event: string, runId: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn("[a2a-task-runs] persistence warning", {
+    event,
+    run_id: runId,
+    error: message,
+  });
 }
 
 interface A2ATaskShape {
@@ -304,47 +332,106 @@ function persistRunStart(args: {
 }) {
   // Best-effort persistence — failures (e.g. local dev without Convex)
   // should never break the JSON-RPC response.
-  return convex()
-    .mutation(api.a2aTaskRuns.start, {
-      server_secret: paymentServerSecret(),
-      run_id: args.runId,
-      agent_id: args.agentId,
-      execution_status: args.executionStatus,
-      method: args.method,
-      task_type: args.taskType,
-      prompt: args.prompt,
-      sandbox_disclosure: args.sandbox ? SANDBOX_DISCLOSURE_TEXT : undefined,
-    })
-    .catch(() => undefined);
+  try {
+    return convex()
+      .mutation(api.a2aTaskRuns.start, {
+        server_secret: paymentServerSecret(),
+        run_id: args.runId,
+        agent_id: args.agentId,
+        execution_status: args.executionStatus,
+        method: args.method,
+        task_type: args.taskType,
+        prompt: args.prompt,
+        sandbox_disclosure: args.sandbox ? SANDBOX_DISCLOSURE_TEXT : undefined,
+      })
+      .catch((error) => {
+        logPersistenceWarning("start", args.runId, error);
+        return undefined;
+      });
+  } catch (error) {
+    logPersistenceWarning("start", args.runId, error);
+    return Promise.resolve(undefined);
+  }
 }
 
 function persistRunWorking(runId: string) {
-  return convex()
-    .mutation(api.a2aTaskRuns.setWorking, {
-      server_secret: paymentServerSecret(),
-      run_id: runId,
-    })
-    .catch(() => undefined);
+  try {
+    return convex()
+      .mutation(api.a2aTaskRuns.setWorking, {
+        server_secret: paymentServerSecret(),
+        run_id: runId,
+      })
+      .catch((error) => {
+        logPersistenceWarning("set_working", runId, error);
+        return undefined;
+      });
+  } catch (error) {
+    logPersistenceWarning("set_working", runId, error);
+    return Promise.resolve(undefined);
+  }
 }
 
 function persistRunComplete(args: { runId: string; artifact: unknown }) {
-  return convex()
-    .mutation(api.a2aTaskRuns.complete, {
-      server_secret: paymentServerSecret(),
-      run_id: args.runId,
-      artifact: args.artifact,
-    })
-    .catch(() => undefined);
+  try {
+    return convex()
+      .mutation(api.a2aTaskRuns.complete, {
+        server_secret: paymentServerSecret(),
+        run_id: args.runId,
+        artifact: args.artifact,
+      })
+      .catch((error) => {
+        logPersistenceWarning("complete", args.runId, error);
+        return undefined;
+      });
+  } catch (error) {
+    logPersistenceWarning("complete", args.runId, error);
+    return Promise.resolve(undefined);
+  }
 }
 
 function persistRunFailure(args: { runId: string; message: string }) {
-  return convex()
-    .mutation(api.a2aTaskRuns.fail, {
-      server_secret: paymentServerSecret(),
-      run_id: args.runId,
-      error_message: args.message,
-    })
-    .catch(() => undefined);
+  try {
+    return convex()
+      .mutation(api.a2aTaskRuns.fail, {
+        server_secret: paymentServerSecret(),
+        run_id: args.runId,
+        error_message: args.message,
+      })
+      .catch((error) => {
+        logPersistenceWarning("fail", args.runId, error);
+        return undefined;
+      });
+  } catch (error) {
+    logPersistenceWarning("fail", args.runId, error);
+    return Promise.resolve(undefined);
+  }
+}
+
+function persistRunCancel(runId: string) {
+  try {
+    return convex()
+      .mutation(api.a2aTaskRuns.cancel, {
+        run_id: runId,
+      })
+      .catch((error) => {
+        logPersistenceWarning("cancel", runId, error);
+        return undefined;
+      });
+  } catch (error) {
+    logPersistenceWarning("cancel", runId, error);
+    return Promise.resolve(undefined);
+  }
+}
+
+async function persistedRun(runId: string) {
+  try {
+    return await convex().query(api.a2aTaskRuns.getByRunId, {
+      run_id: runId,
+    });
+  } catch (error) {
+    logPersistenceWarning("get_by_run_id", runId, error);
+    return null;
+  }
 }
 
 function buildAgentCard(args: {
@@ -358,6 +445,7 @@ function buildAgentCard(args: {
   const url = agentUrl(req, agentId);
   const intrinsic = resolved.intrinsicStatus;
   const effective = resolved.executionStatus;
+  const policy = mockPolicyForExecutionStatus(effective);
 
   return {
     protocolVersion: A2A_PROTOCOL_VERSION,
@@ -427,6 +515,8 @@ function buildAgentCard(args: {
       native_connection: resolved.nativeConnection,
       sandbox: resolved.sandbox,
       sandbox_enabled: isSandboxA2AEnabled(),
+      active_mock_policy: currentMockPolicy(),
+      ...mockPolicyMetadata(policy),
       sandbox_disclosure: resolved.sandbox ? SANDBOX_DISCLOSURE_TEXT : null,
       supported_methods: [
         "message/send",
@@ -497,10 +587,10 @@ async function handleMessageSend(args: {
       EXECUTION_STATUS_DESCRIPTIONS[resolved.executionStatus],
       "",
       `Execution status: ${resolved.executionStatus}`,
-      `Sandbox A2A enabled: ${isSandboxA2AEnabled()}`,
+      `Active mock policy: ${currentMockPolicy()}`,
       "",
       "Arbor will not substitute a ChatGPT placeholder for this A2A request.",
-      "Set ENABLE_SANDBOX_A2A=true to allow a disclosed sandbox run instead.",
+      "Set ARBOR_MOCK_POLICY=demo_mock_llm to allow a disclosed sandbox run instead.",
     ].join("\n");
     await persistRunFailure({ runId, message: errorText });
     return jsonOk({
@@ -514,6 +604,9 @@ async function handleMessageSend(args: {
             execution_status: resolved.executionStatus,
             native_connection: resolved.nativeConnection,
             sandbox: resolved.sandbox,
+            ...mockPolicyMetadata(
+              mockPolicyForExecutionStatus(resolved.executionStatus),
+            ),
           },
         },
       }),
@@ -525,6 +618,8 @@ async function handleMessageSend(args: {
   let sandboxArtifact: SandboxArtifact | undefined;
   let text: string;
   let runnerArtifact: unknown;
+  let vendorError: string | undefined;
+  let sandboxFellBack = false;
   try {
     if (resolved.sandbox) {
       sandboxArtifact = await runSandboxA2AExecution({
@@ -535,12 +630,36 @@ async function handleMessageSend(args: {
       text = sandboxArtifact.markdown;
       runnerArtifact = sandboxArtifact;
     } else {
-      const output = await resolved.runner.execute(prompt, tType);
-      if (typeof output === "string") {
-        text = output;
-      } else {
-        text = output.summary;
-        runnerArtifact = output;
+      try {
+        const output = await resolved.runner.execute(prompt, tType);
+        if (typeof output === "string") {
+          text = output;
+        } else {
+          text = output.summary;
+          runnerArtifact = output;
+        }
+      } catch (vendorErr) {
+        // Native vendor unreachable: if sandbox is enabled, fall back with a
+        // disclosure rather than failing the chat entirely. Otherwise rethrow
+        // so the outer catch reports the vendor error honestly.
+        if (resolved.executionStatus === "native_a2a" && isSandboxA2AEnabled()) {
+          vendorError = vendorErr instanceof Error ? vendorErr.message : String(vendorErr);
+          sandboxArtifact = await runSandboxA2AExecution({
+            config,
+            prompt,
+            taskType: tType,
+          });
+          text = [
+            `> Vendor A2A endpoint failed: ${vendorError}`,
+            `> Falling back to ${SANDBOX_DISCLOSURE_TEXT}`,
+            "",
+            sandboxArtifact.markdown,
+          ].join("\n");
+          runnerArtifact = sandboxArtifact;
+          sandboxFellBack = true;
+        } else {
+          throw vendorErr;
+        }
       }
     }
   } catch (error) {
@@ -553,9 +672,12 @@ async function handleMessageSend(args: {
       `Runner error: ${message}`,
       "",
       `Execution status: ${resolved.executionStatus}`,
+      `Vendor endpoint: ${config.a2a_endpoint ?? config.a2a_agent_card_url ?? "(none)"}`,
       `Sandbox: ${resolved.sandbox ? "yes" : "no"}`,
       "",
-      "This failure is returned as an A2A failed task state instead of silently substituting placeholder work.",
+      isSandboxA2AEnabled()
+        ? "Demo mock LLM policy is enabled but did not apply to this status. This failure is returned honestly."
+        : "Set ARBOR_MOCK_POLICY=demo_mock_llm to let Arbor fall back to a disclosed sandbox run when the vendor endpoint is unreachable.",
     ].join("\n");
     await persistRunFailure({ runId, message: errorText });
     return jsonOk({
@@ -569,7 +691,12 @@ async function handleMessageSend(args: {
             execution_status: resolved.executionStatus,
             native_connection: resolved.nativeConnection,
             sandbox: resolved.sandbox,
+            vendor_endpoint:
+              config.a2a_endpoint ?? config.a2a_agent_card_url ?? null,
             error: message,
+            ...mockPolicyMetadata(
+              mockPolicyForExecutionStatus(resolved.executionStatus),
+            ),
           },
         },
       }),
@@ -589,6 +716,9 @@ async function handleMessageSend(args: {
         sandbox_disclosure: resolved.sandbox ? SANDBOX_DISCLOSURE_TEXT : null,
         task_type: tType,
         request_method: method,
+        ...mockPolicyMetadata(
+          mockPolicyForExecutionStatus(resolved.executionStatus),
+        ),
       },
       artifact: runnerArtifact,
     },
@@ -596,6 +726,9 @@ async function handleMessageSend(args: {
       execution: {
         execution_status: resolved.executionStatus,
         sandbox: resolved.sandbox,
+        ...mockPolicyMetadata(
+          mockPolicyForExecutionStatus(resolved.executionStatus),
+        ),
       },
     },
   });
@@ -621,9 +754,7 @@ async function handleTasksGet(args: {
       message: "tasks/get requires params.id",
     });
   }
-  const row = await convex()
-    .query(api.a2aTaskRuns.getByRunId, { run_id: taskId })
-    .catch(() => null);
+  const row = await persistedRun(taskId);
   if (!row) {
     return jsonRpcError({
       id: args.rpcId,
@@ -682,9 +813,7 @@ async function handleTasksCancel(args: {
       message: "tasks/cancel requires params.id",
     });
   }
-  const result = await convex()
-    .mutation(api.a2aTaskRuns.cancel, { run_id: taskId })
-    .catch(() => null);
+  const result = await persistRunCancel(taskId);
   if (!result || result.notFound) {
     return jsonRpcError({
       id: args.rpcId,

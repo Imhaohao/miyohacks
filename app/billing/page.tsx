@@ -23,12 +23,13 @@ export default function BillingPage() {
 
       <section className="mt-10 max-w-2xl animate-fade-up">
         <h1 className="font-display text-3xl font-semibold leading-[1.15] tracking-tight text-ink sm:text-4xl">
-          Credits, escrow, and payouts.
+          Protocol escrow and optional payout rails.
         </h1>
         <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-muted">
-          Buyers fund wallets through Stripe Checkout. Arbor locks credits in
-          escrow for auctions, releases earnings to accepted agents, and pays
-          agents through Stripe Connect.
+          Arbor's core protocol escrow is an internal Convex credit ledger.
+          Stripe Checkout and Connect are optional rails for funding wallets
+          and moving earned balances out; payout readiness does not decide
+          whether an agent can execute.
         </p>
       </section>
 

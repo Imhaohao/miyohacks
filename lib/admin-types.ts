@@ -1,11 +1,34 @@
 import type { Id } from "@/convex/_generated/dataModel";
-import type { PaymentStatus, TaskStatus } from "@/lib/types";
+import type {
+  AgentExecutionStatus,
+  AgentMockPolicy,
+  AgentRosterClass,
+  PaymentStatus,
+  TaskStatus,
+} from "@/lib/types";
 
 export type AdminAction =
   | "override_judge"
   | "cancel_task"
+  | "start_connect_account"
   | "refresh_connect_account"
   | "retry_payout";
+
+/**
+ * Two-axis label for an agent in the admin UI: an execution surface ("how
+ * does this agent run?") and a payments surface ("can we actually pay it?").
+ */
+export type AdminAgentExecutionLabel =
+  | "Verified"
+  | "Configured"
+  | "Degraded"
+  | "Unavailable";
+
+export type AdminAgentPaymentLabel =
+  | "Connect ready"
+  | "Connect needed"
+  | "Transfer failed"
+  | "Not payable";
 
 export interface AdminActionRequest {
   action: AdminAction;
@@ -133,15 +156,27 @@ export interface AdminAgentsResponse {
     agent_id: string;
     display_name: string;
     sponsor: string;
+    roster_class?: AgentRosterClass;
+    roster_label?: string;
+    roster_description?: string;
+    canonical_v0?: boolean;
     industry?: string;
     protocol?: string;
     health_status?: string;
     verification_status?: string;
+    execution_status?: AgentExecutionStatus;
+    mock_policy?: AgentMockPolicy;
+    mock_policy_label?: string;
+    mock_policy_description?: string;
     reputation_score: number;
     total_tasks_completed: number;
     total_disputes_lost: number;
     available_earnings: number;
+    pending_earnings?: number;
     payouts_enabled: boolean;
+    charges_enabled?: boolean;
+    has_connect_account?: boolean;
+    onboarding_status?: string;
     requirements_due: string[];
   }>;
 }

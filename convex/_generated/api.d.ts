@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as a2aTaskRuns from "../a2aTaskRuns.js";
+import type * as acceptance from "../acceptance.js";
 import type * as accounts from "../accounts.js";
 import type * as admin from "../admin.js";
 import type * as agentContacts from "../agentContacts.js";
@@ -25,6 +27,7 @@ import type * as disputes from "../disputes.js";
 import type * as escrow from "../escrow.js";
 import type * as executionPlans from "../executionPlans.js";
 import type * as lifecycle from "../lifecycle.js";
+import type * as migrations from "../migrations.js";
 import type * as payments from "../payments.js";
 import type * as planning from "../planning.js";
 import type * as productContext from "../productContext.js";
@@ -43,6 +46,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  a2aTaskRuns: typeof a2aTaskRuns;
+  acceptance: typeof acceptance;
   accounts: typeof accounts;
   admin: typeof admin;
   agentContacts: typeof agentContacts;
@@ -60,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   escrow: typeof escrow;
   executionPlans: typeof executionPlans;
   lifecycle: typeof lifecycle;
+  migrations: typeof migrations;
   payments: typeof payments;
   planning: typeof planning;
   productContext: typeof productContext;

@@ -17,8 +17,20 @@ import {
   isRealExecutionStatus,
 } from "../agent-execution-status";
 import { roleForSpecialist } from "../agent-roles";
-import type { AgentExecutionStatus, AgentRole, SpecialistConfig } from "../types";
+import type {
+  AgentConnectionState,
+  AgentExecutionStatus,
+  AgentMockPolicy,
+  AgentRole,
+  AgentRosterClass,
+  SpecialistConfig,
+} from "../types";
 import { MCP_CATALOG, type CatalogEntry } from "./catalog";
+import { rosterMetadataFor } from "./roster";
+import {
+  mockPolicyForExecutionStatus,
+  mockPolicyMetadata,
+} from "../mock-policy";
 
 export interface SpecialistSuggestion {
   agent_id: string;
@@ -30,10 +42,29 @@ export interface SpecialistSuggestion {
   fit_score: number;
   fit_reasoning: string;
   discovered: boolean;
-  discovery_source?: "catalog" | "registry" | "synthesized";
+  discovery_source?: "catalog" | "registry" | "synthesized" | "registered";
+  roster_class: AgentRosterClass;
+  roster_label: string;
+  roster_description: string;
+  canonical_v0: boolean;
+  mock_policy: AgentMockPolicy;
+  mock_policy_label: string;
+  mock_policy_description: string;
   /** Real MCP endpoint backing this specialist, if any. */
   mcp_endpoint?: string;
   execution_status: AgentExecutionStatus;
+  execution_connection_state?: AgentConnectionState;
+  effective_connected?: boolean;
+  probe_status?:
+    | "available"
+    | "missing_auth"
+    | "not_configured"
+    | "unreachable"
+    | "timeout"
+    | "auth_failed"
+    | "protocol_error";
+  last_probe_at?: string;
+  last_probe_reason?: string;
   agent_role?: AgentRole;
   homepage_url?: string;
   /**
@@ -108,7 +139,14 @@ interface CandidateSpec {
   mcp_endpoint?: string;
   homepage_url?: string;
   discovered: boolean;
-  discovery_source?: "catalog" | "registry" | "synthesized";
+  discovery_source?: "catalog" | "registry" | "synthesized" | "registered";
+  roster_class: AgentRosterClass;
+  roster_label: string;
+  roster_description: string;
+  canonical_v0: boolean;
+  mock_policy: AgentMockPolicy;
+  mock_policy_label: string;
+  mock_policy_description: string;
   enrollable: boolean;
   execution_status: AgentExecutionStatus;
   agent_role?: AgentRole;
@@ -140,6 +178,8 @@ function specToCandidate(spec: SpecialistConfig): CandidateSpec {
     homepage_url: spec.homepage_url,
     discovered: !!spec.discovered,
     discovery_source: spec.discovery_source,
+    ...rosterMetadataFor(spec),
+    ...mockPolicyMetadata(mockPolicyForExecutionStatus(execution_status)),
     enrollable: false,
     note: spec.discovered
       ? `runtime-discovered (${spec.discovered_for ?? ""})`
@@ -166,6 +206,12 @@ function catalogToCandidate(entry: CatalogEntry): CandidateSpec {
     homepage_url: entry.homepage_url,
     discovered: true,
     discovery_source: "catalog",
+    ...rosterMetadataFor({
+      agent_id: entry.agent_id,
+      discovered: true,
+      discovery_source: "catalog",
+    }),
+    ...mockPolicyMetadata(mockPolicyForExecutionStatus(execution_status)),
     enrollable: true,
     tags: entry.domain_tags,
     note: "catalog entry — auto-enrolls when picked",
@@ -369,6 +415,13 @@ export async function suggestSpecialists(
       fit_reasoning: r.fit_reasoning,
       discovered: c.discovered,
       discovery_source: c.discovery_source,
+      roster_class: c.roster_class,
+      roster_label: c.roster_label,
+      roster_description: c.roster_description,
+      canonical_v0: c.canonical_v0,
+      mock_policy: c.mock_policy,
+      mock_policy_label: c.mock_policy_label,
+      mock_policy_description: c.mock_policy_description,
       mcp_endpoint: c.mcp_endpoint,
       execution_status: c.execution_status,
       agent_role: c.agent_role,

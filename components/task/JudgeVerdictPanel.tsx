@@ -37,10 +37,10 @@ export function JudgeVerdictPanel({ task, events = [] }: Props) {
         />
         <LoadingProgress
           label="Judge is reviewing the output"
-          status="Independent gpt-5.5 call: scores the work against the enriched context, returns accept/reject + a quality score 0–1."
+          status="Independent OpenAI judge call: scores the work against the enriched context, returns accept/reject + a quality score 0–1."
           details={[
             "Strict but fair: rejects if off-topic, hallucinated, or fails the spec.",
-            "Reputation flows from this score: accepted bumps rep, rejected docks it.",
+            "Canonical reputation flows only from this judge verdict and settlement path.",
           ]}
           elapsedSeconds={elapsed}
           tone="info"
@@ -117,8 +117,9 @@ export function JudgeVerdictPanel({ task, events = [] }: Props) {
           Human override
         </div>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          The judge is advisory. A buyer/operator can override it with an
-          explicit reason; the override is logged and settlement is updated.
+          The judge is canonical for reputation. A buyer/operator override is
+          logged as governance, can update settlement, and does not mutate
+          canonical reputation.
         </p>
         <textarea
           className="mt-3 min-h-20 w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brand-400"

@@ -8,7 +8,7 @@ import type { Doc } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
-import { CREDIT_PACKS, formatCredits } from "@/lib/payments";
+import { CREDIT_PACKS, formatCredits, formatCreditsAsUsd } from "@/lib/payments";
 import { formatMoney } from "@/lib/utils";
 import {
   ArrowSquareOut,
@@ -113,24 +113,24 @@ export function BillingClient() {
     <div className="space-y-5">
       <Card className="animate-fade-up">
         <CardHeader
-          title="Credits wallet"
-          meta={<Pill tone="brand">Stripe funded</Pill>}
+          title="Protocol credits wallet"
+          meta={<Pill tone="brand">Convex ledger</Pill>}
         />
         <div className="grid gap-3 sm:grid-cols-3">
           <Metric
             icon={<Wallet size={18} weight="bold" />}
             label="Available"
-            value={formatCredits(balance)}
+            value={`${formatCredits(balance)} · ${formatCreditsAsUsd(balance)}`}
           />
           <Metric
             icon={<CreditCard size={18} weight="bold" />}
             label="Reserved in auctions"
-            value={formatCredits(reserved)}
+            value={`${formatCredits(reserved)} · ${formatCreditsAsUsd(reserved)}`}
           />
           <Metric
             icon={<Bank size={18} weight="bold" />}
             label="Trial granted"
-            value={formatCredits(wallet?.lifetime_granted ?? 0)}
+            value={`${formatCredits(wallet?.lifetime_granted ?? 0)} · ${formatCreditsAsUsd(wallet?.lifetime_granted ?? 0)}`}
           />
         </div>
       </Card>
@@ -176,13 +176,18 @@ export function BillingClient() {
 
       <Card className="animate-fade-up [animation-delay:120ms]">
         <CardHeader
-          title="Agent payout rail"
+          title="Optional Stripe payout rail"
           meta={
             <Pill tone={payoutReady ? "success" : "warning"}>
-              {payoutReady ? "Payout ready" : "Connect required"}
+              {payoutReady ? "Payout ready" : "Connect needed"}
             </Pill>
           }
         />
+        <p className="mb-4 max-w-2xl text-sm leading-relaxed text-ink-muted">
+          Agent execution is gated by tool/API readiness, not Stripe Connect.
+          Connect only controls whether earned internal credits can move to a
+          bank account.
+        </p>
         <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
           <div className="space-y-3">
             <label className="block text-sm font-medium text-ink">
@@ -196,11 +201,11 @@ export function BillingClient() {
             <div className="grid gap-3 sm:grid-cols-2">
               <Metric
                 label="Available earnings"
-                value={formatCredits(agentWallet?.available_earnings ?? 0)}
+                value={`${formatCredits(agentWallet?.available_earnings ?? 0)} · ${formatCreditsAsUsd(agentWallet?.available_earnings ?? 0)}`}
               />
               <Metric
                 label="Lifetime paid out"
-                value={formatCredits(agentWallet?.lifetime_paid_out ?? 0)}
+                value={`${formatCredits(agentWallet?.lifetime_paid_out ?? 0)} · ${formatCreditsAsUsd(agentWallet?.lifetime_paid_out ?? 0)}`}
               />
             </div>
           </div>
@@ -276,7 +281,7 @@ export function BillingClient() {
                   }
                 >
                   {entry.amount >= 0 ? "+" : ""}
-                  {entry.amount.toFixed(2)}
+                  {formatCredits(Math.abs(entry.amount))}
                 </div>
               </div>
             ))

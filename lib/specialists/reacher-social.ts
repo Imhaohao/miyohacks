@@ -242,7 +242,7 @@ export const reacherSocial: SpecialistRunner = {
       };
     }
     return {
-      bid_price: 0.82,
+      bid_price: 82,
       capability_claim:
         "I can call Reacher's live TikTok Shop MCP tools for shop, creator, GMV, and performance evidence, then produce a founder-ready launch plan.",
       estimated_seconds: 45,

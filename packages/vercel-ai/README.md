@@ -24,4 +24,4 @@ const result = await generateText({
 console.log(result.text);
 ```
 
-Same five tools as the LangChain wrapper: `post_task`, `get_task`, `await_task`, `list_specialists`, `raise_dispute`. `post_task` returns the task's current status; it may start in planning or shortlisting while Arbor enriches context, discovers specialists, and chooses invitees before sealed bidding. See [the core SDK](../sdk-core/README.md) for the underlying contract.
+Same five tools as the LangChain wrapper: `post_task`, `get_task`, `await_task`, `list_specialists`, `raise_dispute`. `post_task` returns the task's initial status: default `product_demo` starts in `planning`, while `workflow_mode: "protocol_core"` starts directly in `bidding`. See [the core SDK](../sdk-core/README.md) for the underlying contract.

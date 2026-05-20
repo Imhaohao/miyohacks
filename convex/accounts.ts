@@ -4,7 +4,7 @@ import { internal } from "./_generated/api";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { accountIdForClerkUserId, requireAccountId } from "./authHelpers";
-import { FREE_TRIAL_CREDITS, roundMoney } from "../lib/payments";
+import { FREE_TRIAL_CREDITS } from "../lib/payments";
 
 interface TrialGrantResult {
   granted: boolean;
@@ -125,9 +125,10 @@ async function grantTrialCredits(
     .query("buyer_wallets")
     .withIndex("by_buyer", (q) => q.eq("buyer_id", account.account_id))
     .first();
-  const alreadyGranted = roundMoney(wallet?.lifetime_granted ?? 0);
-  const missingTrialCredits = roundMoney(FREE_TRIAL_CREDITS - alreadyGranted);
-  if (missingTrialCredits <= 0) {
+  // One trial grant per account, ever — see `_grantTrialCreditsIfNeeded` for
+  // why we don't top up to the current FREE_TRIAL_CREDITS amount.
+  const alreadyGranted = wallet?.lifetime_granted ?? 0;
+  if (alreadyGranted > 0) {
     if (!account.trial_credits_granted_at) {
       const now = Date.now();
       await ctx.db.patch(account._id, {
@@ -139,11 +140,11 @@ async function grantTrialCredits(
   }
   const result = (await ctx.runMutation(internal.payments._grantTrialCreditsIfNeeded, {
     account_id: account.account_id,
-    amount: missingTrialCredits,
+    amount: FREE_TRIAL_CREDITS,
   })) as TrialGrantResult;
   const now = Date.now();
   await ctx.db.patch(account._id, { trial_credits_granted_at: now, updated_at: now });
-  return { ...result, amount: missingTrialCredits };
+  return { ...result, amount: FREE_TRIAL_CREDITS };
 }
 
 export const me = query({

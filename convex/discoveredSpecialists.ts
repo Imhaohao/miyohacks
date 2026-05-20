@@ -38,18 +38,59 @@ const SPECIALIST_FIELDS = {
   cost_baseline: v.number(),
   starting_reputation: v.number(),
   one_liner: v.string(),
+  industry: v.optional(
+    v.union(
+      v.literal("software"),
+      v.literal("finance"),
+      v.literal("legal"),
+      v.literal("healthcare"),
+      v.literal("ecommerce"),
+      v.literal("marketing"),
+      v.literal("sales"),
+      v.literal("operations"),
+      v.literal("data"),
+      v.literal("creative-media"),
+    ),
+  ),
   discovered_for: v.string(),
   discovery_source: v.optional(
+      v.union(
+        v.literal("catalog"),
+        v.literal("registry"),
+        v.literal("synthesized"),
+        v.literal("registered"),
+      ),
+    ),
+  protocol: v.optional(
     v.union(
-      v.literal("catalog"),
-      v.literal("registry"),
-      v.literal("synthesized"),
+      v.literal("a2a"),
+      v.literal("mcp"),
+      v.literal("mock"),
+      v.literal("manual"),
     ),
   ),
   mcp_endpoint: v.optional(v.string()),
   mcp_api_key_env: v.optional(v.string()),
+  a2a_endpoint: v.optional(v.string()),
+  a2a_agent_card_url: v.optional(v.string()),
   homepage_url: v.optional(v.string()),
   rationale: v.optional(v.string()),
+  last_probe_status: v.optional(
+    v.union(
+      v.literal("available"),
+      v.literal("missing_auth"),
+      v.literal("not_configured"),
+      v.literal("unreachable"),
+      v.literal("timeout"),
+      v.literal("auth_failed"),
+      v.literal("protocol_error"),
+    ),
+  ),
+  last_probe_reason: v.optional(v.string()),
+  last_probe_at: v.optional(v.string()),
+  last_probe_latency_ms: v.optional(v.number()),
+  verified_tool_count: v.optional(v.number()),
+  registered_via: v.optional(v.string()),
 };
 
 export const create = mutation({

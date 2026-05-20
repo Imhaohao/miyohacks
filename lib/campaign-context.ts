@@ -122,7 +122,26 @@ export function isCreatorCommerceTask(
   return hasCreatorChannel || (hasGenericCampaign && hasCreator);
 }
 
+/**
+ * Task types that are explicitly NOT implementation work — context lookups,
+ * memory queries, research summaries, document extractions. Without this
+ * override the keyword classifier picks up incidental words like "github" or
+ * "api" in the prompt and miscategorizes the judge rubric.
+ */
+const NON_IMPLEMENTATION_TASK_TYPES = new Set([
+  "context",
+  "research",
+  "memory",
+  "document-extraction",
+  "browser-automation",
+  "operations",
+  "writing",
+]);
+
 export function isImplementationTask(prompt: string, taskType: string): boolean {
+  if (taskType && NON_IMPLEMENTATION_TASK_TYPES.has(taskType.toLowerCase().trim())) {
+    return false;
+  }
   const lower = `${taskType} ${prompt}`.toLowerCase();
   return [
     "repo",

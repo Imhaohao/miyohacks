@@ -16,6 +16,8 @@ export type KnownAgentId =
 
 export type AgentId = KnownAgentId | (string & {});
 
+export type TaskWorkflowMode = "product_demo" | "protocol_core";
+
 export type TaskStatus =
   | "open"
   | "shortlisting"
@@ -36,11 +38,26 @@ export type EscrowStatus = "locked" | "released" | "refunded";
 
 export type PaymentStatus =
   | "unfunded"
+  | "checkout_pending"
+  | "live_funded"
   | "funds_reserved"
   | "escrow_locked"
   | "released"
   | "refunded"
+  | "payable"
+  | "transferred"
+  | "transfer_failed"
+  | "incident"
   | "payout_pending";
+
+export type TaskFundingMode = "credits" | "live";
+
+export type TransferStatus =
+  | "not_required"
+  | "pending"
+  | "succeeded"
+  | "failed"
+  | "payable_blocked";
 
 export type AgentIndustry =
   | "software"
@@ -56,6 +73,12 @@ export type AgentIndustry =
 
 export type AgentProtocol = "a2a" | "mcp" | "mock" | "manual";
 export type AgentRole = "executive" | "context" | "executor" | "judge";
+export type AgentRosterClass =
+  | "canonical_v0"
+  | "demo_extension"
+  | "discovered_contact"
+  | "post_v0_integration";
+export type AgentMockPolicy = "strict_no_mock" | "demo_mock_llm";
 export type AgentExecutionStatus =
   | "native_mcp"
   | "native_a2a"
@@ -63,6 +86,12 @@ export type AgentExecutionStatus =
   | "arbor_sandbox_adapter"
   | "needs_vendor_a2a_endpoint"
   | "mock_unconnected";
+
+export type AgentConnectionState =
+  | "configured"
+  | "verified"
+  | "degraded"
+  | "unavailable";
 
 export type AgentHealthStatus =
   | "unknown"
@@ -100,6 +129,13 @@ export interface AgentContact {
   cost_baseline: number;
   starting_reputation: number;
   homepage_url?: string;
+  roster_class?: AgentRosterClass;
+  roster_label?: string;
+  roster_description?: string;
+  canonical_v0?: boolean;
+  mock_policy?: AgentMockPolicy;
+  mock_policy_label?: string;
+  mock_policy_description?: string;
 }
 
 export interface BrokeredAgentContact {
@@ -129,6 +165,8 @@ export type LifecycleEventType =
   | "auction_choice_selected"
   | "auction_failed"
   | "execution_plan_started"
+  | "connection_probe_started"
+  | "connection_probe_result"
   | "execution_plan_ready"
   | "execution_plan_revision_requested"
   | "execution_plan_approved"
@@ -138,13 +176,17 @@ export type LifecycleEventType =
   | "payment_refunded"
   | "payment_released"
   | "execution_started"
+  | "output_schema_validation_failed"
   | "execution_complete"
   | "codex_pr_opened"
   | "execution_failed"
+  | "dispute_raised"
   | "judge_verdict"
+  | "judge_override"
   | "settled";
 
 export interface BidPayload {
+  /** Integer credits. Pricing unit: 100 credits = $1 USD. */
   bid_price: number;
   capability_claim: string;
   estimated_seconds: number;
@@ -161,6 +203,24 @@ export interface BidPayload {
     endpoint_host?: string;
     proof?: string;
     sandbox?: boolean;
+    connection_state?: AgentConnectionState;
+    effective_connected?: boolean;
+    probe_status?:
+      | "available"
+      | "missing_auth"
+      | "not_configured"
+      | "unreachable"
+      | "timeout"
+      | "auth_failed"
+      | "protocol_error";
+    last_probe_at?: string;
+    last_probe_reason?: string;
+    last_probe_latency_ms?: number;
+    mock_policy?: AgentMockPolicy;
+    mock_policy_label?: string;
+    mock_policy_description?: string;
+    /** True if executing this bid will open a real pull request. */
+    opens_prs?: boolean;
   };
 }
 
@@ -175,6 +235,14 @@ export interface JudgeVerdict {
   verdict: "accept" | "reject";
   reasoning: string;
   quality_score: number;
+  source?: "llm_judge" | "human_override";
+  override?: boolean;
+  affects_reputation?: boolean;
+  reputation_authority?: "llm_judge" | "canonical_judge_only";
+  settlement_authority?: "llm_judge" | "human_governance_override";
+  original_verdict?: JudgeVerdict | null;
+  override_actor?: string;
+  override_reason?: string;
 }
 
 export interface CampaignLaunchCreator {
@@ -220,6 +288,8 @@ export interface ImplementationPlanArtifact {
   kind: "implementation_plan";
   title: string;
   summary: string;
+  /** Full specialist narrative (MCP synthesis, etc.) — not truncated. */
+  agent_report?: string;
   agent_id: string;
   mode: "plan_for_approval";
   user_goal: string;
@@ -251,7 +321,15 @@ export interface ExecutionPlanProvenance {
   source: ExecutionPlanSource;
   agent_id: string;
   execution_status: AgentExecutionStatus;
-  probe_status: "available" | "missing_auth" | "not_configured" | "unreachable" | "skipped";
+  probe_status:
+    | "available"
+    | "missing_auth"
+    | "not_configured"
+    | "unreachable"
+    | "timeout"
+    | "auth_failed"
+    | "protocol_error"
+    | "skipped";
   note?: string;
 }
 
@@ -293,6 +371,7 @@ export interface SpecialistConfig {
   agent_role?: AgentRole;
   capabilities: string[];
   system_prompt: string;
+  /** Integer credits. Pricing unit: 100 credits = $1 USD. */
   cost_baseline: number;
   starting_reputation: number;
   one_liner: string;
@@ -311,6 +390,13 @@ export interface SpecialistConfig {
   is_verified?: boolean;
   /** Public homepage / docs URL for the sponsor. */
   homepage_url?: string;
+  roster_class?: AgentRosterClass;
+  roster_label?: string;
+  roster_description?: string;
+  canonical_v0?: boolean;
+  mock_policy?: AgentMockPolicy;
+  mock_policy_label?: string;
+  mock_policy_description?: string;
   /** Optional A2A endpoints. Sponsor runners decline when unavailable. */
   a2a_agent_card_url?: string;
   a2a_endpoint?: string;
@@ -329,7 +415,7 @@ export interface SpecialistConfig {
    *   - "registry"     → live search against an MCP registry
    *   - "synthesized"  → LLM-designed in-persona agent (no real MCP backend)
    */
-  discovery_source?: "catalog" | "registry" | "synthesized";
+  discovery_source?: "catalog" | "registry" | "synthesized" | "registered";
   /** Free-form note explaining what query triggered discovery. */
   discovered_for?: string;
 }

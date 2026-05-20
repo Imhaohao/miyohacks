@@ -1,4 +1,5 @@
 import type { AgentExecutionStatus, AgentId, AgentProtocol } from "./types";
+import { isDemoMockLLMPolicyEnabled } from "./mock-policy";
 
 type ExecutionSubject = {
   agent_id: AgentId | string;
@@ -36,7 +37,7 @@ const NEEDS_VENDOR_A2A = new Set<string>(
 );
 
 export const SANDBOX_DISCLOSURE_TEXT =
-  "Sandbox A2A adapter: Arbor produced this output via its own LLM in the agent's persona. It is not a vendor-native API call.";
+  "Demo mock LLM policy: Arbor produced this output via its own sandbox LLM in the agent's persona. It is not a vendor-native API call.";
 
 export const EXECUTION_STATUS_LABELS: Record<AgentExecutionStatus, string> = {
   native_mcp: "Native MCP",
@@ -56,11 +57,11 @@ export const EXECUTION_STATUS_DESCRIPTIONS: Record<
   arbor_real_adapter:
     "Arbor exposes A2A, but execution calls a real underlying API or runner.",
   arbor_sandbox_adapter:
-    "Sandbox A2A adapter: real bounded work via Arbor/OpenAI, disclosed as sandbox rather than vendor-native.",
+    "Demo-only mock LLM adapter: bounded work via Arbor/OpenAI, disclosed as sandbox rather than vendor-native.",
   needs_vendor_a2a_endpoint:
     "A sponsor runner exists, but no real vendor A2A endpoint is configured.",
   mock_unconnected:
-    "Visible in the catalog only; it must not execute through a ChatGPT placeholder.",
+    "Visible in the catalog only under the strict no-mock policy; it must not execute through a ChatGPT placeholder.",
 };
 
 export function isRealExecutionStatus(status: AgentExecutionStatus): boolean {
@@ -86,8 +87,7 @@ export function isSelectableExecutionStatus(
 
 /** Read the env flag that gates sandbox A2A execution. */
 export function isSandboxA2AEnabled(): boolean {
-  const raw = process.env.ENABLE_SANDBOX_A2A;
-  return typeof raw === "string" && raw.toLowerCase() === "true";
+  return isDemoMockLLMPolicyEnabled();
 }
 
 /**

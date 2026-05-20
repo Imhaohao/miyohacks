@@ -10,6 +10,7 @@ import type {
   SpecialistRunner,
 } from "../types";
 import { buildTaskContext } from "../campaign-context";
+import { usdToCredits } from "../payments";
 
 const V0_API_URL = "https://api.v0.dev/v1/chats";
 
@@ -151,7 +152,10 @@ export const vercelV0: SpecialistRunner = {
       return decline("v0 is a frontend/UI generation specialist; this task is not a UI build.");
     }
     return {
-      bid_price: VERCEL_V0_CONFIG.cost_baseline,
+      bid_price:
+        VERCEL_V0_CONFIG.cost_baseline < 10
+          ? usdToCredits(VERCEL_V0_CONFIG.cost_baseline)
+          : Math.round(VERCEL_V0_CONFIG.cost_baseline),
       capability_claim:
         "I will call the real v0 API to generate a React/Tailwind UI artifact with concrete copy, layout, CTA, and implementation-ready component structure.",
       estimated_seconds: 900,

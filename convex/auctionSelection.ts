@@ -7,9 +7,11 @@ import {
   sortBidsByProtocolScore,
 } from "../lib/auction-mechanism";
 import {
+  bidCanOpenPullRequest,
   isSelectableExecutorBid,
   explainUnselectableExecutorBid,
 } from "../lib/auction-selection";
+import { isImplementationTask } from "../lib/campaign-context";
 import { roleForAgent } from "../lib/agent-roles";
 import { actorForCurrentUser, assertTaskReadable } from "./authHelpers";
 import type { Id } from "./_generated/dataModel";
@@ -55,7 +57,16 @@ async function chooseTopBidCore(
     .query("bids")
     .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
     .collect();
-  const validBids = eligibleExecutorBids(allBids, task.max_budget);
+  const rawValidBids = eligibleExecutorBids(allBids, task.max_budget);
+  const requiresPullRequest = isImplementationTask(task.prompt, task.task_type);
+  const validBids = requiresPullRequest
+    ? rawValidBids.filter(bidCanOpenPullRequest)
+    : rawValidBids;
+  if (requiresPullRequest && validBids.length === 0) {
+    throw new Error(
+      "no PR-capable executor bid for this implementation task — codex-writer must bid and be eligible (GITHUB_TOKEN + OPENAI_API_KEY + target_repo)",
+    );
+  }
 
   const top3 = validBids.slice(0, 3);
   if (!top3.some((bid) => bid._id === args.bid_id)) {
@@ -131,9 +142,17 @@ async function repairInvalidWinnerCore(
     .query("bids")
     .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
     .collect();
-  const validBids = eligibleExecutorBids(allBids, task.max_budget);
+  const rawValidBids = eligibleExecutorBids(allBids, task.max_budget);
+  const requiresPullRequest = isImplementationTask(task.prompt, task.task_type);
+  const validBids = requiresPullRequest
+    ? rawValidBids.filter(bidCanOpenPullRequest)
+    : rawValidBids;
   if (validBids.length === 0) {
-    throw new Error("no verified external executor bids are available");
+    throw new Error(
+      requiresPullRequest
+        ? "no PR-capable executor bid for this implementation task — codex-writer must bid and be eligible (GITHUB_TOKEN + OPENAI_API_KEY + target_repo)"
+        : "no verified external executor bids are available",
+    );
   }
 
   const winner = validBids[0];

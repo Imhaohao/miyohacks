@@ -15,14 +15,25 @@ export interface AuctionClientOptions {
   fetch?: typeof fetch;
 }
 
+export type TaskWorkflowMode = "product_demo" | "protocol_core";
+export type AgentRosterClass =
+  | "canonical_v0"
+  | "demo_extension"
+  | "discovered_contact"
+  | "post_v0_integration";
+export type AgentMockPolicy = "strict_no_mock" | "demo_mock_llm";
+
 export interface PostTaskInput {
   prompt: string;
+  /** Integer credits. Pricing unit: 100 credits = $1 USD. */
   max_budget: number;
   task_type?: string;
+  workflow_mode?: TaskWorkflowMode;
   output_schema?: Record<string, unknown>;
 }
 
 export type TaskStatus =
+  | "open"
   | "planning"
   | "shortlisting"
   | "bidding"
@@ -37,19 +48,38 @@ export type TaskStatus =
   | "failed"
   | "cancelled";
 
-export interface PostTaskResult {
+export type PostTaskInitialStatus = "planning" | "bidding";
+
+export interface BasePostTaskResult {
   task_id: string;
-  status: TaskStatus;
+  status: PostTaskInitialStatus;
+  workflow_mode: TaskWorkflowMode;
   bid_window_closes_at: number;
   web_view_url: string;
 }
+
+export interface ProductDemoPostTaskResult extends BasePostTaskResult {
+  status: "planning";
+  workflow_mode: "product_demo";
+}
+
+export interface ProtocolCorePostTaskResult extends BasePostTaskResult {
+  status: "bidding";
+  workflow_mode: "protocol_core";
+}
+
+export type PostTaskResult =
+  | ProductDemoPostTaskResult
+  | ProtocolCorePostTaskResult;
 
 export interface TaskState {
   task: {
     _id: string;
     status: TaskStatus;
     prompt: string;
+    /** Integer credits. */
     max_budget: number;
+    /** Integer credits. */
     price_paid?: number;
     result?: { text: string; agent_id: string } | unknown;
     judge_verdict?: {
@@ -61,6 +91,7 @@ export interface TaskState {
   } | null;
   bids: Array<{
     agent_id: string;
+    /** Integer credits. */
     bid_price: number;
     score: number;
     capability_claim: string;
@@ -68,6 +99,7 @@ export interface TaskState {
   }>;
   escrow: {
     status: "locked" | "released" | "refunded";
+    /** Integer credits. */
     locked_amount: number;
     [key: string]: unknown;
   } | null;
@@ -83,10 +115,20 @@ export interface Specialist {
   agent_id: string;
   sponsor: string;
   capabilities: string[];
+  /** Integer credits (100 credits = $1). */
   cost_baseline: number;
   one_liner: string;
   reputation_score: number;
   total_tasks_completed: number;
+  roster_class: AgentRosterClass;
+  roster_label: string;
+  roster_description: string;
+  canonical_v0: boolean;
+  execution_status?: string;
+  execution_status_label?: string;
+  mock_policy?: AgentMockPolicy;
+  mock_policy_label?: string;
+  mock_policy_description?: string;
 }
 
 export interface AwaitTaskOptions {
@@ -112,6 +154,13 @@ export class AuctionClient {
     this._fetch = opts.fetch ?? fetch;
   }
 
+  async postTask(
+    input: PostTaskInput & { workflow_mode: "protocol_core" },
+  ): Promise<ProtocolCorePostTaskResult>;
+  async postTask(
+    input: PostTaskInput & { workflow_mode?: "product_demo" | undefined },
+  ): Promise<ProductDemoPostTaskResult>;
+  async postTask(input: PostTaskInput): Promise<PostTaskResult>;
   async postTask(input: PostTaskInput): Promise<PostTaskResult> {
     return await this.request<PostTaskResult>("POST", "/api/v1/tasks", {
       ...input,

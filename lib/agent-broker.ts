@@ -226,7 +226,7 @@ export function rankAgentContacts(input: RankContactsInput): BrokeredAgentContac
         reasons.push(`needs ${contact.auth_env ?? "API key"} for live tools`);
       }
       if (contact.execution_status === "mock_unconnected") {
-        reasons.push("mock catalog entry; no live execution endpoint");
+        reasons.push("strict no-mock: no live execution endpoint");
       }
       if (contact.execution_status === "needs_vendor_a2a_endpoint") {
         reasons.push("needs vendor A2A endpoint before execution");

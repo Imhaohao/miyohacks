@@ -10,6 +10,11 @@ import {
   EXECUTION_STATUS_LABELS,
   classifyAgentExecution,
 } from "@/lib/agent-execution-status";
+import {
+  mockPolicyForExecutionStatus,
+  mockPolicyMetadata,
+} from "@/lib/mock-policy";
+import { rosterMetadataFor } from "@/lib/specialists/roster";
 import type { AgentExecutionStatus, SpecialistConfig } from "@/lib/types";
 import { CheckCircle, Plug, ShieldWarning } from "@phosphor-icons/react";
 
@@ -80,6 +85,8 @@ export function SpecialistCard({
   const disputeRate = total === 0 ? 0 : (disputes / total) * 100;
 
   const executionStatus = spec.execution_status ?? classifyAgentExecution(spec);
+  const roster = rosterMetadataFor(spec);
+  const mockPolicy = mockPolicyMetadata(mockPolicyForExecutionStatus(executionStatus));
   const hasMcpEndpoint = !!spec.mcp_endpoint;
   const mcpConnected = hasMcpEndpoint && !!spec.is_verified;
 
@@ -110,6 +117,15 @@ export function SpecialistCard({
                 {EXECUTION_STATUS_LABELS[executionStatus]}
               </Pill>
             )}
+            <Pill
+              tone={roster.canonical_v0 ? "success" : "neutral"}
+              title={roster.roster_description}
+            >
+              {roster.roster_label}
+            </Pill>
+            <Pill tone="neutral" title={mockPolicy.mock_policy_description}>
+              {mockPolicy.mock_policy_label}
+            </Pill>
           </span>
         }
         meta={spec.sponsor}
@@ -124,9 +140,19 @@ export function SpecialistCard({
           tone={executionStatusTone(executionStatus)}
         />
         <TrustStat
+          label="Connection"
+          value={connectionStateLabel(executionStatus)}
+          tone={connectionTone(executionStatus)}
+        />
+        <TrustStat
           label="Baseline"
           value={formatMoney(spec.cost_baseline)}
           tone="neutral"
+        />
+        <TrustStat
+          label="Mock policy"
+          value={mockPolicy.mock_policy_label}
+          tone={mockPolicy.mock_policy === "demo_mock_llm" ? "warning" : "neutral"}
         />
         <TrustStat
           label="Verified"
@@ -213,6 +239,7 @@ export function SpecialistCard({
 function executionTone(status: AgentExecutionStatus) {
   if (status === "native_mcp" || status === "native_a2a") return "success";
   if (status === "arbor_real_adapter") return "info";
+  if (status === "arbor_sandbox_adapter") return "warning";
   if (status === "needs_vendor_a2a_endpoint") return "warning";
   return "danger";
 }
@@ -229,6 +256,33 @@ function executionStatusTone(
   }
   if (status === "needs_vendor_a2a_endpoint") return "warning";
   return "neutral";
+}
+
+function connectionTone(
+  status: AgentExecutionStatus,
+): "success" | "warning" | "neutral" {
+  if (
+    status === "native_mcp" ||
+    status === "native_a2a" ||
+    status === "arbor_real_adapter"
+  ) {
+    return "success";
+  }
+  if (status === "needs_vendor_a2a_endpoint") return "warning";
+  return "neutral";
+}
+
+function connectionStateLabel(status: AgentExecutionStatus) {
+  if (
+    status === "native_mcp" ||
+    status === "native_a2a" ||
+    status === "arbor_real_adapter"
+  ) {
+    return "Verified";
+  }
+  if (status === "arbor_sandbox_adapter") return "Configured";
+  if (status === "needs_vendor_a2a_endpoint") return "Degraded";
+  return "Unavailable";
 }
 
 function TrustStat({

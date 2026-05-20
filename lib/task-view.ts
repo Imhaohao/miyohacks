@@ -15,6 +15,7 @@ import type {
   JudgeVerdict,
   PaymentStatus,
   TaskStatus,
+  TaskWorkflowMode,
 } from "./types";
 
 export interface TaskPlanStep {
@@ -28,6 +29,7 @@ export interface TaskDoc {
   _creationTime: number;
   posted_by: string;
   task_type: string;
+  workflow_mode?: TaskWorkflowMode;
   prompt: string;
   max_budget: number;
   payment_status?: PaymentStatus;
@@ -36,7 +38,17 @@ export interface TaskDoc {
   bid_window_closes_at: number;
   winning_bid_id?: string;
   price_paid?: number;
-  result?: { text: string; agent_id: string; artifact?: ExecutionArtifact } | unknown;
+  result?:
+    | {
+        text: string;
+        agent_id: string;
+        artifact?: ExecutionArtifact;
+        output_schema_validation?: {
+          ok: true;
+          candidate: "artifact" | "text_json" | "text";
+        };
+      }
+    | unknown;
   judge_verdict?: JudgeVerdict;
   output_schema?: Record<string, unknown>;
   target_repo?: string;
@@ -78,6 +90,7 @@ export interface BidDoc {
   task_id: string;
   agent_id: string;
   agent_role?: AgentRole;
+  /** Integer credits (100 credits = $1). */
   bid_price: number;
   capability_claim: string;
   estimated_seconds: number;
@@ -104,10 +117,15 @@ export interface BidDoc {
       | "native_mcp"
       | "native_a2a"
       | "arbor_real_adapter"
+      | "arbor_sandbox_adapter"
       | "needs_vendor_a2a_endpoint"
       | "mock_unconnected";
     endpoint_host?: string;
     proof?: string;
+    sandbox?: boolean;
+    mock_policy?: "strict_no_mock" | "demo_mock_llm";
+    mock_policy_label?: string;
+    mock_policy_description?: string;
   };
 }
 
@@ -117,6 +135,7 @@ export interface EscrowDoc {
   task_id: string;
   buyer_id: string;
   seller_id: string;
+  /** Integer credits (100 credits = $1). */
   locked_amount: number;
   platform_fee?: number;
   agent_net_amount?: number;
@@ -166,6 +185,7 @@ export interface AuctionBidSummary {
   bid_id: string;
   agent_id: AgentId;
   agent_role?: AgentRole;
+  /** Integer credits (100 credits = $1). */
   bid_price: number;
   score: number;
   capability_claim: string;
@@ -192,10 +212,15 @@ export interface AuctionBidSummary {
       | "native_mcp"
       | "native_a2a"
       | "arbor_real_adapter"
+      | "arbor_sandbox_adapter"
       | "needs_vendor_a2a_endpoint"
       | "mock_unconnected";
     endpoint_host?: string;
     proof?: string;
+    sandbox?: boolean;
+    mock_policy?: "strict_no_mock" | "demo_mock_llm";
+    mock_policy_label?: string;
+    mock_policy_description?: string;
   };
 }
 

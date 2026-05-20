@@ -5,6 +5,13 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { JudgeVerdict } from "../lib/types";
 
+const HUMAN_OVERRIDE_GOVERNANCE = {
+  source: "human_override",
+  affects_reputation: false,
+  reputation_authority: "canonical_judge_only",
+  settlement_authority: "human_governance_override",
+} as const;
+
 /**
  * Re-runs the judge with the dispute reason injected. Reputation and escrow
  * effects then flow through the standard settle action.
@@ -14,8 +21,12 @@ export const raise = action({
   handler: async (ctx, args) => {
     await ctx.runMutation(internal.lifecycle.log, {
       task_id: args.task_id,
-      event_type: "judge_verdict",
-      payload: { dispute_opened: true, reason: args.reason },
+      event_type: "dispute_raised",
+      payload: {
+        reason: args.reason,
+        next_step: "rerun_canonical_judge",
+        reputation_authority: "llm_judge",
+      },
     });
     await ctx.scheduler.runAfter(0, internal.auctions.judge, {
       task_id: args.task_id,
@@ -27,7 +38,8 @@ export const raise = action({
 
 /**
  * Human override: unlike `raise`, this does not ask the model judge again.
- * It records an auditable buyer/operator decision and updates escrow/status.
+ * It records an auditable buyer/operator decision and updates escrow/status,
+ * but it does not mutate canonical judge-derived reputation.
  */
 export const override = action({
   args: {
@@ -49,6 +61,7 @@ export const override = action({
         args.verdict === "accept"
           ? Math.max(0.7, task.judge_verdict?.quality_score ?? 0.8)
           : Math.min(0.3, task.judge_verdict?.quality_score ?? 0.2),
+      ...HUMAN_OVERRIDE_GOVERNANCE,
     };
 
     await ctx.runMutation(internal.tasks._setVerdict, {
@@ -70,6 +83,7 @@ export const override = action({
         verdict: args.verdict,
         reason: args.reason,
         original_verdict: task.judge_verdict ?? null,
+        ...HUMAN_OVERRIDE_GOVERNANCE,
       },
     });
 
@@ -87,6 +101,7 @@ export const override = action({
           synthesized: true,
           quality_score: overrideVerdict.quality_score,
           reason: args.reason,
+          ...HUMAN_OVERRIDE_GOVERNANCE,
         },
       });
       return { ok: true, verdict: args.verdict };
@@ -120,6 +135,7 @@ export const override = action({
           new_score: agent?.reputation_score ?? 0,
           price_paid: task.price_paid,
           reason: args.reason,
+          ...HUMAN_OVERRIDE_GOVERNANCE,
         },
       });
     } else {
@@ -143,6 +159,7 @@ export const override = action({
           new_score: agent?.reputation_score ?? 0,
           price_paid: task.price_paid,
           reason: args.reason,
+          ...HUMAN_OVERRIDE_GOVERNANCE,
         },
       });
     }

@@ -143,7 +143,32 @@ export function ExecutionPanel({ task, events }: Props) {
       {artifact?.kind === "campaign_launch" ? (
         <LaunchProduct artifact={artifact} />
       ) : artifact?.kind === "implementation_plan" ? (
-        <ImplementationPlanProduct artifact={artifact} />
+        <div className="space-y-4">
+          <div className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm leading-relaxed text-ink-muted">
+            <p className="font-medium text-ink">Plan-phase deliverable</p>
+            <p className="mt-1">
+              Engineering tasks run specialists in{" "}
+              <span className="font-medium text-ink">plan-for-approval</span> mode
+              first: you get their full report plus a structured build plan, not a
+              merged PR yet. Scroll to{" "}
+              <span className="font-medium text-ink">Agent report</span> for the
+              narrative; use step 3 (Approve) before expecting paid code changes.
+            </p>
+          </div>
+          {(artifact.agent_report?.trim() || text.trim()) && (
+            <section>
+              <h3 className="mb-2 text-sm font-semibold text-ink">
+                Agent report
+              </h3>
+              <div className="rounded-xl border border-line bg-surface-subtle p-4">
+                <MarkdownLite
+                  text={artifact.agent_report?.trim() || text}
+                />
+              </div>
+            </section>
+          )}
+          <ImplementationPlanProduct artifact={artifact} />
+        </div>
       ) : text ? (
         <MarkdownLite text={text} />
       ) : (

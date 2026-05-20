@@ -19,6 +19,12 @@ import {
   assertTaskReadable,
   requireAccountId,
 } from "./authHelpers";
+import {
+  initialStatusForWorkflow,
+  isProtocolCoreWorkflow,
+  normalizeTaskWorkflowMode,
+} from "../lib/task-workflow";
+import type { TaskWorkflowMode } from "../lib/types";
 
 export const BID_WINDOW_SECONDS = 15;
 
@@ -37,6 +43,11 @@ const taskStatusValidator = v.union(
   v.literal("disputed"),
   v.literal("failed"),
   v.literal("cancelled"),
+);
+
+const workflowModeValidator = v.union(
+  v.literal("product_demo"),
+  v.literal("protocol_core"),
 );
 
 function cleanOptional(value: string | undefined): string | undefined {
@@ -69,6 +80,7 @@ interface CreateTaskArgs {
   output_schema?: unknown;
   target_repo?: string;
   target_branch?: string;
+  workflow_mode?: TaskWorkflowMode;
   business_context?: string;
   repo_context?: string;
   source_hints?: string[];
@@ -88,7 +100,9 @@ async function latestProfileForTask(ctx: MutationCtx, args: CreateTaskArgs) {
 async function createTask(ctx: MutationCtx, args: CreateTaskArgs) {
   const now = Date.now();
   const closesAt = now + BID_WINDOW_SECONDS * 1000;
-  const profile = await latestProfileForTask(ctx, args);
+  const workflowMode = normalizeTaskWorkflowMode(args.workflow_mode);
+  const protocolCore = isProtocolCoreWorkflow(workflowMode);
+  const profile = protocolCore ? null : await latestProfileForTask(ctx, args);
 
   const profileBusiness = profile
     ? [
@@ -125,7 +139,8 @@ async function createTask(ctx: MutationCtx, args: CreateTaskArgs) {
     target_branch: cleanOptional(args.target_branch),
     payment_status: "unfunded",
     output_schema: args.output_schema,
-    status: "planning",
+    workflow_mode: workflowMode,
+    status: initialStatusForWorkflow(workflowMode),
     bid_window_seconds: BID_WINDOW_SECONDS,
     bid_window_closes_at: closesAt,
     project_id: args.project_id,
@@ -138,23 +153,27 @@ async function createTask(ctx: MutationCtx, args: CreateTaskArgs) {
     amount: args.max_budget,
   });
 
-  const orchestrationContext = buildOrchestrationContext({
-    prompt: args.prompt,
-    taskType: args.task_type ?? "general",
-    businessContext,
-    repoContext,
-    sourceHints,
-  });
+  const orchestrationContext = protocolCore
+    ? null
+    : buildOrchestrationContext({
+        prompt: args.prompt,
+        taskType: args.task_type ?? "general",
+        businessContext,
+        repoContext,
+        sourceHints,
+      });
 
-  await ctx.db.insert("task_contexts", {
-    task_id,
-    version: orchestrationContext.version,
-    business: orchestrationContext.business,
-    repo: orchestrationContext.repo,
-    routing: orchestrationContext.routing,
-    prompt_addendum: orchestrationContext.prompt_addendum,
-    created_at: now,
-  });
+  if (orchestrationContext) {
+    await ctx.db.insert("task_contexts", {
+      task_id,
+      version: orchestrationContext.version,
+      business: orchestrationContext.business,
+      repo: orchestrationContext.repo,
+      routing: orchestrationContext.routing,
+      prompt_addendum: orchestrationContext.prompt_addendum,
+      created_at: now,
+    });
+  }
 
   await ctx.runMutation(internal.lifecycle.log, {
     task_id,
@@ -166,43 +185,56 @@ async function createTask(ctx: MutationCtx, args: CreateTaskArgs) {
       max_budget: args.max_budget,
       target_repo: cleanOptional(args.target_repo),
       target_branch: cleanOptional(args.target_branch),
+      workflow_mode: workflowMode,
     },
   });
 
-  await ctx.runMutation(internal.lifecycle.log, {
-    task_id,
-    event_type: "context_enriched",
-    payload: orchestrationContext,
-  });
-
-  if (profile) {
+  if (orchestrationContext) {
     await ctx.runMutation(internal.lifecycle.log, {
       task_id,
-      event_type: "product_context_attached",
-      payload: {
-        profile_id: profile._id,
-        project_id: profile.project_id,
-        company_name: profile.company_name,
-        has_product_url: Boolean(profile.product_url),
-        has_github_repo: Boolean(profile.github_repo_url),
-        source_hint_count: sourceHints.length,
-        hyperspell_status: profile.hyperspell_status,
-      },
+      event_type: "context_enriched",
+      payload: orchestrationContext,
     });
+
+    if (profile) {
+      await ctx.runMutation(internal.lifecycle.log, {
+        task_id,
+        event_type: "product_context_attached",
+        payload: {
+          profile_id: profile._id,
+          project_id: profile.project_id,
+          company_name: profile.company_name,
+          has_product_url: Boolean(profile.product_url),
+          has_github_repo: Boolean(profile.github_repo_url),
+          source_hint_count: sourceHints.length,
+          hyperspell_status: profile.hyperspell_status,
+        },
+      });
+    }
   }
 
-  await ctx.scheduler.runAfter(0, internal.planning.decompose, { task_id });
+  if (protocolCore) {
+    await ctx.scheduler.runAfter(0, internal.auctions.solicitBids, { task_id });
+    await ctx.scheduler.runAfter(
+      BID_WINDOW_SECONDS * 1000,
+      internal.auctions.resolve,
+      { task_id },
+    );
+  } else {
+    await ctx.scheduler.runAfter(0, internal.planning.decompose, { task_id });
+  }
 
   return {
     task_id,
-    status: "planning" as const,
+    status: initialStatusForWorkflow(workflowMode),
+    workflow_mode: workflowMode,
     bid_window_closes_at: closesAt,
   };
 }
 
 /**
- * Post a new task. Creates the row in `bidding`, schedules bid solicitation
- * immediately and the auction resolution at window close.
+ * Post a new task. Defaults to the product/demo workflow; callers may pass
+ * workflow_mode: "protocol_core" to start directly in bidding.
  */
 export const post = mutation({
   args: {
@@ -213,6 +245,7 @@ export const post = mutation({
     output_schema: v.optional(v.any()),
     target_repo: v.optional(v.string()),
     target_branch: v.optional(v.string()),
+    workflow_mode: v.optional(workflowModeValidator),
     business_context: v.optional(v.string()),
     repo_context: v.optional(v.string()),
     source_hints: v.optional(v.array(v.string())),
@@ -231,6 +264,7 @@ export const postAuthenticated = mutation({
     output_schema: v.optional(v.any()),
     target_repo: v.optional(v.string()),
     target_branch: v.optional(v.string()),
+    workflow_mode: v.optional(workflowModeValidator),
     business_context: v.optional(v.string()),
     repo_context: v.optional(v.string()),
     source_hints: v.optional(v.array(v.string())),
@@ -245,6 +279,103 @@ export const postAuthenticated = mutation({
   },
 });
 
+/**
+ * Live-money variant: create a task pending Stripe checkout. Skips the
+ * credit-wallet reservation and parks the task in `checkout_pending` /
+ * `funding_mode: "live"`. The Stripe webhook flips it to `live_funded` and
+ * starts the auction via `startAuctionAfterFunding`.
+ */
+export const postLivePending = mutation({
+  args: {
+    server_secret: v.optional(v.string()),
+    account_id: v.string(),
+    project_id: v.optional(v.id("projects")),
+    task_type: v.optional(v.string()),
+    prompt: v.string(),
+    max_budget: v.number(),
+    output_schema: v.optional(v.any()),
+    target_repo: v.optional(v.string()),
+    target_branch: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    requireServerSecret(args.server_secret);
+    const project =
+      args.project_id !== undefined
+        ? await assertProjectOwned(ctx, args.project_id, args.account_id)
+        : await ctx.db
+            .query("projects")
+            .withIndex("by_owner", (q) =>
+              q.eq("owner_account_id", args.account_id),
+            )
+            .order("asc")
+            .first();
+    if (!project) throw new Error("project not found");
+    const profile = await latestProfileForTask(ctx, {
+      posted_by: args.account_id,
+      project_id: project._id,
+      prompt: args.prompt,
+      max_budget: args.max_budget,
+    });
+    const now = Date.now();
+    const closesAt = now + BID_WINDOW_SECONDS * 1000;
+    const task_id = await ctx.db.insert("tasks", {
+      posted_by: args.account_id,
+      task_type: args.task_type ?? "general",
+      prompt: args.prompt,
+      max_budget: args.max_budget,
+      target_repo: cleanOptional(args.target_repo),
+      target_branch: cleanOptional(args.target_branch),
+      payment_status: "checkout_pending",
+      funding_mode: "live",
+      output_schema: args.output_schema,
+      status: "open",
+      bid_window_seconds: BID_WINDOW_SECONDS,
+      bid_window_closes_at: closesAt,
+      project_id: project._id,
+      product_context_profile_id: profile?._id,
+    });
+    await ctx.runMutation(internal.lifecycle.log, {
+      task_id,
+      event_type: "task_posted",
+      payload: {
+        posted_by: args.account_id,
+        prompt: args.prompt,
+        max_budget: args.max_budget,
+        funding_mode: "live",
+        payment_status: "checkout_pending",
+      },
+    });
+    return { task_id, status: "open" as const };
+  },
+});
+
+/**
+ * Called by the Stripe webhook once `checkout.session.completed` is verified
+ * for a live-funded task. Promotes the task into the standard planning path.
+ */
+export const startAuctionAfterFunding = mutation({
+  args: {
+    server_secret: v.optional(v.string()),
+    task_id: v.id("tasks"),
+  },
+  handler: async (ctx, args) => {
+    requireServerSecret(args.server_secret);
+    const task = await ctx.db.get(args.task_id);
+    if (!task) throw new Error("task not found");
+    if (
+      task.payment_status !== "live_funded" &&
+      task.payment_status !== "checkout_pending"
+    ) {
+      return { ok: false, payment_status: task.payment_status };
+    }
+    await ctx.db.patch(args.task_id, { status: "planning" });
+    await ctx.scheduler.runAfter(0, internal.planning.decompose, {
+      task_id: args.task_id,
+    });
+    return { ok: true };
+  },
+});
+
 export const postForAccount = mutation({
   args: {
     server_secret: v.optional(v.string()),
@@ -256,6 +387,7 @@ export const postForAccount = mutation({
     output_schema: v.optional(v.any()),
     target_repo: v.optional(v.string()),
     target_branch: v.optional(v.string()),
+    workflow_mode: v.optional(workflowModeValidator),
     business_context: v.optional(v.string()),
     repo_context: v.optional(v.string()),
     source_hints: v.optional(v.array(v.string())),
@@ -282,6 +414,7 @@ export const postForAccount = mutation({
       output_schema: args.output_schema,
       target_repo: args.target_repo,
       target_branch: args.target_branch,
+      workflow_mode: args.workflow_mode,
       business_context: args.business_context,
       repo_context: args.repo_context,
       source_hints: args.source_hints,
@@ -313,6 +446,7 @@ export const _createChild = internalMutation({
       prompt: args.prompt,
       max_budget: args.max_budget,
       payment_status: "funds_reserved",
+      workflow_mode: "product_demo",
       status: "bidding",
       bid_window_seconds: BID_WINDOW_SECONDS,
       bid_window_closes_at: closesAt,
@@ -448,6 +582,7 @@ export const getBundleForAccount = query({
       executionPlan,
       approvalEvents,
       paymentLedger,
+      taskPayment,
       children,
     ] = await Promise.all([
       !areBidsVisible(Date.now(), task.bid_window_closes_at)
@@ -492,6 +627,10 @@ export const getBundleForAccount = query({
         .collect()
         .then((rows) => rows.sort((a, b) => a.created_at - b.created_at)),
       ctx.db
+        .query("task_payments")
+        .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
+        .first(),
+      ctx.db
         .query("tasks")
         .withIndex("by_parent", (q) => q.eq("parent_task_id", args.task_id))
         .collect()
@@ -509,6 +648,7 @@ export const getBundleForAccount = query({
       execution_plan: executionPlan,
       approval_events: approvalEvents,
       payment_ledger: paymentLedger,
+      payment_provenance: taskPayment,
       children,
     };
   },

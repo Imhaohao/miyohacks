@@ -2,18 +2,26 @@
   "name": "arbor",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.12.0"
+  },
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
     "dev": "next dev",
+    "jira-agent:dev": "tsx services/jira-agent/server.ts",
     "build": "next build",
     "mcp:stdio": "tsx scripts/mcp-stdio.ts",
     "mcp:stdio:extensions": "tsx scripts/mcp-stdio.ts --surface extensions",
     "example:mcp-stdio": "tsx examples/mcp-stdio-client.ts",
+    "demo:harness": "tsx scripts/demo-success-harness.ts",
     "start": "next start",
     "lint": "next lint",
-    "convex:dev": "convex dev",
+    "convex:dev": "NODE_OPTIONS='--require ./scripts/node-styleText-polyfill.cjs' convex dev",
+    "convex:once": "NODE_OPTIONS='--require ./scripts/node-styleText-polyfill.cjs' convex dev --once",
+    "convex:env:sync-payment-secret": "node scripts/sync-convex-payment-secret.mjs",
+    "grant:credits": "tsx scripts/grant-buyer-credits-once.ts",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

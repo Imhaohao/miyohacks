@@ -12,15 +12,22 @@ import {
   isSandboxA2AEnabled,
   SANDBOX_DISCLOSURE_TEXT,
 } from "../agent-execution-status";
+import {
+  mockPolicyForExecutionStatus,
+  mockPolicyMetadata,
+} from "../mock-policy";
 import { discoverTools, type RemoteMcpTool } from "../mcp-outbound";
-import type { BidPayload, SpecialistConfig } from "../types";
+import type { AgentConnectionState, BidPayload, SpecialistConfig } from "../types";
 
 export type ConnectionProtocol = "mcp" | "a2a" | "arbor_a2a_bridge" | "none";
 export type ConnectionProbeStatus =
   | "available"
   | "missing_auth"
   | "not_configured"
-  | "unreachable";
+  | "unreachable"
+  | "timeout"
+  | "auth_failed"
+  | "protocol_error";
 
 export interface SpecialistConnection {
   protocol: ConnectionProtocol;
@@ -43,6 +50,17 @@ export interface ConnectionProbe {
   toolCount?: number;
   toolNames?: string[];
   cardName?: string;
+  checkedAt: string;
+  latencyMs?: number;
+}
+
+export interface ConnectionTruth {
+  configured: ToolAvailability;
+  probe?: ConnectionProbe;
+  connection_state: AgentConnectionState;
+  effective_connected: boolean;
+  last_probe_at?: string;
+  last_probe_reason?: string;
 }
 
 export interface A2AExecutionResult {
@@ -56,6 +74,40 @@ type ToolAvailability = NonNullable<BidPayload["tool_availability"]>;
 function trim(value: string | undefined): string | undefined {
   const v = value?.trim();
   return v ? v : undefined;
+}
+
+const PROBE_TTL_MS = Number(process.env.ARBOR_CONNECTIVITY_PROBE_TTL_MS ?? "60000");
+function isProbeEnabled() {
+  return (
+    (process.env.ARBOR_CONNECTIVITY_PROBE_ENABLED ?? "true").toLowerCase() !==
+    "false"
+  );
+}
+
+const probeCache = new Map<
+  string,
+  { expiresAt: number; value: ConnectionProbe }
+>();
+
+function logProbe(config: SpecialistConfig, probe: ConnectionProbe) {
+  const endpoint = probe.endpointUrl ?? probe.agentCardUrl ?? "";
+  let endpointHash = "none";
+  if (endpoint) {
+    try {
+      endpointHash = Buffer.from(endpoint).toString("base64").slice(0, 12);
+    } catch {
+      endpointHash = endpoint.slice(0, 12);
+    }
+  }
+  console.info("[connection-probe]", {
+    agent_id: config.agent_id,
+    protocol: probe.protocol,
+    status: probe.status,
+    reason: probe.reason,
+    checked_at: probe.checkedAt,
+    latency_ms: probe.latencyMs,
+    endpoint_hash: endpointHash,
+  });
 }
 
 export function getSpecialistConnection(
@@ -131,10 +183,11 @@ export function configuredConnectionAvailability(
     protocol: connection.protocol,
     execution_status: executionStatus,
     endpoint_host: endpointHost(connection.endpointUrl ?? connection.agentCardUrl),
+    ...mockPolicyMetadata(mockPolicyForExecutionStatus(executionStatus)),
   } satisfies Partial<ToolAvailability>;
 
-  // Sandbox A2A: when env-flagged, otherwise inactive A2A contacts surface as
-  // available via the sandbox adapter. The disclosure flag tells callers to
+  // Demo mock LLM policy: when enabled, otherwise inactive A2A contacts surface
+  // as available via the sandbox adapter. The disclosure flag tells callers to
   // label output as sandbox rather than vendor-native.
   if (
     effectiveStatus === "arbor_sandbox_adapter" &&
@@ -145,10 +198,12 @@ export function configuredConnectionAvailability(
     return {
       ...base,
       status: "available",
-      checked: [...checked, "ENABLE_SANDBOX_A2A=true"],
+      checked: [...checked, "ARBOR_MOCK_POLICY=demo_mock_llm"],
       reason: SANDBOX_DISCLOSURE_TEXT,
       sandbox: true,
       proof: `sandbox runner: ${config.agent_id}`,
+      connection_state: "configured",
+      effective_connected: true,
     };
   }
 
@@ -159,7 +214,9 @@ export function configuredConnectionAvailability(
       status: "missing",
       checked: [...checked, "execution_status"],
       reason:
-        "mock catalog entry has no real execution endpoint; Arbor will not use a ChatGPT placeholder",
+        "strict no-mock policy: mock catalog entry has no real execution endpoint; Arbor will not use a ChatGPT placeholder",
+      connection_state: "unavailable",
+      effective_connected: false,
     };
   }
 
@@ -169,7 +226,10 @@ export function configuredConnectionAvailability(
       execution_status: intrinsicStatus,
       status: "missing",
       checked: [...checked, "execution_status"],
-      reason: "real vendor A2A endpoint is required before this agent can bid",
+      reason:
+        "strict no-mock policy: real vendor A2A endpoint is required before this agent can bid",
+      connection_state: "unavailable",
+      effective_connected: false,
     };
   }
 
@@ -179,6 +239,8 @@ export function configuredConnectionAvailability(
       status: "missing",
       checked,
       reason: `missing required credential${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`,
+      connection_state: "unavailable",
+      effective_connected: false,
     };
   }
 
@@ -188,6 +250,8 @@ export function configuredConnectionAvailability(
       status: "available",
       checked,
       reason: "native MCP endpoint is configured",
+      connection_state: "configured",
+      effective_connected: true,
     };
   }
 
@@ -197,6 +261,8 @@ export function configuredConnectionAvailability(
       status: "available",
       checked,
       reason: "native A2A endpoint is configured",
+      connection_state: "configured",
+      effective_connected: true,
     };
   }
 
@@ -206,6 +272,8 @@ export function configuredConnectionAvailability(
       status: "available",
       checked,
       reason: "Arbor-hosted A2A bridge is configured",
+      connection_state: "configured",
+      effective_connected: true,
     };
   }
 
@@ -215,6 +283,8 @@ export function configuredConnectionAvailability(
       status: "manual",
       checked,
       reason: "manual specialist; no live API credential required",
+      connection_state: "configured",
+      effective_connected: false,
     };
   }
 
@@ -224,6 +294,8 @@ export function configuredConnectionAvailability(
       status: "missing",
       checked,
       reason: "A2A protocol selected but no native endpoint is configured",
+      connection_state: "unavailable",
+      effective_connected: false,
     };
   }
 
@@ -232,7 +304,10 @@ export function configuredConnectionAvailability(
       ...base,
       status: "mock",
       checked,
-      reason: "mock specialist; output is synthetic",
+      reason:
+        "strict no-mock policy: mock specialist is catalog-only unless demo_mock_llm is explicitly enabled",
+      connection_state: "configured",
+      effective_connected: false,
     };
   }
 
@@ -240,7 +315,10 @@ export function configuredConnectionAvailability(
     ...base,
     status: "mock",
     checked,
-    reason: "no MCP or A2A execution connection is configured",
+    reason:
+      "strict no-mock policy: no MCP or A2A execution connection is configured",
+    connection_state: "unavailable",
+    effective_connected: false,
   };
 }
 
@@ -248,6 +326,7 @@ function probeFromUnavailable(
   connection: SpecialistConnection,
   status: ConnectionProbeStatus,
   reason: string,
+  extras?: Partial<Pick<ConnectionProbe, "latencyMs">>,
 ): ConnectionProbe {
   const missing = missingCredential(connection);
   return {
@@ -262,72 +341,184 @@ function probeFromUnavailable(
     reason,
     endpointUrl: connection.endpointUrl,
     agentCardUrl: connection.agentCardUrl,
+    checkedAt: new Date().toISOString(),
+    ...(extras?.latencyMs !== undefined ? { latencyMs: extras.latencyMs } : {}),
   };
+}
+
+function classifyProbeError(err: unknown): ConnectionProbeStatus {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  if (message.includes("timed out") || message.includes("timeout")) {
+    return "timeout";
+  }
+  if (
+    message.includes("unauthorized") ||
+    message.includes("forbidden") ||
+    message.includes("invalid api key") ||
+    message.includes("401") ||
+    message.includes("403")
+  ) {
+    return "auth_failed";
+  }
+  if (
+    message.includes("json-rpc") ||
+    message.includes("invalid json") ||
+    message.includes("protocol")
+  ) {
+    return "protocol_error";
+  }
+  return "unreachable";
 }
 
 export async function probeSpecialistConnection(
   config: SpecialistConfig,
+  options?: { force?: boolean },
 ): Promise<ConnectionProbe> {
+  const cacheKey = config.agent_id;
+  const now = Date.now();
+  const cached = probeCache.get(cacheKey);
+  if (
+    !options?.force &&
+    cached &&
+    cached.expiresAt > now
+  ) {
+    return cached.value;
+  }
   const connection = getSpecialistConnection(config);
   if (connection.protocol === "none") {
-    return probeFromUnavailable(
+    const probe = probeFromUnavailable(
       connection,
       "not_configured",
       "no MCP or A2A endpoint is configured",
     );
+    probeCache.set(cacheKey, { value: probe, expiresAt: now + PROBE_TTL_MS });
+    logProbe(config, probe);
+    return probe;
   }
   const missing = missingCredential(connection);
   if (missing.length > 0) {
-    return probeFromUnavailable(
+    const probe = probeFromUnavailable(
       connection,
       "missing_auth",
       `missing required credential${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`,
     );
+    probeCache.set(cacheKey, { value: probe, expiresAt: now + PROBE_TTL_MS });
+    return probe;
   }
 
   if (connection.protocol === "mcp") {
+    const startedAt = Date.now();
     try {
       const tools = await discoverTools(connection.endpointUrl!, connection.apiKey);
-      return {
+      const probe = {
         ...probeFromUnavailable(
           connection,
           "available",
           `native MCP endpoint returned ${tools.length} tool${tools.length === 1 ? "" : "s"}`,
+          { latencyMs: Date.now() - startedAt },
         ),
         toolCount: tools.length,
         toolNames: tools.slice(0, 12).map((tool: RemoteMcpTool) => tool.name),
       };
+      probeCache.set(cacheKey, { value: probe, expiresAt: now + PROBE_TTL_MS });
+      logProbe(config, probe);
+      return probe;
     } catch (err) {
-      return probeFromUnavailable(
+      const probe = probeFromUnavailable(
         connection,
-        "unreachable",
+        classifyProbeError(err),
         err instanceof Error ? err.message : String(err),
+        { latencyMs: Date.now() - startedAt },
       );
+      probeCache.set(cacheKey, { value: probe, expiresAt: now + PROBE_TTL_MS });
+      logProbe(config, probe);
+      return probe;
     }
   }
 
+  const startedAt = Date.now();
   try {
     let card: A2AAgentCard | undefined;
     if (connection.agentCardUrl) {
       card = await fetchAgentCard(connection.agentCardUrl, connection.apiKey);
     }
-    return {
+    const probe = {
       ...probeFromUnavailable(
         connection,
         "available",
         connection.protocol === "arbor_a2a_bridge"
           ? "Arbor-hosted A2A bridge is reachable"
           : "native A2A agent card is reachable",
+        { latencyMs: Date.now() - startedAt },
       ),
       cardName: card?.name,
     };
+    probeCache.set(cacheKey, { value: probe, expiresAt: now + PROBE_TTL_MS });
+    logProbe(config, probe);
+    return probe;
   } catch (err) {
-    return probeFromUnavailable(
+    const probe = probeFromUnavailable(
       connection,
-      "unreachable",
+      classifyProbeError(err),
       err instanceof Error ? err.message : String(err),
+      { latencyMs: Date.now() - startedAt },
     );
+    probeCache.set(cacheKey, { value: probe, expiresAt: now + PROBE_TTL_MS });
+    logProbe(config, probe);
+    return probe;
   }
+}
+
+function connectionStateFromTruth(args: {
+  configuredStatus: ToolAvailability["status"];
+  probe?: ConnectionProbe;
+}): AgentConnectionState {
+  const { configuredStatus, probe } = args;
+  if (configuredStatus === "available" && probe?.status === "available") {
+    return "verified";
+  }
+  if (configuredStatus === "available" && probe && probe.status !== "available") {
+    return "degraded";
+  }
+  if (configuredStatus === "available") return "configured";
+  if (configuredStatus === "manual" || configuredStatus === "mock") {
+    return "configured";
+  }
+  return "unavailable";
+}
+
+export async function assessSpecialistConnectionTruth(
+  config: SpecialistConfig,
+  options?: { forceProbe?: boolean },
+): Promise<ConnectionTruth> {
+  const configured = configuredConnectionAvailability(config);
+  const shouldProbe =
+    isProbeEnabled() &&
+    (configured.protocol === "mcp" ||
+      configured.protocol === "a2a" ||
+      configured.protocol === "arbor_a2a_bridge") &&
+    configured.status === "available";
+
+  const probe = shouldProbe
+    ? await probeSpecialistConnection(config, { force: options?.forceProbe })
+    : undefined;
+  const connection_state = connectionStateFromTruth({
+    configuredStatus: configured.status,
+    probe,
+  });
+  const effective_connected =
+    (connection_state === "verified" ||
+      (connection_state === "configured" && !shouldProbe)) &&
+    configured.status === "available";
+
+  return {
+    configured,
+    probe,
+    connection_state,
+    effective_connected,
+    last_probe_at: probe?.checkedAt,
+    last_probe_reason: probe?.reason,
+  };
 }
 
 export function toolAvailabilityFromProbe(probe: ConnectionProbe): ToolAvailability {
@@ -364,6 +555,14 @@ export function toolAvailabilityFromProbe(probe: ConnectionProbe): ToolAvailabil
       status: "available",
       checked: probe.checked,
       reason: probe.reason,
+      connection_state: "verified",
+      effective_connected: true,
+      probe_status: probe.status,
+      last_probe_at: probe.checkedAt,
+      last_probe_reason: probe.reason,
+      ...(probe.latencyMs !== undefined
+        ? { last_probe_latency_ms: probe.latencyMs }
+        : {}),
     };
   }
   return {
@@ -372,6 +571,14 @@ export function toolAvailabilityFromProbe(probe: ConnectionProbe): ToolAvailabil
     checked: probe.checked,
     missing: probe.missing,
     reason: probe.reason,
+    connection_state: "degraded",
+    effective_connected: false,
+    probe_status: probe.status,
+    last_probe_at: probe.checkedAt,
+    last_probe_reason: probe.reason,
+    ...(probe.latencyMs !== undefined
+      ? { last_probe_latency_ms: probe.latencyMs }
+      : {}),
   };
 }
 

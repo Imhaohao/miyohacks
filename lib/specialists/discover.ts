@@ -20,6 +20,8 @@ import { callOpenAIJSON } from "../openai";
 import { discoverTools } from "../mcp-outbound";
 import type { SpecialistConfig } from "../types";
 import { MCP_CATALOG, type CatalogEntry } from "./catalog";
+import { rosterMetadataFor } from "./roster";
+import { mockPolicyMetadata } from "../mock-policy";
 import {
   searchRegistry,
   resolveRegistryUrl,
@@ -228,6 +230,13 @@ function catalogEntryToConfig(
     verification_status: "configured",
     is_verified: false,
     homepage_url: entry.homepage_url,
+    ...mockPolicyMetadata("strict_no_mock"),
+    ...rosterMetadataFor({
+      agent_id: entry.agent_id,
+      discovered: true,
+      discovery_source: "catalog",
+      discovered_for: query.trim().slice(0, 240),
+    }),
     discovered: true,
     discovery_source: "catalog",
     discovered_for: query.trim().slice(0, 240),
@@ -386,6 +395,13 @@ function registryCandidateToConfig(
     verification_status: hasMissingVars ? "unverified" : "configured",
     is_verified: false,
     homepage_url: c.homepage,
+    ...mockPolicyMetadata("strict_no_mock"),
+    ...rosterMetadataFor({
+      agent_id: slug,
+      discovered: true,
+      discovery_source: "registry",
+      discovered_for: query.trim().slice(0, 240),
+    }),
     discovered: true,
     discovery_source: "registry",
     discovered_for: query.trim().slice(0, 240),
@@ -497,6 +513,13 @@ Do not duplicate any existing agent_id.`;
     discovered: true,
     discovery_source: "synthesized",
     discovered_for: query.trim().slice(0, 240),
+    ...rosterMetadataFor({
+      agent_id,
+      discovered: true,
+      discovery_source: "synthesized",
+      discovered_for: query.trim().slice(0, 240),
+    }),
+    ...mockPolicyMetadata("strict_no_mock"),
     execution_status: "mock_unconnected",
     verification_status: "mock",
   };

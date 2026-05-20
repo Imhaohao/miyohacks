@@ -2,24 +2,41 @@
 
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
+import { classifyAgentExecution } from "@/lib/agent-execution-status";
+import {
+  mockPolicyForExecutionStatus,
+  mockPolicyMetadata,
+} from "@/lib/mock-policy";
 import { SPECIALISTS } from "@/lib/specialists/registry";
+import { rosterMetadataFor } from "@/lib/specialists/roster";
 import { formatMoney, formatScore } from "@/lib/utils";
 import { CheckCircle, Plug, ShieldWarning } from "@phosphor-icons/react";
 
 export function SpecialistLeaderboard() {
   const endpointCount = SPECIALISTS.filter((s) => s.mcp_endpoint).length;
+  const canonicalCount = SPECIALISTS.filter(
+    (s) => rosterMetadataFor(s).canonical_v0,
+  ).length;
   return (
     <Card>
       <CardHeader
-        title={`Specialists · ${SPECIALISTS.length}`}
+        title={`Canonical v0 roster · ${canonicalCount}`}
         meta={
-          <span className="text-brand-700">{endpointCount} live MCP</span>
+          <span className="text-brand-700">
+            {SPECIALISTS.length - canonicalCount} demo extensions · {endpointCount} live MCP
+          </span>
         }
       />
       <div className="divide-y divide-line">
         {SPECIALISTS.map((s) => {
           const hasEndpoint = !!s.mcp_endpoint;
           const live = hasEndpoint && !!s.is_verified;
+          const roster = rosterMetadataFor(s);
+          const mockPolicy = mockPolicyMetadata(
+            mockPolicyForExecutionStatus(
+              s.execution_status ?? classifyAgentExecution(s),
+            ),
+          );
           return (
             <div
               key={s.agent_id}
@@ -54,6 +71,15 @@ export function SpecialistLeaderboard() {
                       Soft
                     </Pill>
                   )}
+                  <Pill
+                    tone={roster.canonical_v0 ? "success" : "neutral"}
+                    title={roster.roster_description}
+                  >
+                    {roster.roster_label}
+                  </Pill>
+                  <Pill tone="neutral" title={mockPolicy.mock_policy_description}>
+                    {mockPolicy.mock_policy_label}
+                  </Pill>
                 </span>
                 <span className="truncate text-xs text-ink-muted">
                   {s.sponsor} · {s.one_liner}

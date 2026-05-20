@@ -47,8 +47,13 @@ test("context labels use product language instead of vendor names", () => {
 
 test("agent registry surfaces execution status and mock counts", () => {
   assert.match(agentsPage, /EXECUTION_STATUS_LABELS/);
+  assert.match(agentsPage, /ROSTER_CLASS_LABELS/);
+  assert.match(agentsPage, /All roster classes/);
+  assert.match(agentsPage, /mock_policy_label/);
   assert.match(agentsPage, /mock_unconnected/);
   assert.match(specialistsApi, /execution_status_counts/);
+  assert.match(specialistsApi, /roster_class_counts/);
+  assert.match(specialistsApi, /mock_policy/);
 });
 
 test("public auction copy matches score-ranked clearing behavior", () => {

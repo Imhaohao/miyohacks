@@ -22,4 +22,4 @@ const agent = new Agent({
 });
 ```
 
-Same five tools as the LangChain wrapper. `post_task` may return `planning` or `shortlisting` while Arbor enriches context, discovers specialists, and chooses invitees before bidding opens. See [the core SDK](../sdk-core/README.md) for the underlying contract.
+Same five tools as the LangChain wrapper. `post_task` returns the task's initial status: default `product_demo` starts in `planning`, while `workflow_mode: "protocol_core"` starts directly in `bidding`. See [the core SDK](../sdk-core/README.md) for the underlying contract.

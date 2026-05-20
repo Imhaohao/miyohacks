@@ -22,6 +22,48 @@ function connectStatus(account: Stripe.Account) {
     : ("pending" as const);
 }
 
+async function startConnectAccount(actor: string, agentId: string, reason: string) {
+  const c = convexAdmin();
+  const existing = await c.query(api.payments.payoutAccountForAgent, {
+    agent_id: agentId,
+  });
+  if (existing) {
+    return await refreshConnectAccount(actor, agentId, reason);
+  }
+  const account = await getStripe().accounts.create({
+    type: "express",
+    capabilities: {
+      transfers: { requested: true },
+    },
+    metadata: { agent_id: agentId },
+  });
+  await c.mutation(api.payments.upsertPayoutAccount, {
+    server_secret: paymentServerSecret(),
+    agent_id: agentId,
+    stripe_connect_account_id: account.id,
+    onboarding_status: connectStatus(account),
+    charges_enabled: Boolean(account.charges_enabled),
+    payouts_enabled: Boolean(account.payouts_enabled),
+    requirements_due: account.requirements?.currently_due ?? [],
+  });
+  await logAdminEvent({
+    actor,
+    action: "start_connect_account",
+    target_type: "agent",
+    target_id: agentId,
+    reason,
+    payload: {
+      stripe_connect_account_id: account.id,
+    },
+  });
+  return {
+    ok: true,
+    started: true,
+    stripe_connect_account_id: account.id,
+    payouts_enabled: false,
+  };
+}
+
 async function refreshConnectAccount(actor: string, agentId: string, reason: string) {
   const c = convexAdmin();
   const existing = await c.query(api.payments.payoutAccountForAgent, {
@@ -140,6 +182,11 @@ export async function POST(req: NextRequest) {
     if (body.action === "refresh_connect_account") {
       return NextResponse.json(
         await refreshConnectAccount(admin.actor, body.target_id, body.reason),
+      );
+    }
+    if (body.action === "start_connect_account") {
+      return NextResponse.json(
+        await startConnectAccount(admin.actor, body.target_id, body.reason),
       );
     }
     if (body.action === "retry_payout") {

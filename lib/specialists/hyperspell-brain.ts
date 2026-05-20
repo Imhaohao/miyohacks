@@ -18,6 +18,7 @@ import type {
   SpecialistOutput,
   SpecialistRunner,
 } from "../types";
+import { usdToCredits } from "../payments";
 
 export const HYPERSPELL_BRAIN_CONFIG: SpecialistConfig = {
   agent_id: "hyperspell-brain",
@@ -100,7 +101,10 @@ export const hyperspellBrain: SpecialistRunner = {
       );
     }
     return {
-      bid_price: HYPERSPELL_BRAIN_CONFIG.cost_baseline,
+      bid_price:
+        HYPERSPELL_BRAIN_CONFIG.cost_baseline < 10
+          ? usdToCredits(HYPERSPELL_BRAIN_CONFIG.cost_baseline)
+          : Math.round(HYPERSPELL_BRAIN_CONFIG.cost_baseline),
       capability_claim:
         "I will call Hyperspell's live memory API to retrieve relevant business/workspace context, add this task brief to memory, and return cited context for the executor.",
       estimated_seconds: 60,

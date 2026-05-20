@@ -23,6 +23,7 @@ import {
 } from "@/lib/specialists/suggest";
 import { discoverSpecialist } from "@/lib/specialists/discover";
 import {
+  assessSpecialistConnectionTruth,
   configuredConnectionAvailability,
   getSpecialistConnection,
 } from "@/lib/specialists/connection-runtime";
@@ -32,12 +33,16 @@ import {
 } from "@/lib/agent-contacts";
 import {
   EXECUTION_STATUS_DESCRIPTIONS,
-  classifyAgentExecution,
+  EXECUTION_STATUS_LABELS,
+  effectiveExecutionStatus,
 } from "@/lib/agent-execution-status";
+import {
+  mockPolicyForExecutionStatus,
+  mockPolicyMetadata,
+} from "@/lib/mock-policy";
 import { rankAgentContacts } from "@/lib/agent-broker";
 import type { AgentIndustry, AgentProtocol, SpecialistConfig } from "@/lib/types";
 import {
-  amountToCents,
   checkoutMetadata,
   creditPackForCredits,
 } from "@/lib/payments";
@@ -59,6 +64,7 @@ export interface PostTaskArgs {
   prompt: string;
   max_budget: number;
   task_type?: string;
+  workflow_mode?: "product_demo" | "protocol_core";
   output_schema?: Record<string, unknown>;
   agent_id?: string;
   target_repo?: string;
@@ -172,23 +178,14 @@ function requireIdentity(identity: ApiCallerIdentity | null | undefined) {
 
 export interface ToolDefinition {
   name: string;
+  category?: "protocol_core" | "billing" | "registry" | "planning" | "admin";
   description: string;
-  category:
-    | "protocol_core"
-    | "billing"
-    | "registry"
-    | "context"
-    | "planning"
-    | "admin";
   inputSchema: Record<string, unknown>;
 }
-
-export type McpToolSurface = "core" | "extensions";
 
 export const TOOLS: ToolDefinition[] = [
   {
     name: "get_wallet",
-    category: "billing",
     description:
       "Fetch a buyer's Arbor credit wallet, including available and reserved credits.",
     inputSchema: {
@@ -203,7 +200,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "create_credit_checkout",
-    category: "billing",
     description:
       "Create a Stripe Checkout URL for buying Arbor credits. Credits are added only after the Stripe webhook confirms payment.",
     inputSchema: {
@@ -216,14 +212,13 @@ export const TOOLS: ToolDefinition[] = [
         },
         credits: {
           type: "number",
-          description: "Credit pack size: 10, 25, 100, or 250.",
+          description: "Credit pack size: 1000, 2500, 10000, or 25000.",
         },
       },
     },
   },
   {
     name: "get_agent_earnings",
-    category: "billing",
     description:
       "Fetch an agent's available earnings and Stripe Connect payout readiness.",
     inputSchema: {
@@ -236,7 +231,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "list_agent_contacts",
-    category: "registry",
     description:
       "List the 100-agent cross-industry registry. Every contact is connected through either a native MCP endpoint or Arbor-hosted A2A bridge, with protocol, health, verification, capabilities, and live reputation.",
     inputSchema: {
@@ -260,7 +254,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "suggest_agent_contacts",
-    category: "registry",
     description:
       "Run the deterministic broker ranker over the 100 connected MCP/A2A agents and return the best-fit contacts for a task.",
     inputSchema: {
@@ -278,7 +271,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "upsert_product_context",
-    category: "context",
     description:
       "Save reusable product/business/repo context for a buyer. Future post_task calls from the same agent_id automatically attach this Hyperspell/Nia context before specialists bid.",
     inputSchema: {
@@ -322,9 +314,8 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "post_task",
-    category: "protocol_core",
     description:
-      "Post work for specialist agents. Arbor may enrich context and shortlist before specialists enter a sealed-bid, reputation-weighted Vickrey-style auction; the highest reputation-per-bid executable specialist wins by default, and the clearing price comes from the next-best eligible executor's raw bid. Returns a task_id and web_view_url.",
+      "Post work for specialist agents. Agents bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring fit wins and returns either a product artifact, an implementation plan for approval, or a domain-specific deliverable. Returns a task_id and web_view_url.",
     inputSchema: {
       type: "object",
       required: ["prompt", "max_budget"],
@@ -335,22 +326,29 @@ export const TOOLS: ToolDefinition[] = [
         },
         max_budget: {
           type: "number",
-          description: "Maximum USD willing to pay. Bids above this are rejected.",
+          description:
+            "Maximum budget in integer credits (100 credits = $1). Bids above this are rejected.",
         },
         task_type: {
           type: "string",
           description:
             "Optional workflow hint, e.g. 'implementation-plan', 'pricing-experiment', 'creator-campaign', or 'reacher-live-launch'.",
         },
+        workflow_mode: {
+          type: "string",
+          enum: ["product_demo", "protocol_core"],
+          description:
+            "Optional lifecycle mode. Use 'protocol_core' for post -> bidding -> resolve -> execute -> judge -> settle.",
+        },
         output_schema: {
           type: "object",
           description:
-            "Optional JSON schema the agent's result should conform to.",
+            "Optional JSON Schema the agent's result must conform to. Arbor validates it after execution and before judging/settlement; invalid output fails the task and refunds escrow.",
         },
         agent_id: {
           type: "string",
           description:
-            "Optional legacy caller identifier. Authenticated callers should send an Arbor API key.",
+            "Optional caller identifier. Defaults to 'agent:mcp'. No auth in v0.",
         },
         target_repo: {
           type: "string",
@@ -383,7 +381,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "get_task",
-    category: "protocol_core",
     description:
       "Fetch current task state: status, bids (only after window closes), output artifact, judge verdict, context packet, wallet-backed escrow status, and payment ledger.",
     inputSchema: {
@@ -396,9 +393,8 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "list_specialists",
-    category: "protocol_core",
     description:
-      "List specialist agents with reputation, capabilities, MCP/A2A connection status, and cost baselines.",
+      "List specialist agents with reputation, capabilities, MCP/A2A connection status, roster class, and explicit mock policy.",
     inputSchema: {
       type: "object",
       properties: {
@@ -411,7 +407,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "suggest_specialists",
-    category: "registry",
     description:
       "Given a free-form goal, return the top specialist agents ranked by literal fit, with reasoning. Flags low-confidence matches so the caller knows when to use discover_specialist.",
     inputSchema: {
@@ -432,7 +427,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "discover_specialist",
-    category: "registry",
     description:
       "Synthesize a brand-new specialist agent tailored to a goal that the existing roster cannot cover well. Persists the new specialist so it can compete in future auctions. Use this when suggest_specialists returns low_confidence: true.",
     inputSchema: {
@@ -454,7 +448,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "approve_execution_plan",
-    category: "planning",
     description:
       "Approve the winning executor's execution plan so the task can move from plan_review to execution.",
     inputSchema: {
@@ -468,7 +461,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "request_plan_revision",
-    category: "planning",
     description:
       "Ask the winning executor to revise the execution plan before approval. Execution does not start.",
     inputSchema: {
@@ -483,9 +475,8 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "cancel_task",
-    category: "planning",
     description:
-      "Cancel a task before execution approval. Reserved wallet escrow is refunded and no agent executes.",
+      "Cancel a task before execution approval. Simulated escrow is refunded and no agent executes.",
     inputSchema: {
       type: "object",
       required: ["task_id"],
@@ -498,7 +489,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "raise_dispute",
-    category: "protocol_core",
     description:
       "Raise a dispute on a completed task. The judge re-evaluates with the dispute reason injected; reputation and escrow flow accordingly.",
     inputSchema: {
@@ -515,7 +505,6 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "override_judge",
-    category: "admin",
     description:
       "Human override for a judge verdict. Records an auditable override and updates settlement without re-running the model judge.",
     inputSchema: {
@@ -541,55 +530,6 @@ export const TOOLS: ToolDefinition[] = [
   },
 ];
 
-export const CORE_MCP_TOOLS = TOOLS.filter(
-  (tool) => tool.category === "protocol_core",
-);
-
-export const PRODUCT_EXTENSION_TOOLS = TOOLS.filter(
-  (tool) => tool.category !== "protocol_core",
-);
-
-export function extensionToolName(tool: ToolDefinition) {
-  if (tool.category === "protocol_core") return tool.name;
-  return `${tool.category}.${tool.name}`;
-}
-
-/**
- * Public extension endpoint tools are explicitly namespaced so MCP-first
- * clients can tell protocol tools from Arbor product/admin affordances.
- */
-export const EXTENSION_MCP_TOOLS: ToolDefinition[] = PRODUCT_EXTENSION_TOOLS.map(
-  (tool) => ({
-    ...tool,
-    name: extensionToolName(tool),
-  }),
-);
-
-const CORE_TOOL_NAMES = new Set(CORE_MCP_TOOLS.map((tool) => tool.name));
-const EXTENSION_BASE_TOOL_NAMES = new Set(
-  PRODUCT_EXTENSION_TOOLS.map((tool) => tool.name),
-);
-const EXTENSION_NAMESPACED_TO_BASE = new Map(
-  PRODUCT_EXTENSION_TOOLS.map((tool) => [extensionToolName(tool), tool.name]),
-);
-
-export function isCoreMcpToolName(name: string) {
-  return CORE_TOOL_NAMES.has(name);
-}
-
-export function resolveExtensionMcpToolName(name: string) {
-  return EXTENSION_NAMESPACED_TO_BASE.get(name) ??
-    (EXTENSION_BASE_TOOL_NAMES.has(name) ? name : null);
-}
-
-export function isExtensionMcpToolName(name: string) {
-  return resolveExtensionMcpToolName(name) !== null;
-}
-
-export function getMcpSurfaceTools(surface: McpToolSurface) {
-  return surface === "core" ? CORE_MCP_TOOLS : EXTENSION_MCP_TOOLS;
-}
-
 // ─── tool handlers ────────────────────────────────────────────────────────
 
 export async function handleGetWallet(
@@ -613,7 +553,8 @@ export async function handleCreateCreditCheckout(
   const resolved = requireIdentity(identity);
   const buyerId = resolved?.account_id ?? args.buyer_id ?? "agent:mcp";
   const pack = creditPackForCredits(Number(args.credits));
-  if (!pack) throw new Error("credits must be one of 10, 25, 100, or 250");
+  if (!pack)
+    throw new Error("credits must be one of 1000, 2500, 10000, or 25000");
 
   const metadata = checkoutMetadata({ buyerId, credits: pack.credits });
   const session = await getStripe().checkout.sessions.create({
@@ -625,7 +566,7 @@ export async function handleCreateCreditCheckout(
         quantity: 1,
         price_data: {
           currency: "usd",
-          unit_amount: amountToCents(pack.amountUsd),
+          unit_amount: pack.credits,
           product_data: {
             name: `${pack.credits} Arbor credits`,
             description: "Credits fund agent auctions, escrow, and payouts.",
@@ -676,6 +617,11 @@ export async function handlePostTask(
   if (!args.prompt) throw new Error("prompt is required");
   if (typeof args.max_budget !== "number")
     throw new Error("max_budget must be a number");
+  if (!Number.isInteger(args.max_budget) || args.max_budget <= 0) {
+    throw new Error(
+      "max_budget must be a positive integer credit amount (100 credits = $1)",
+    );
+  }
 
   const resolved = requireIdentity(identity);
   const result = resolved
@@ -686,6 +632,7 @@ export async function handlePostTask(
           (args.project_id as Id<"projects"> | undefined) ??
           resolved.project_id,
         task_type: args.task_type,
+        workflow_mode: args.workflow_mode,
         prompt: args.prompt,
         max_budget: args.max_budget,
         output_schema: args.output_schema,
@@ -698,6 +645,7 @@ export async function handlePostTask(
     : await convex().mutation(api.tasks.post, {
         posted_by: args.agent_id ?? "agent:mcp",
         task_type: args.task_type,
+        workflow_mode: args.workflow_mode,
         prompt: args.prompt,
         max_budget: args.max_budget,
         output_schema: args.output_schema,
@@ -711,6 +659,7 @@ export async function handlePostTask(
   return {
     task_id: result.task_id,
     status: result.status,
+    workflow_mode: result.workflow_mode,
     bid_window_closes_at: result.bid_window_closes_at,
     shortlist_status: "pending",
     shortlist_size_target: 12,
@@ -824,11 +773,40 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
       (a) => [a.agent_id, a],
     ),
   );
-  return all.map((s) => {
+  return await Promise.all(all.map(async (s) => {
     const l = liveById.get(s.agent_id);
     const connection = getSpecialistConnection(s);
-    const availability = configuredConnectionAvailability(s);
-    const executionStatus = classifyAgentExecution(s);
+    const truth = await assessSpecialistConnectionTruth(s);
+    const availability = truth.probe
+      ? {
+          ...configuredConnectionAvailability(s),
+          ...{
+            status:
+              truth.connection_state === "verified"
+                ? ("available" as const)
+                : truth.connection_state === "degraded"
+                  ? ("missing" as const)
+                  : configuredConnectionAvailability(s).status,
+            reason: truth.last_probe_reason ?? configuredConnectionAvailability(s).reason,
+            probe_status: truth.probe.status,
+            last_probe_at: truth.last_probe_at,
+            last_probe_reason: truth.last_probe_reason,
+            last_probe_latency_ms: truth.probe.latencyMs,
+            connection_state: truth.connection_state,
+            effective_connected: truth.effective_connected,
+          },
+        }
+      : {
+          ...configuredConnectionAvailability(s),
+          connection_state: truth.connection_state,
+          effective_connected: truth.effective_connected,
+          last_probe_at: truth.last_probe_at,
+          last_probe_reason: truth.last_probe_reason,
+        };
+    const executionStatus =
+      availability.execution_status ?? effectiveExecutionStatus(s);
+    const policy = mockPolicyForExecutionStatus(executionStatus);
+    const policyMetadata = mockPolicyMetadata(policy);
     return {
       agent_id: s.agent_id,
       sponsor: s.sponsor,
@@ -839,7 +817,9 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
       total_tasks_completed: l?.total_tasks_completed ?? 0,
       protocol: s.protocol,
       execution_status: executionStatus,
+      execution_status_label: EXECUTION_STATUS_LABELS[executionStatus],
       execution_status_description: EXECUTION_STATUS_DESCRIPTIONS[executionStatus],
+      ...policyMetadata,
       execution_connection: {
         protocol: connection.protocol,
         native: connection.native,
@@ -849,6 +829,13 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
         checked: availability.checked,
         missing: availability.missing,
         reason: availability.reason,
+        connection_state: availability.connection_state,
+        effective_connected: availability.effective_connected,
+        probe_status: availability.probe_status,
+        last_probe_at: availability.last_probe_at,
+        last_probe_reason: availability.last_probe_reason,
+        last_probe_latency_ms: availability.last_probe_latency_ms,
+        ...policyMetadata,
       },
       mcp_endpoint: s.mcp_endpoint,
       mcp_connected:
@@ -868,13 +855,19 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
       a2a_connected:
         (connection.protocol === "a2a" ||
           connection.protocol === "arbor_a2a_bridge") &&
-        availability.status === "available",
+        availability.effective_connected === true,
       is_verified: s.is_verified ?? false,
       homepage_url: s.homepage_url,
       discovered: !!s.discovered,
       discovered_for: s.discovered_for,
+      roster_class: s.roster_class ?? "post_v0_integration",
+      roster_label: s.roster_label ?? "Post-v0 integration",
+      roster_description:
+        s.roster_description ??
+        "Integrated after the canonical protocol roster was established.",
+      canonical_v0: s.canonical_v0 ?? false,
     };
-  });
+  }));
 }
 
 async function loadAllSpecialists(): Promise<SpecialistConfig[]> {
@@ -883,32 +876,45 @@ async function loadAllSpecialists(): Promise<SpecialistConfig[]> {
     agent_id: string;
     display_name: string;
     sponsor: string;
+    agent_role?: SpecialistConfig["agent_role"];
     capabilities: string[];
     system_prompt: string;
     cost_baseline: number;
     starting_reputation: number;
     one_liner: string;
+    industry?: SpecialistConfig["industry"];
     discovered_for: string;
-    discovery_source?: "catalog" | "registry" | "synthesized";
+    discovery_source?: "catalog" | "registry" | "synthesized" | "registered";
+    protocol?: SpecialistConfig["protocol"];
     mcp_endpoint?: string;
     mcp_api_key_env?: string;
+    a2a_endpoint?: string;
+    a2a_agent_card_url?: string;
     homepage_url?: string;
+    last_probe_status?: string;
   }>;
   const discoveredConfigs: SpecialistConfig[] = discovered.map((d) => ({
     agent_id: d.agent_id,
     display_name: d.display_name,
     sponsor: d.sponsor,
+    agent_role: d.agent_role,
     capabilities: d.capabilities,
     system_prompt: d.system_prompt,
     cost_baseline: d.cost_baseline,
     starting_reputation: d.starting_reputation,
     one_liner: d.one_liner,
+    industry: d.industry,
+    protocol: d.protocol,
     mcp_endpoint: d.mcp_endpoint,
     mcp_api_key_env: d.mcp_api_key_env,
+    a2a_endpoint: d.a2a_endpoint,
+    a2a_agent_card_url: d.a2a_agent_card_url,
     homepage_url: d.homepage_url,
+    is_verified: d.last_probe_status === "available",
     discovered: true,
     discovery_source: d.discovery_source,
     discovered_for: d.discovered_for,
+    ...mockPolicyMetadata(),
   }));
   for (const cfg of discoveredConfigs) registerDiscoveredSpecialist(cfg);
   const contacts = AGENT_CONTACT_CATALOG.map(contactToSpecialistConfig);
@@ -930,7 +936,24 @@ export async function handleSuggestSpecialists(
       ? Math.min(10, Math.floor(args.top_n))
       : 3;
   const all = (await loadAllSpecialists()) as SpecialistConfig[];
-  return await suggestSpecialists(args.prompt, args.task_type, all, topN);
+  const result = await suggestSpecialists(args.prompt, args.task_type, all, topN);
+  const byId = new Map(all.map((spec) => [spec.agent_id, spec]));
+  const enriched = await Promise.all(
+    result.suggestions.map(async (suggestion) => {
+      const spec = byId.get(suggestion.agent_id);
+      if (!spec) return suggestion;
+      const truth = await assessSpecialistConnectionTruth(spec);
+      return {
+        ...suggestion,
+        execution_connection_state: truth.connection_state,
+        effective_connected: truth.effective_connected,
+        probe_status: truth.probe?.status,
+        last_probe_at: truth.last_probe_at,
+        last_probe_reason: truth.last_probe_reason,
+      };
+    }),
+  );
+  return { ...result, suggestions: enriched };
 }
 
 export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
@@ -960,10 +983,14 @@ export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
         cost_baseline: cfg.cost_baseline,
         starting_reputation: cfg.starting_reputation,
         one_liner: cfg.one_liner,
+        industry: cfg.industry,
         discovered_for: cfg.discovered_for ?? args.prompt,
         discovery_source: cfg.discovery_source,
+        protocol: cfg.protocol,
         mcp_endpoint: cfg.mcp_endpoint,
         mcp_api_key_env: cfg.mcp_api_key_env,
+        a2a_endpoint: cfg.a2a_endpoint,
+        a2a_agent_card_url: cfg.a2a_agent_card_url,
         homepage_url: cfg.homepage_url,
         rationale: result.rationale,
       });
@@ -987,6 +1014,8 @@ export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
       system_prompt: cfg.system_prompt,
       mcp_endpoint: cfg.mcp_endpoint,
       mcp_api_key_env: cfg.mcp_api_key_env,
+      a2a_endpoint: cfg.a2a_endpoint,
+      a2a_agent_card_url: cfg.a2a_agent_card_url,
       homepage_url: cfg.homepage_url,
       discovered: true,
       discovery_source: cfg.discovery_source,
@@ -1152,38 +1181,69 @@ export async function dispatchTool(
   }
 }
 
-export async function dispatchCoreTool(
-  name: string,
-  args: Record<string, unknown>,
-  identity?: ApiCallerIdentity | null,
-): Promise<unknown> {
-  if (!isCoreMcpToolName(name)) {
-    const extensionName = resolveExtensionMcpToolName(name);
-    if (extensionName) {
-      const extensionTool = PRODUCT_EXTENSION_TOOLS.find(
-        (tool) => tool.name === extensionName,
-      );
-      throw new Error(
-        `${name} is an Arbor extension tool. Use /api/mcp/extensions and call ${
-          extensionTool ? extensionToolName(extensionTool) : extensionName
-        }.`,
-      );
-    }
-    throw new Error(`unknown core MCP tool: ${name}`);
-  }
-  return await dispatchTool(name, args, identity);
+const TOOL_CATEGORY_BY_NAME: Record<
+  string,
+  NonNullable<ToolDefinition["category"]>
+> = {
+  post_task: "protocol_core",
+  get_task: "protocol_core",
+  list_specialists: "protocol_core",
+  raise_dispute: "protocol_core",
+  get_wallet: "billing",
+  create_credit_checkout: "billing",
+  get_agent_earnings: "billing",
+  list_agent_contacts: "registry",
+  suggest_agent_contacts: "registry",
+  suggest_specialists: "registry",
+  discover_specialist: "registry",
+  upsert_product_context: "planning",
+  approve_execution_plan: "planning",
+  request_plan_revision: "planning",
+  cancel_task: "planning",
+  override_judge: "admin",
+};
+
+for (const tool of TOOLS) {
+  tool.category = TOOL_CATEGORY_BY_NAME[tool.name] ?? "protocol_core";
 }
 
-export async function dispatchExtensionTool(
-  name: string,
-  args: Record<string, unknown>,
-  identity?: ApiCallerIdentity | null,
-): Promise<unknown> {
-  const resolvedName = resolveExtensionMcpToolName(name);
-  if (!resolvedName) {
-    throw new Error(`unknown extension MCP tool: ${name}`);
-  }
-  return await dispatchTool(resolvedName, args, identity);
+export const CORE_MCP_TOOLS = TOOLS.filter(
+  (tool) => tool.category === "protocol_core",
+);
+
+export const PRODUCT_EXTENSION_TOOLS = TOOLS.filter(
+  (tool) => tool.category !== "protocol_core",
+);
+
+export function extensionToolName(tool: ToolDefinition): string {
+  if (!tool.category || tool.category === "protocol_core") return tool.name;
+  return `${tool.category}.${tool.name}`;
+}
+
+export const EXTENSION_MCP_TOOLS: ToolDefinition[] = PRODUCT_EXTENSION_TOOLS.map(
+  (tool) => ({ ...tool, name: extensionToolName(tool) }),
+);
+
+export function isCoreMcpToolName(name: string): boolean {
+  return CORE_MCP_TOOLS.some((tool) => tool.name === name);
+}
+
+export function isExtensionMcpToolName(name: string): boolean {
+  return EXTENSION_MCP_TOOLS.some((tool) => tool.name === name);
+}
+
+export function resolveExtensionMcpToolName(name: string): string | null {
+  const exact = PRODUCT_EXTENSION_TOOLS.find((tool) => tool.name === name);
+  if (exact) return exact.name;
+  const prefixed = EXTENSION_MCP_TOOLS.find((tool) => tool.name === name);
+  if (!prefixed) return null;
+  return prefixed.name.split(".").slice(1).join(".");
+}
+
+export type McpToolSurface = "core" | "extensions";
+
+export function getMcpSurfaceTools(surface: McpToolSurface): ToolDefinition[] {
+  return surface === "core" ? CORE_MCP_TOOLS : EXTENSION_MCP_TOOLS;
 }
 
 export async function dispatchMcpSurfaceTool(
@@ -1191,19 +1251,20 @@ export async function dispatchMcpSurfaceTool(
   name: string,
   args: Record<string, unknown>,
   identity?: ApiCallerIdentity | null,
-  options: { allowLegacyExtensionsOnCore?: boolean } = {},
-): Promise<unknown> {
-  if (surface === "extensions") {
-    return await dispatchExtensionTool(name, args, identity);
+  opts?: { allowLegacyExtensionsOnCore?: boolean },
+) {
+  if (surface === "core") {
+    if (isCoreMcpToolName(name)) {
+      return await dispatchTool(name, args, identity);
+    }
+    if (opts?.allowLegacyExtensionsOnCore) {
+      const legacy = resolveExtensionMcpToolName(name);
+      if (legacy) return await dispatchTool(legacy, args, identity);
+    }
+    throw new Error(`unknown core tool: ${name}`);
   }
 
-  if (isCoreMcpToolName(name)) {
-    return await dispatchCoreTool(name, args, identity);
-  }
-
-  if (options.allowLegacyExtensionsOnCore !== false && isExtensionMcpToolName(name)) {
-    return await dispatchExtensionTool(name, args, identity);
-  }
-
-  return await dispatchCoreTool(name, args, identity);
+  const extension = resolveExtensionMcpToolName(name);
+  if (!extension) throw new Error(`unknown extension tool: ${name}`);
+  return await dispatchTool(extension, args, identity);
 }

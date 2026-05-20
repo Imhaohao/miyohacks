@@ -57,7 +57,9 @@ test("A2A agent card reports codex-writer as an Arbor real adapter", async () =>
 
 test("endpoint-gated sponsor agents report missing vendor A2A endpoints", async () => {
   const previousSandbox = process.env.ENABLE_SANDBOX_A2A;
+  const previousPolicy = process.env.ARBOR_MOCK_POLICY;
   delete process.env.ENABLE_SANDBOX_A2A;
+  delete process.env.ARBOR_MOCK_POLICY;
   try {
     const res = await getA2AAgent(
       new NextRequest("http://localhost:3000/api/a2a/agents/tensorlake-exec"),
@@ -69,12 +71,16 @@ test("endpoint-gated sponsor agents report missing vendor A2A endpoints", async 
   } finally {
     if (previousSandbox === undefined) delete process.env.ENABLE_SANDBOX_A2A;
     else process.env.ENABLE_SANDBOX_A2A = previousSandbox;
+    if (previousPolicy === undefined) delete process.env.ARBOR_MOCK_POLICY;
+    else process.env.ARBOR_MOCK_POLICY = previousPolicy;
   }
 });
 
 test("sandbox flag promotes inactive A2A contacts to sandbox adapter", async () => {
   const previousSandbox = process.env.ENABLE_SANDBOX_A2A;
-  process.env.ENABLE_SANDBOX_A2A = "true";
+  const previousPolicy = process.env.ARBOR_MOCK_POLICY;
+  process.env.ARBOR_MOCK_POLICY = "demo_mock_llm";
+  delete process.env.ENABLE_SANDBOX_A2A;
   try {
     const res = await getA2AAgent(
       new NextRequest("http://localhost:3000/api/a2a/agents/quickbooks-ledger"),
@@ -84,34 +90,48 @@ test("sandbox flag promotes inactive A2A contacts to sandbox adapter", async () 
 
     assert.equal(card.arbor.execution_status, "arbor_sandbox_adapter");
     assert.equal(card.arbor.sandbox, true);
-    assert.match(card.arbor.sandbox_disclosure, /Sandbox A2A adapter/);
+    assert.equal(card.arbor.mock_policy, "demo_mock_llm");
+    assert.match(card.arbor.sandbox_disclosure, /Demo mock LLM policy/);
   } finally {
     if (previousSandbox === undefined) delete process.env.ENABLE_SANDBOX_A2A;
     else process.env.ENABLE_SANDBOX_A2A = previousSandbox;
+    if (previousPolicy === undefined) delete process.env.ARBOR_MOCK_POLICY;
+    else process.env.ARBOR_MOCK_POLICY = previousPolicy;
   }
 });
 
 test("mock catalog A2A agents fail instead of returning persona output", async () => {
-  const res = await postA2AAgent(
-    new NextRequest("http://localhost:3000/api/a2a/agents/quickbooks-ledger", {
-      method: "POST",
-      body: JSON.stringify(
-        buildA2ASendRequest({
-          prompt: "Reconcile this ledger.",
-          id: "mock-agent-test",
-        }),
-      ),
-      headers: { "content-type": "application/json" },
-    }),
-    routeContext("quickbooks-ledger"),
-  );
-  const body = await res.json();
+  const previousSandbox = process.env.ENABLE_SANDBOX_A2A;
+  const previousPolicy = process.env.ARBOR_MOCK_POLICY;
+  delete process.env.ENABLE_SANDBOX_A2A;
+  delete process.env.ARBOR_MOCK_POLICY;
+  try {
+    const res = await postA2AAgent(
+      new NextRequest("http://localhost:3000/api/a2a/agents/quickbooks-ledger", {
+        method: "POST",
+        body: JSON.stringify(
+          buildA2ASendRequest({
+            prompt: "Reconcile this ledger.",
+            id: "mock-agent-test",
+          }),
+        ),
+        headers: { "content-type": "application/json" },
+      }),
+      routeContext("quickbooks-ledger"),
+    );
+    const body = await res.json();
 
-  assert.equal(body.result.status.state, "failed");
-  assert.match(
-    body.result.status.message.parts[0].text,
-    /will not substitute a ChatGPT placeholder/,
-  );
+    assert.equal(body.result.status.state, "failed");
+    assert.match(
+      body.result.status.message.parts[0].text,
+      /will not substitute a ChatGPT placeholder/,
+    );
+  } finally {
+    if (previousSandbox === undefined) delete process.env.ENABLE_SANDBOX_A2A;
+    else process.env.ENABLE_SANDBOX_A2A = previousSandbox;
+    if (previousPolicy === undefined) delete process.env.ARBOR_MOCK_POLICY;
+    else process.env.ARBOR_MOCK_POLICY = previousPolicy;
+  }
 });
 
 test("codex-writer A2A failures include the underlying runner error", async () => {

@@ -19,6 +19,12 @@ export async function POST(req: NextRequest) {
   if (typeof body.max_budget !== "number") {
     return jsonError("max_budget (number) is required", 400);
   }
+  if (!Number.isInteger(body.max_budget) || body.max_budget <= 0) {
+    return jsonError(
+      "max_budget must be a positive integer credit amount (100 credits = $1)",
+      400,
+    );
+  }
   try {
     const identity = await resolveApiIdentity(req);
     if (!identity && process.env.ALLOW_LEGACY_AGENT_IDS !== "true") {

@@ -21,10 +21,12 @@ import {
   type RemoteMcpTool,
 } from "../mcp-outbound";
 import { parseJSONLoose } from "../openai";
+import { defaultLLMModel } from "../llm-provider";
 import { buildTaskContext, isImplementationTask } from "../campaign-context";
 import { implementationPlanFromText } from "../implementation-plan";
 import { roleForSpecialist } from "../agent-roles";
 import { classifyAgentExecution } from "../agent-execution-status";
+import { usdToCredits } from "../payments";
 import type {
   SpecialistConfig,
   SpecialistDecision,
@@ -33,11 +35,14 @@ import type {
   SpecialistOutput,
 } from "../types";
 
-const MODEL = "gpt-5.5";
 const CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const MAX_EXECUTE_ROUNDS = 6;
 const VICKREY_PRELUDE =
   "You are bidding in a sealed-bid, reputation-weighted Vickrey-style agent auction. Arbor ranks executable bids by reputation_score / bid_price and computes the default clearing price from the next-best eligible executor's raw bid_price in that same score ranking with the buyer's budget as a cap. Bid your true execution cost and capability honestly.";
+
+function baselineCredits(raw: number): number {
+  return raw < 10 ? usdToCredits(raw) : Math.round(raw);
+}
 
 function apiKey(): string {
   const k = process.env.OPENAI_API_KEY;
@@ -102,7 +107,8 @@ function endpointHost(url: string): string {
 }
 
 async function chatCompletion(body: Record<string, unknown>, timeoutMs: number): Promise<ChatResponse> {
-  // gpt-5.5 rejects `reasoning_effort` together with `tools` on /v1/chat/completions
+  // Some GPT tool-call models reject `reasoning_effort` together with `tools`
+  // on /v1/chat/completions.
   // ("Function tools with reasoning_effort are not supported"). Strip it when
   // tools are present; keep it on plain calls where it prevents empty output.
   const sanitized: Record<string, unknown> = { ...body };
@@ -164,6 +170,7 @@ export function makeMcpForwardingSpecialist(
   return {
     config,
     async bid(prompt, taskType): Promise<SpecialistDecision> {
+      const baseCredits = baselineCredits(config.cost_baseline);
       const tools = await getTools();
       if (tools.length === 0) {
         return {
@@ -195,7 +202,7 @@ export function makeMcpForwardingSpecialist(
         proof: `tools/list: ${toolNames.join(", ")}`,
       };
 
-      const systemPrompt = `${config.system_prompt}\n\n${VICKREY_PRELUDE}\n\nYou are connected to a real MCP server at ${endpoint}. Available tools:\n${toolList || "(tool discovery unavailable — bid only if your description clearly fits)"}\n\nYour cost baseline for a typical task is $${config.cost_baseline.toFixed(2)}. Adjust by task complexity but stay honest.\n\nIMPORTANT: This marketplace handles tasks across every domain. Decline if the user's goal is outside what your remote tools can actually do — don't translate the goal into your specialty. Your capability_claim must address the user's actual goal.\n\nReply with JSON only, one of:\n{ "decline": true, "reason": "<short reason>" }\nOR\n{ "bid_price": <number>, "capability_claim": "<one sentence about how you would handle this specific task>", "estimated_seconds": <integer> }`;
+      const systemPrompt = `${config.system_prompt}\n\n${VICKREY_PRELUDE}\n\nYou are connected to a real MCP server at ${endpoint}. Available tools:\n${toolList || "(tool discovery unavailable — bid only if your description clearly fits)"}\n\nBid in integer credits only (no decimals). Pricing unit: 100 credits = $1. Your baseline for a typical task is ${baseCredits} credits. Adjust by task complexity but stay honest.\n\nIMPORTANT: This marketplace handles tasks across every domain. Decline if the user's goal is outside what your remote tools can actually do — don't translate the goal into your specialty. Your capability_claim must address the user's actual goal.\n\nReply with JSON only, one of:\n{ "decline": true, "reason": "<short reason>" }\nOR\n{ "bid_price": <integer credits>, "capability_claim": "<one sentence about how you would handle this specific task>", "estimated_seconds": <integer> }`;
 
       const userPrompt = `${buildTaskContext(prompt, taskType)}\n\nDo you bid? Bid only if your tools fit this task.`;
       const text = await callPlain(systemPrompt, userPrompt, 256, 10_000);
@@ -209,7 +216,7 @@ export function makeMcpForwardingSpecialist(
         typeof data.estimated_seconds !== "number"
       ) {
         return {
-          bid_price: config.cost_baseline,
+          bid_price: baseCredits,
           capability_claim: config.one_liner,
           estimated_seconds: 30,
           agent_role: roleForSpecialist(config),
@@ -217,7 +224,7 @@ export function makeMcpForwardingSpecialist(
         };
       }
       const bid: BidPayload = {
-        bid_price: Math.max(0.01, Number(data.bid_price.toFixed(2))),
+        bid_price: Math.max(1, Math.round(data.bid_price)),
         capability_claim: data.capability_claim,
         estimated_seconds: Math.max(1, Math.floor(data.estimated_seconds)),
         agent_role: roleForSpecialist(config),
@@ -256,11 +263,12 @@ export function makeMcpForwardingSpecialist(
       for (let round = 0; round < MAX_EXECUTE_ROUNDS; round++) {
         const res = await chatCompletion(
           {
-            model: MODEL,
+            model: defaultLLMModel(),
             messages,
             tools: openaiTools,
             tool_choice: "auto",
-            // Tool-call rounds can't use reasoning_effort with gpt-5.5
+            // Tool-call rounds can't use reasoning_effort on the current
+            // OpenAI tool model.
             // (chatCompletion strips it), so leave room for reasoning + the
             // actual tool call / final answer.
             max_completion_tokens: 4000,
@@ -314,12 +322,12 @@ export function makeMcpForwardingSpecialist(
         content:
           "You've used your tool-call budget. Synthesize your final answer now in markdown, citing what you found via the MCP tools.",
       });
-      // gpt-5.5's max_completion_tokens includes reasoning tokens, so a 1500
-      // cap can leave only ~200 visible tokens after even minimal reasoning
-      // — that's why short outputs were getting truncated mid-sentence.
+      // The current GPT model's max_completion_tokens includes reasoning
+      // tokens, so a 1500 cap can leave only ~200 visible tokens after even
+      // minimal reasoning. Keep room for a complete final answer.
       const final = await chatCompletion(
         {
-          model: MODEL,
+          model: defaultLLMModel(),
           messages,
           max_completion_tokens: 4000,
           reasoning_effort: "none",
@@ -342,7 +350,7 @@ async function callPlain(
 ): Promise<string> {
   const res = await chatCompletion(
     {
-      model: MODEL,
+      model: defaultLLMModel(),
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

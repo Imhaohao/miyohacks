@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { StatusBadge } from "./StatusBadge";
-import { formatMoney } from "@/lib/utils";
+import { formatCreditsAsUsd } from "@/lib/payments";
 import type { TaskDoc } from "@/lib/task-view";
 
 export function TaskHeader({ task }: { task: TaskDoc }) {
@@ -25,7 +25,7 @@ export function TaskHeader({ task }: { task: TaskDoc }) {
           <div className="text-right">
             <div className="text-xs text-ink-muted">Budget</div>
             <div className="font-mono text-lg font-semibold tracking-tight text-ink">
-              {formatMoney(task.max_budget)}
+              {formatCreditsAsUsd(task.max_budget)}
             </div>
           </div>
         </div>

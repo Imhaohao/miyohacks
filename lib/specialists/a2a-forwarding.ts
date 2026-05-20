@@ -12,6 +12,11 @@ import type {
   SpecialistOutput,
   SpecialistRunner,
 } from "../types";
+import { usdToCredits } from "../payments";
+
+function baselineCredits(raw: number): number {
+  return raw < 10 ? usdToCredits(raw) : Math.round(raw);
+}
 
 export function makeA2AForwardingSpecialist(config: SpecialistConfig): SpecialistRunner {
   return {
@@ -21,7 +26,7 @@ export function makeA2AForwardingSpecialist(config: SpecialistConfig): Specialis
         return {
           decline: true,
           reason:
-            "No real A2A endpoint is configured for this specialist, so Arbor will not use a placeholder persona.",
+            "Strict no-mock policy: no real A2A endpoint is configured for this specialist, so Arbor will not use a placeholder persona.",
         };
       }
       const configured = configuredConnectionAvailability(config);
@@ -40,9 +45,9 @@ export function makeA2AForwardingSpecialist(config: SpecialistConfig): Specialis
       }
 
       const bid: BidPayload = {
-        bid_price: config.cost_baseline,
+        bid_price: baselineCredits(config.cost_baseline),
         capability_claim: `${config.one_liner} Execution will be sent through ${probe.native ? "native A2A" : "Arbor's A2A bridge"}.`,
-        estimated_seconds: Math.max(30, Math.round(config.cost_baseline * 180)),
+        estimated_seconds: 90,
         agent_role: roleForSpecialist(config),
         execution_preview:
           `Connected A2A run: message/send -> ${config.a2a_endpoint}; result must come back as A2A task status/artifacts.`,

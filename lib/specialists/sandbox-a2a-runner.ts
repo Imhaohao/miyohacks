@@ -19,6 +19,8 @@ import {
   SANDBOX_DISCLOSURE_TEXT,
   isSandboxA2AEnabled,
 } from "../agent-execution-status";
+import { mockPolicyMetadata } from "../mock-policy";
+import { usdToCredits } from "../payments";
 import type {
   BidPayload,
   DeclineDecision,
@@ -79,7 +81,7 @@ function renderMarkdown(args: {
     artifact.summary,
     "",
     `**Agent persona:** ${config.display_name} (${config.sponsor})`,
-    `**Execution mode:** Sandbox A2A adapter`,
+    `**Execution mode:** Demo mock LLM sandbox adapter`,
     "",
   ];
   if (artifact.capabilities_used.length > 0) {
@@ -191,17 +193,23 @@ function sandboxBidAvailability(
 ): NonNullable<BidPayload["tool_availability"]> {
   return {
     status: "available",
-    checked: ["sandbox-a2a", "ENABLE_SANDBOX_A2A"],
-    reason: "Arbor sandbox A2A adapter is enabled for this agent",
+    checked: ["sandbox-a2a", "ARBOR_MOCK_POLICY=demo_mock_llm"],
+    reason:
+      "Demo mock LLM policy is enabled; Arbor will produce a disclosed sandbox artifact instead of vendor-native output",
     protocol: "arbor_a2a_bridge",
     execution_status: "arbor_sandbox_adapter",
     sandbox: true,
     proof: `sandbox runner: ${config.agent_id}`,
+    ...mockPolicyMetadata("demo_mock_llm"),
   };
 }
 
 function sandboxSystemPrompt(config: SpecialistConfig): string {
   return `${config.system_prompt}\n\n${SANDBOX_PRELUDE}`;
+}
+
+function baselineCredits(raw: number): number {
+  return raw < 10 ? usdToCredits(raw) : Math.round(raw);
 }
 
 export function makeSandboxA2ASpecialist(
@@ -214,12 +222,13 @@ export function makeSandboxA2ASpecialist(
         const decline: DeclineDecision = {
           decline: true,
           reason:
-            "Sandbox A2A is disabled (set ENABLE_SANDBOX_A2A=true to allow this agent to bid via the sandbox adapter).",
+            "Demo mock LLM policy is disabled (set ARBOR_MOCK_POLICY=demo_mock_llm to allow this agent to bid via the sandbox adapter).",
         };
         return decline;
       }
-      const systemPrompt = `${sandboxSystemPrompt(config)}\n\nYou are participating in a sealed-bid auction as a sandbox A2A adapter. Bid only when the user's actual goal fits ${config.display_name}'s real domain. Decline if it doesn't.\n\nRespond with JSON only, one of:\n{ "decline": true, "reason": "<short reason>" }\nOR\n{ "bid_price": <number>, "capability_claim": "<one sentence framed as 'In sandbox mode, ...'>", "estimated_seconds": <integer> }`;
-      const userPrompt = `${buildTaskContext(prompt, taskType)}\n\nDo you want to bid via the sandbox adapter? Bid only if your specialty fits this task; sandbox cost should be low (under $1) since no vendor call is made.`;
+      const baseCredits = baselineCredits(config.cost_baseline);
+      const systemPrompt = `${sandboxSystemPrompt(config)}\n\nYou are participating in a sealed-bid auction as a sandbox A2A adapter. Bid only when the user's actual goal fits ${config.display_name}'s real domain. Decline if it doesn't.\n\nBid in integer credits only (no decimals). Pricing unit: 100 credits = $1.\n\nRespond with JSON only, one of:\n{ "decline": true, "reason": "<short reason>" }\nOR\n{ "bid_price": <integer credits>, "capability_claim": "<one sentence framed as 'In sandbox mode, ...'>", "estimated_seconds": <integer> }`;
+      const userPrompt = `${buildTaskContext(prompt, taskType)}\n\nDo you want to bid via the sandbox adapter? Bid only if your specialty fits this task; sandbox cost should stay low (typically under ${Math.max(baseCredits, 100)} credits) since no vendor call is made.`;
       let data: SandboxBidLLMResponse;
       try {
         data = await callOpenAIJSON<SandboxBidLLMResponse>({
@@ -231,7 +240,7 @@ export function makeSandboxA2ASpecialist(
         });
       } catch {
         return {
-          bid_price: Math.min(0.5, config.cost_baseline),
+          bid_price: Math.max(1, Math.min(baseCredits, 100)),
           capability_claim: `In sandbox mode, ${config.display_name} will produce a structured draft for: ${config.one_liner}`,
           estimated_seconds: 35,
           agent_role: roleForSpecialist(config),
@@ -247,8 +256,8 @@ export function makeSandboxA2ASpecialist(
       }
       const bidPrice =
         typeof data.bid_price === "number" && data.bid_price > 0
-          ? Math.min(1, Number(data.bid_price.toFixed(2)))
-          : Math.min(0.5, config.cost_baseline);
+          ? Math.max(1, Math.min(100, Math.round(data.bid_price)))
+          : Math.max(1, Math.min(baseCredits, 100));
       const estimated =
         typeof data.estimated_seconds === "number" && data.estimated_seconds > 0
           ? Math.max(10, Math.min(120, Math.floor(data.estimated_seconds)))
@@ -263,7 +272,7 @@ export function makeSandboxA2ASpecialist(
         estimated_seconds: estimated,
         agent_role: roleForSpecialist(config),
         sandbox_disclosure: SANDBOX_DISCLOSURE_TEXT,
-        execution_preview: `Sandbox A2A adapter will produce a structured JSON+markdown artifact in ${config.display_name}'s persona. Output is explicitly disclosed as sandbox, not vendor-native.`,
+        execution_preview: `Demo mock LLM sandbox adapter will produce a structured JSON+markdown artifact in ${config.display_name}'s persona. Output is explicitly disclosed as sandbox, not vendor-native.`,
         tool_availability: sandboxBidAvailability(config),
       };
       return bid;

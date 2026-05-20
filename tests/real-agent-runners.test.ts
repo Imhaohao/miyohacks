@@ -66,6 +66,6 @@ test("A2A specialists without endpoints decline instead of using a placeholder",
   assert.equal("decline" in bid, true);
   assert.match(
     "reason" in bid ? bid.reason : "",
-    /No real A2A endpoint is configured/,
+    /strict no-mock policy: no real A2A endpoint is configured/i,
   );
 });

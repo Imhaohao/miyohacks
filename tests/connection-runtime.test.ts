@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  assessSpecialistConnectionTruth,
   configuredConnectionAvailability,
   getSpecialistConnection,
 } from "../lib/specialists/connection-runtime";
@@ -18,6 +19,8 @@ const BASE_CONFIG: SpecialistConfig = {
 };
 
 test("MCP specialists are unavailable until required credentials are present", () => {
+  const previousProbe = process.env.ARBOR_CONNECTIVITY_PROBE_ENABLED;
+  process.env.ARBOR_CONNECTIVITY_PROBE_ENABLED = "false";
   const previous = process.env.TEST_MCP_API_KEY;
   delete process.env.TEST_MCP_API_KEY;
   try {
@@ -36,6 +39,8 @@ test("MCP specialists are unavailable until required credentials are present", (
     assert.equal(availability.status, "missing");
     assert.deepEqual(availability.missing, ["TEST_MCP_API_KEY"]);
   } finally {
+    if (previousProbe === undefined) delete process.env.ARBOR_CONNECTIVITY_PROBE_ENABLED;
+    else process.env.ARBOR_CONNECTIVITY_PROBE_ENABLED = previousProbe;
     if (previous === undefined) delete process.env.TEST_MCP_API_KEY;
     else process.env.TEST_MCP_API_KEY = previous;
   }
@@ -57,6 +62,27 @@ test("native A2A specialists remain distinct from Arbor-hosted bridges", () => {
   assert.equal(connection.native, true);
   assert.equal(availability.status, "available");
   assert.match(availability.reason ?? "", /native A2A/);
+});
+
+test("truth model reports configured state without probes when disabled", async () => {
+  const previousProbe = process.env.ARBOR_CONNECTIVITY_PROBE_ENABLED;
+  process.env.ARBOR_CONNECTIVITY_PROBE_ENABLED = "false";
+  try {
+    const config: SpecialistConfig = {
+      ...BASE_CONFIG,
+      protocol: "a2a",
+      a2a_endpoint: "https://agents.example.test/tasks",
+      a2a_agent_card_url: "https://agents.example.test/.well-known/agent-card.json",
+      verification_status: "configured",
+    };
+    const truth = await assessSpecialistConnectionTruth(config);
+    assert.equal(truth.connection_state, "configured");
+    assert.equal(truth.effective_connected, true);
+    assert.equal(truth.probe, undefined);
+  } finally {
+    if (previousProbe === undefined) delete process.env.ARBOR_CONNECTIVITY_PROBE_ENABLED;
+    else process.env.ARBOR_CONNECTIVITY_PROBE_ENABLED = previousProbe;
+  }
 });
 
 test("Arbor-hosted A2A bridges are explicit execution connections", () => {

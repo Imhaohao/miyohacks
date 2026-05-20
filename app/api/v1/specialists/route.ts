@@ -1,7 +1,16 @@
 import { NextRequest } from "next/server";
 import { handleListSpecialists } from "@/lib/mcp-tools";
 import { jsonOk, jsonError, corsPreflight } from "@/lib/http";
-import type { AgentExecutionStatus } from "@/lib/types";
+import {
+  ROSTER_CLASS_ORDER,
+  ROSTER_CLASS_LABELS,
+} from "@/lib/specialists/roster";
+import {
+  currentMockPolicy,
+  MOCK_POLICY_DESCRIPTIONS,
+  MOCK_POLICY_LABELS,
+} from "@/lib/mock-policy";
+import type { AgentExecutionStatus, AgentRosterClass } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,9 +29,24 @@ export async function GET(req: NextRequest) {
       mock_unconnected: 0,
     };
     for (const specialist of result) {
-      execution_status_counts[specialist.execution_status as AgentExecutionStatus] += 1;
+      execution_status_counts[specialist.execution_status] += 1;
     }
-    return jsonOk({ specialists: result, execution_status_counts });
+    const roster_class_counts = Object.fromEntries(
+      ROSTER_CLASS_ORDER.map((rosterClass) => [rosterClass, 0]),
+    ) as Record<AgentRosterClass, number>;
+    for (const specialist of result) {
+      roster_class_counts[specialist.roster_class] += 1;
+    }
+    const mockPolicy = currentMockPolicy();
+    return jsonOk({
+      specialists: result,
+      execution_status_counts,
+      roster_class_counts,
+      roster_class_labels: ROSTER_CLASS_LABELS,
+      mock_policy: mockPolicy,
+      mock_policy_label: MOCK_POLICY_LABELS[mockPolicy],
+      mock_policy_description: MOCK_POLICY_DESCRIPTIONS[mockPolicy],
+    });
   } catch (e) {
     return jsonError(e instanceof Error ? e.message : String(e), 500);
   }

@@ -13,6 +13,10 @@ import type {
   AdminPaymentsResponse,
   AdminTasksResponse,
 } from "@/lib/admin-types";
+import {
+  executionLabelFor,
+  paymentLabelFor,
+} from "@/lib/admin-agent-labels";
 import { cn } from "@/lib/utils";
 import {
   Bank,
@@ -355,7 +359,7 @@ function Payments({
         <Rows rows={data.ledger_entries.slice(0, 18).map((entry) => ({
           key: entry.idempotency_key,
           left: `${entry.entry_type} · ${entry.account_type}:${entry.account_id}`,
-          right: `${entry.amount >= 0 ? "+" : ""}${entry.amount.toFixed(2)}`,
+          right: `${entry.amount >= 0 ? "+" : "-"}${formatCredits(Math.abs(entry.amount))}`,
         }))} />
       </Card>
     </div>
@@ -376,34 +380,76 @@ function Agents({
     <Card>
       <CardHeader title="Agents" meta={`${data.agents.length} seeded agents`} />
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {data.agents.map((agent) => (
-          <div key={agent.agent_id} className="rounded-xl bg-surface-subtle p-4">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-semibold text-ink">{agent.display_name}</div>
-                <div className="font-mono text-xs text-ink-muted">{agent.agent_id}</div>
+        {data.agents.map((agent) => {
+          const execution = executionLabelFor(agent);
+          const payment = paymentLabelFor(agent);
+          const connectAction =
+            payment.connectButton === "start"
+              ? "start_connect_account"
+              : payment.connectButton === "refresh"
+                ? "refresh_connect_account"
+                : null;
+          const connectLabel =
+            payment.connectButton === "start"
+              ? "Start Connect"
+              : "Refresh Connect";
+          return (
+            <div key={agent.agent_id} className="rounded-xl bg-surface-subtle p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-semibold text-ink">{agent.display_name}</div>
+                  <div className="font-mono text-xs text-ink-muted">{agent.agent_id}</div>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <Pill tone={execution.tone} title={execution.description}>
+                    {execution.label}
+                  </Pill>
+                  {agent.roster_label && (
+                    <Pill
+                      tone={agent.canonical_v0 ? "success" : "neutral"}
+                      title={agent.roster_description}
+                    >
+                      {agent.roster_label}
+                    </Pill>
+                  )}
+                  {agent.mock_policy_label && (
+                    <Pill tone="neutral" title={agent.mock_policy_description}>
+                      {agent.mock_policy_label}
+                    </Pill>
+                  )}
+                  <Pill tone={payment.tone} title={payment.description}>
+                    {payment.label}
+                  </Pill>
+                </div>
               </div>
-              <Pill tone={agent.payouts_enabled ? "success" : "warning"}>
-                {agent.payouts_enabled ? "payout ready" : "payout blocked"}
-              </Pill>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <Metric label="Rep" value={agent.reputation_score.toFixed(2)} compact />
+                <Metric label="Earnings" value={formatCredits(agent.available_earnings)} compact />
+              </div>
+              {connectAction ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="mt-3 w-full"
+                  disabled={actionBusy === `${connectAction}:${agent.agent_id}`}
+                  onClick={() => runAction(connectAction, agent.agent_id)}
+                >
+                  {actionBusy === `${connectAction}:${agent.agent_id}` ? (
+                    <CircleNotch size={14} className="animate-spin" />
+                  ) : (
+                    <Bank size={14} weight="bold" />
+                  )}
+                  {connectLabel}
+                </Button>
+              ) : (
+                <div className="mt-3 text-xs text-ink-muted">
+                  {payment.description}
+                </div>
+              )}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <Metric label="Rep" value={agent.reputation_score.toFixed(2)} compact />
-              <Metric label="Earnings" value={formatCredits(agent.available_earnings)} compact />
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="mt-3 w-full"
-              disabled={actionBusy === `refresh_connect_account:${agent.agent_id}`}
-              onClick={() => runAction("refresh_connect_account", agent.agent_id)}
-            >
-              {actionBusy === `refresh_connect_account:${agent.agent_id}` ? <CircleNotch size={14} className="animate-spin" /> : <Bank size={14} weight="bold" />}
-              Refresh Connect
-            </Button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Card>
   );

@@ -5,7 +5,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id, Doc } from "@/convex/_generated/dataModel";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
-import { formatCredits } from "@/lib/payments";
+import { formatCredits, formatCreditsAsUsd } from "@/lib/payments";
 import type { EscrowDoc, TaskDoc } from "@/lib/task-view";
 
 interface Props {
@@ -40,22 +40,30 @@ export function PaymentPanel({
   return (
     <Card className="animate-fade-up">
       <CardHeader
-        title="Payment rail"
+        title="Protocol escrow"
         meta={<Pill tone={tone}>{status.replaceAll("_", " ")}</Pill>}
       />
+      <p className="mb-4 text-sm leading-relaxed text-ink-muted">
+        This panel shows Arbor's internal Convex credit escrow. Stripe funding
+        and payouts are optional rails around the protocol; they do not gate
+        specialist execution.
+      </p>
       <div className="grid gap-3 sm:grid-cols-4">
-        <Metric label="Max budget" value={formatCredits(task.max_budget)} />
+        <Metric
+          label="Max budget"
+          value={`${formatCreditsAsUsd(task.max_budget)} · ${formatCredits(task.max_budget)}`}
+        />
         <Metric
           label="Locked escrow"
-          value={formatCredits(escrow?.locked_amount ?? task.price_paid ?? 0)}
+          value={`${formatCreditsAsUsd(escrow?.locked_amount ?? task.price_paid ?? 0)} · ${formatCredits(escrow?.locked_amount ?? task.price_paid ?? 0)}`}
         />
         <Metric
           label="Platform fee"
-          value={formatCredits(escrow?.platform_fee ?? 0)}
+          value={`${formatCreditsAsUsd(escrow?.platform_fee ?? 0)} · ${formatCredits(escrow?.platform_fee ?? 0)}`}
         />
         <Metric
           label="Agent net"
-          value={formatCredits(escrow?.agent_net_amount ?? 0)}
+          value={`${formatCreditsAsUsd(escrow?.agent_net_amount ?? 0)} · ${formatCredits(escrow?.agent_net_amount ?? 0)}`}
         />
       </div>
       {ledger && ledger.length > 0 && (
@@ -81,7 +89,7 @@ export function PaymentPanel({
                 }
               >
                 {entry.amount >= 0 ? "+" : ""}
-                {entry.amount.toFixed(2)}
+                {formatCredits(Math.abs(entry.amount))}
               </span>
             </div>
           ))}
