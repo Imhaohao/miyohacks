@@ -435,6 +435,7 @@ async function shipConversionDropInner(
           target_path: prResult.target_path,
           upstream: `${upstream.owner}/${upstream.repo}`,
         },
+        provenance: { tier: "mock", live_tools_called: false },
       },
     });
     await ctx.runMutation(internal.tasks._setStatus, {
@@ -467,6 +468,7 @@ async function failDemo(
         diagnosis,
         error: reason,
       },
+      provenance: { tier: "mock", live_tools_called: false },
     },
   });
   await c.runMutation(internal.tasks._setStatus, { task_id, status: "failed" });

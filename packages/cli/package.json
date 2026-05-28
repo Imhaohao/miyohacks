@@ -1,0 +1,21 @@
+{
+  "name": "@agent-auction/cli",
+  "version": "0.1.0",
+  "description": "Command-line interface for the Agent Auction Protocol — discover specialists, post tasks, dispute, from the shell or another agent's subprocess.",
+  "type": "module",
+  "bin": {
+    "arbor": "./src/main.mjs"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.12.0"
+  },
+  "keywords": ["agent-auction", "cli", "mcp", "a2a", "vickrey", "agents", "ai"],
+  "license": "MIT",
+  "dependencies": {
+    "@agent-auction/sdk-core": "*"
+  }
+}

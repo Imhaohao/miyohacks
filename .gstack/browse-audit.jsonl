@@ -1,0 +1,172 @@
+{"ts":"2026-05-23T16:54:50.607Z","cmd":"status","args":"","origin":"about:blank","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:00.500Z","cmd":"goto","args":"http://localhost:3000/admin/login","origin":"http://localhost:3000/admin/login","durationMs":9833,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:03.562Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin/login","durationMs":15,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:07.717Z","cmd":"fill","args":"@e2 Triangle123!","origin":"http://localhost:3000/admin/login","durationMs":10,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:07.788Z","cmd":"click","args":"@e3","origin":"http://localhost:3000/admin/login","durationMs":18,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:10.867Z","cmd":"url","args":"","origin":"http://localhost:3000/admin","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:10.936Z","cmd":"snapshot","args":"-d 2","origin":"http://localhost:3000/admin","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:16.654Z","cmd":"click","args":"@e18","origin":"http://localhost:3000/admin","durationMs":39,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:19.750Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":12,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:43.198Z","cmd":"viewport","args":"1280x900","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:43.265Z","cmd":"click","args":"@e10","origin":"http://localhost:3000/admin","durationMs":11,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:44.352Z","cmd":"fill","args":"@e43 Hello, brief ping to verify the A2A bridge is up. Respond in one sentence.","origin":"http://localhost:3000/admin","durationMs":10,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:55:44.442Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":31,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:56:29.654Z","cmd":"screenshot","args":"/tmp/a2a-01-atlassian.png","origin":"http://localhost:3000/admin","durationMs":55,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:56:29.725Z","cmd":"snapshot","args":"--selector .max-h-\\[420px\\] -d 4","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:59:17.397Z","cmd":"reload","args":"","origin":"http://localhost:3000/admin","durationMs":187,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:59:20.496Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":13,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:59:27.442Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:59:31.013Z","cmd":"click","args":"@e7","origin":"http://localhost:3000/admin","durationMs":26,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T16:59:34.100Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":14,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:01:01.227Z","cmd":"reload","args":"","origin":"http://localhost:3000/admin","durationMs":263,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:01:05.328Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":14,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:01:14.929Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:01:18.494Z","cmd":"click","args":"@e7","origin":"http://localhost:3000/admin","durationMs":34,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:01:21.589Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:01:41.470Z","cmd":"click","args":"@e16","origin":"http://localhost:3000/admin","durationMs":27,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:01:43.559Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:01:49.549Z","cmd":"fill","args":"@e42 ui","origin":"http://localhost:3000/admin","durationMs":11,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:01:49.618Z","cmd":"fill","args":"@e43 Give me a minimal one-sentence confirmation that you received this A2A ping. Skip the UI.","origin":"http://localhost:3000/admin","durationMs":10,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:01:50.717Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":18,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:03:20.850Z","cmd":"screenshot","args":"/tmp/a2a-vercel-v0.png","origin":"http://localhost:3000/admin","durationMs":46,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:03:20.910Z","cmd":"snapshot","args":"--selector [class*='max-h-\\[420px\\]']","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:03:52.200Z","cmd":"click","args":"@e13","origin":"http://localhost:3000/admin","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e13 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-23T17:03:54.284Z","cmd":"fill","args":"@e42 general","origin":"http://localhost:3000/admin","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e42 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-23T17:03:54.330Z","cmd":"fill","args":"@e43 What MCP tools are you connected to? One line.","origin":"http://localhost:3000/admin","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e43 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-23T17:03:54.374Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e44 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-23T17:05:09.454Z","cmd":"snapshot","args":"--selector [class*='max-h-\\[420px\\]']","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:05:09.549Z","cmd":"screenshot","args":"/tmp/a2a-nia-context.png","origin":"http://localhost:3000/admin","durationMs":44,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:05:14.848Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:05:30.733Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:05:30.827Z","cmd":"click","args":"@e13","origin":"http://localhost:3000/admin","durationMs":26,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:05:32.920Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:05:32.992Z","cmd":"fill","args":"@e42 general","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:05:33.048Z","cmd":"fill","args":"@e43 What is your name and what MCP server are you connected to? Reply briefly.","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:05:33.121Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":25,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:06:48.248Z","cmd":"screenshot","args":"/tmp/a2a-nia-context.png","origin":"http://localhost:3000/admin","durationMs":47,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:06:52.048Z","cmd":"snapshot","args":"--selector [class*='max-h-\\[420px\\]']","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:07:01.432Z","cmd":"click","args":"@e11","origin":"http://localhost:3000/admin","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e11 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-23T17:07:03.525Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:07:03.591Z","cmd":"fill","args":"@e42 general","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:07:03.647Z","cmd":"fill","args":"@e43 Who are you and what GitHub MCP tools can you call? One line.","origin":"http://localhost:3000/admin","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:07:03.721Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":22,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:08:03.851Z","cmd":"screenshot","args":"/tmp/a2a-github-engineering.png","origin":"http://localhost:3000/admin","durationMs":50,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:08:03.901Z","cmd":"snapshot","args":"--selector [class*='max-h-\\[420px\\]']","origin":"http://localhost:3000/admin","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:08:19.112Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:08:19.191Z","cmd":"click","args":"@e11","origin":"http://localhost:3000/admin","durationMs":26,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:08:21.286Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:08:21.350Z","cmd":"fill","args":"@e42 general","origin":"http://localhost:3000/admin","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:08:21.405Z","cmd":"fill","args":"@e43 Who are you and what GitHub MCP tools can you call? One line.","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:08:21.477Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":24,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:09:21.605Z","cmd":"screenshot","args":"/tmp/a2a-github-engineering.png","origin":"http://localhost:3000/admin","durationMs":50,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:09:25.719Z","cmd":"snapshot","args":"--selector [class*='max-h-\\[420px\\]']","origin":"http://localhost:3000/admin","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:09:36.991Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:09:37.069Z","cmd":"click","args":"@e12","origin":"http://localhost:3000/admin","durationMs":22,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:09:39.167Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:09:39.247Z","cmd":"fill","args":"@e42 context","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:09:39.311Z","cmd":"fill","args":"@e43 Just confirm via Hyperspell memory that you got this A2A ping. One short sentence.","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:09:39.394Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":28,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:10:54.532Z","cmd":"screenshot","args":"/tmp/a2a-hyperspell-brain.png","origin":"http://localhost:3000/admin","durationMs":52,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:10:54.585Z","cmd":"snapshot","args":"--selector [class*='max-h-\\[420px\\]']","origin":"http://localhost:3000/admin","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:11:04.255Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:11:04.333Z","cmd":"click","args":"@e14","origin":"http://localhost:3000/admin","durationMs":25,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:11:06.421Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:11:06.491Z","cmd":"fill","args":"@e42 reacher-live-launch","origin":"http://localhost:3000/admin","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:11:06.546Z","cmd":"fill","args":"@e43 Confirm A2A bridge is up. Use Reacher tools briefly and reply with the shop list count.","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:11:06.618Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":25,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:12:21.739Z","cmd":"screenshot","args":"/tmp/a2a-reacher-social.png","origin":"http://localhost:3000/admin","durationMs":47,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:12:21.802Z","cmd":"snapshot","args":"--selector [class*='max-h-\\[420px\\]']","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:12:39.123Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:12:39.199Z","cmd":"click","args":"@e15","origin":"http://localhost:3000/admin","durationMs":23,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:12:41.281Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:12:41.351Z","cmd":"fill","args":"@e42 general","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:12:41.407Z","cmd":"fill","args":"@e43 Identify yourself and confirm the Stripe MCP is reachable. One short line.","origin":"http://localhost:3000/admin","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:12:41.482Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":24,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:13:41.611Z","cmd":"screenshot","args":"/tmp/a2a-stripe-payments.png","origin":"http://localhost:3000/admin","durationMs":48,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:13:41.666Z","cmd":"snapshot","args":"--selector [class*='max-h-\\[420px\\]']","origin":"http://localhost:3000/admin","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:13:51.276Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:13:51.348Z","cmd":"click","args":"@e10","origin":"http://localhost:3000/admin","durationMs":19,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:13:53.433Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:13:53.503Z","cmd":"fill","args":"@e42 general","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:13:53.558Z","cmd":"fill","args":"@e43 Just confirm you received this A2A ping. No code changes.","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:13:53.632Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":27,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:14:23.760Z","cmd":"screenshot","args":"/tmp/a2a-codex-writer.png","origin":"http://localhost:3000/admin","durationMs":48,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:14:23.811Z","cmd":"snapshot","args":"--selector [class*='max-h-\\[420px\\]']","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:15:23.036Z","cmd":"viewport","args":"1440x1200","origin":"http://localhost:3000/admin","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T17:15:24.171Z","cmd":"screenshot","args":"/tmp/a2a-overview-final.png","origin":"http://localhost:3000/admin","durationMs":50,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:12.783Z","cmd":"reload","args":"","origin":"about:blank","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:15.935Z","cmd":"snapshot","args":"-i","origin":"about:blank","durationMs":23,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:15.996Z","cmd":"click","args":"","origin":"about:blank","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Usage: browse click <selector>"}
+{"ts":"2026-05-23T20:57:19.135Z","cmd":"snapshot","args":"-i","origin":"about:blank","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:32.208Z","cmd":"goto","args":"http://localhost:3000/admin","origin":"http://localhost:3000/admin/login","durationMs":9033,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:36.290Z","cmd":"url","args":"","origin":"http://localhost:3000/admin/login","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:36.352Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin/login","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:40.290Z","cmd":"fill","args":"@e2 Triangle123!","origin":"http://localhost:3000/admin/login","durationMs":11,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:40.358Z","cmd":"click","args":"@e3","origin":"http://localhost:3000/admin/login","durationMs":17,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:44.438Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:50.216Z","cmd":"click","args":"@e7","origin":"http://localhost:3000/admin","durationMs":41,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:54.370Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":11,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:54.436Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:57:54.500Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T20:59:56.818Z","cmd":"reload","args":"","origin":"http://localhost:3000/admin","durationMs":187,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:00:00.992Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":14,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:00:01.068Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":5,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:00:01.135Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:00:07.212Z","cmd":"url","args":"","origin":"http://localhost:3000/admin","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:00:07.276Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:00:12.384Z","cmd":"click","args":"@e7","origin":"http://localhost:3000/admin","durationMs":35,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:00:16.542Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:00:16.605Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:00:16.670Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:02:35.477Z","cmd":"reload","args":"","origin":"http://localhost:3000/admin","durationMs":182,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:02:39.627Z","cmd":"click","args":"@e7","origin":"http://localhost:3000/admin","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e7 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-23T21:02:42.789Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":13,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:02:42.847Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:02:49.985Z","cmd":"url","args":"","origin":"http://localhost:3000/admin","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:02:50.045Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:02:50.133Z","cmd":"click","args":"@e7","origin":"http://localhost:3000/admin","durationMs":32,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:02:54.225Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":10,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:02:54.289Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-23T21:02:54.348Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:12:41.674Z","cmd":"viewport","args":"1440x1400","origin":"about:blank","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:12:43.776Z","cmd":"reload","args":"","origin":"about:blank","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:12:47.882Z","cmd":"snapshot","args":"-i","origin":"about:blank","durationMs":26,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:12:47.936Z","cmd":"click","args":"","origin":"about:blank","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Usage: browse click <selector>"}
+{"ts":"2026-05-24T02:12:51.035Z","cmd":"snapshot","args":"-i","origin":"about:blank","durationMs":5,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:12:51.179Z","cmd":"snapshot","args":"-i","origin":"about:blank","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:12:51.235Z","cmd":"snapshot","args":"-i","origin":"about:blank","durationMs":1,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:12:51.292Z","cmd":"click","args":"","origin":"about:blank","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Usage: browse click <selector>"}
+{"ts":"2026-05-24T02:12:53.373Z","cmd":"snapshot","args":"-i","origin":"about:blank","durationMs":2,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:12:53.439Z","cmd":"fill","args":" general","origin":"about:blank","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Usage: browse fill <selector> <value>"}
+{"ts":"2026-05-24T02:12:53.486Z","cmd":"fill","args":" Confirm A2A with a one-sentence pong.","origin":"about:blank","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Usage: browse fill <selector> <value>"}
+{"ts":"2026-05-24T02:12:53.533Z","cmd":"click","args":"","origin":"about:blank","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Usage: browse click <selector>"}
+{"ts":"2026-05-24T02:13:28.715Z","cmd":"screenshot","args":"/tmp/a2a-all30-supabase-success.png","origin":"about:blank","durationMs":29,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:28.765Z","cmd":"snapshot","args":"--selector [class*='max-h-\\[420px\\]']","origin":"about:blank","durationMs":1,"status":"error","hasCookies":false,"mode":"launched","error":"Selector not found: [class*='max-h-\\[420px\\]']"}
+{"ts":"2026-05-24T02:13:33.414Z","cmd":"url","args":"","origin":"about:blank","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:34.772Z","cmd":"goto","args":"http://localhost:3000/admin","origin":"http://localhost:3000/admin/login","durationMs":1309,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:37.872Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin/login","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:47.789Z","cmd":"fill","args":"@e2 Triangle123!","origin":"http://localhost:3000/admin/login","durationMs":12,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:47.854Z","cmd":"click","args":"@e3","origin":"http://localhost:3000/admin/login","durationMs":16,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:51.937Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":5,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:52.033Z","cmd":"click","args":"@e7","origin":"http://localhost:3000/admin","durationMs":38,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:56.156Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":13,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:56.218Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:56.276Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:56.351Z","cmd":"click","args":"@e36","origin":"http://localhost:3000/admin","durationMs":20,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:58.445Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":10,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:58.515Z","cmd":"fill","args":"@e42 general","origin":"http://localhost:3000/admin","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:58.571Z","cmd":"fill","args":"@e43 Confirm A2A with a one-sentence pong.","origin":"http://localhost:3000/admin","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:13:58.645Z","cmd":"click","args":"@e44","origin":"http://localhost:3000/admin","durationMs":25,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:14:38.852Z","cmd":"screenshot","args":"/tmp/a2a-all30-supabase-success.png","origin":"http://localhost:3000/admin","durationMs":45,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:14:49.542Z","cmd":"viewport","args":"800x2000","origin":"http://localhost:3000/admin","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T02:14:50.697Z","cmd":"screenshot","args":"/tmp/a2a-all30-agent-list.png","origin":"http://localhost:3000/admin","durationMs":75,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T08:37:48.355Z","cmd":"goto","args":"http://localhost:3000/admin","origin":"http://localhost:3000/admin/login","durationMs":11427,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T08:37:51.464Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin/login","durationMs":20,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T08:37:51.554Z","cmd":"fill","args":"@e2 Triangle123!","origin":"http://localhost:3000/admin/login","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T08:37:51.636Z","cmd":"click","args":"@e3","origin":"http://localhost:3000/admin/login","durationMs":15,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T08:37:55.722Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":5,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T08:37:55.830Z","cmd":"click","args":"@e7","origin":"http://localhost:3000/admin","durationMs":39,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T08:37:59.918Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":10,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T08:37:59.983Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3000/admin","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T08:38:00.046Z","cmd":"viewport","args":"800x2000","origin":"http://localhost:3000/admin","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-24T08:38:01.200Z","cmd":"screenshot","args":"/tmp/post-migration-agent-list.png","origin":"http://localhost:3000/admin","durationMs":74,"status":"ok","hasCookies":false,"mode":"launched"}

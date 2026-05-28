@@ -6,11 +6,16 @@
 // plan instead of letting a generic tool-calling loop spend the full timeout.
 
 import { callRemoteTool, flattenToolResult } from "../mcp-outbound";
+import { mcpToolOutcome, previewValue } from "../tool-call-audit";
 import type {
   CampaignLaunchArtifact,
   CampaignLaunchCreator,
   SpecialistConfig,
   SpecialistRunner,
+  SpecialistExecuteResult,
+  SpecialistExecuteContext,
+  SpecialistProvenance,
+  ToolCallAuditInput,
 } from "../types";
 
 /**
@@ -38,6 +43,7 @@ function isInScope(prompt: string, taskType: string): boolean {
 
 export const REACHER_SOCIAL_CONFIG: SpecialistConfig = {
   agent_id: "reacher-social",
+  tier: "real",
   display_name: "reacher-social",
   sponsor: "Reacher",
   capabilities: [
@@ -239,26 +245,51 @@ export const reacherSocial: SpecialistRunner = {
     };
   },
 
-  async execute(prompt) {
+  async execute(
+    prompt,
+    _taskType,
+    context?: SpecialistExecuteContext,
+  ): Promise<SpecialistExecuteResult> {
     const key = apiKey();
     const endpoint = REACHER_SOCIAL_CONFIG.mcp_endpoint;
     if (!endpoint) throw new Error("Reacher MCP endpoint is not configured");
 
-    const [shopsResult, performanceResult, creatorsResult] = await Promise.all([
-      callRemoteTool(endpoint, "list_shops_shops_get", {}, 10_000, key),
-      callRemoteTool(
+    const recorded = async (
+      toolName: string,
+      args: Record<string, unknown>,
+      timeoutMs: number,
+    ) => {
+      const input: ToolCallAuditInput = {
+        agent_id: context?.agent_id ?? REACHER_SOCIAL_CONFIG.agent_id,
+        phase: "execute",
+        transport: "mcp",
+        provider: "reacher",
         endpoint,
+        method: "tools/call",
+        tool_name: toolName,
+        arguments: args,
+      };
+      const run = () => callRemoteTool(endpoint, toolName, args, timeoutMs, key);
+      if (!context?.toolRecorder) return await run();
+      return await context.toolRecorder.record(input, run, (result) =>
+        mcpToolOutcome({
+          result,
+          preview: previewValue(flattenToolResult(result)),
+        }),
+      );
+    };
+
+    const [shopsResult, performanceResult, creatorsResult] = await Promise.all([
+      recorded("list_shops_shops_get", {}, 10_000),
+      recorded(
         "creators_performance_creators_performance_post",
         { shop: "all", page_size: 5, sort_by: "gmv", sort_dir: "desc" },
         12_000,
-        key,
       ),
-      callRemoteTool(
-        endpoint,
+      recorded(
         "creators_list_creators_list_post",
         { shop: "all", page_size: 5, sort_by: "shop_gmv", sort_dir: "desc" },
         12_000,
-        key,
       ),
     ]);
 
@@ -266,7 +297,6 @@ export const reacherSocial: SpecialistRunner = {
     const performance = parseToolData(flattenToolResult(performanceResult));
     const creators = parseToolData(flattenToolResult(creatorsResult));
     const rows = performance.data.length > 0 ? performance.data : creators.data;
-    const top = rows.slice(0, 3);
     const currency = performance.currency ?? creators.currency ?? "USD";
     const dateRange = performance.date_range
       ? `${String(performance.date_range.start_date ?? "recent")} to ${String(
@@ -274,7 +304,7 @@ export const reacherSocial: SpecialistRunner = {
         )}`
       : "recent Reacher performance window";
 
-    return buildArtifact({
+    const output = buildArtifact({
       prompt,
       creators: rows.map(creatorFromRow),
       currency,
@@ -283,5 +313,18 @@ export const reacherSocial: SpecialistRunner = {
         shops.data.map((s) => str(s, "shop_name")).filter(Boolean),
       dateRange,
     });
+
+    const provenance: SpecialistProvenance = {
+      tier: "real",
+      live_tools_called: true,
+      transport: "mcp",
+      proof_level: "tool_call",
+      successful_tool_call_count:
+        context?.toolRecorder?.successfulCallIds().length ?? 3,
+      tool_call_ids: context?.toolRecorder?.successfulCallIds(),
+      endpoint,
+    };
+
+    return { output, provenance };
   },
 };

@@ -5,10 +5,26 @@ export interface RepoRef {
   repo: string;
 }
 
+export interface PullRequestRef extends RepoRef {
+  number: number;
+}
+
 export function parseRepoUrl(url: string): RepoRef | null {
   const match = url.match(/github\.com\/([^/\s]+)\/([^/\s.]+)(?:\.git)?\/?$/i);
   if (!match) return null;
   return { owner: match[1], repo: match[2] };
+}
+
+export function parsePullRequestUrl(url: string): PullRequestRef | null {
+  const match = url.match(
+    /^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)(?:[/?#].*)?$/i,
+  );
+  if (!match) return null;
+  return {
+    owner: match[1],
+    repo: match[2],
+    number: Number(match[3]),
+  };
 }
 
 interface GhRequestInit extends RequestInit {
@@ -22,6 +38,32 @@ async function gh<T>(path: string, init: GhRequestInit): Promise<{ status: numbe
       authorization: `Bearer ${init.token}`,
       accept: "application/vnd.github+json",
       "user-agent": "arbor-demo",
+      ...(init.body ? { "content-type": "application/json" } : {}),
+      ...(init.headers ?? {}),
+    },
+  });
+  const text = await res.text();
+  let body: T | string = text;
+  if (text && (res.headers.get("content-type") ?? "").includes("application/json")) {
+    try {
+      body = JSON.parse(text) as T;
+    } catch {
+      body = text;
+    }
+  }
+  return { status: res.status, body, raw: text };
+}
+
+async function ghOptional<T>(
+  path: string,
+  init: RequestInit & { token?: string },
+): Promise<{ status: number; body: T | string; raw: string }> {
+  const res = await fetch(`${API}${path}`, {
+    ...init,
+    headers: {
+      ...(init.token ? { authorization: `Bearer ${init.token}` } : {}),
+      accept: "application/vnd.github+json",
+      "user-agent": "arbor",
       ...(init.body ? { "content-type": "application/json" } : {}),
       ...(init.headers ?? {}),
     },
@@ -215,4 +257,24 @@ export async function openCrossRepoPR(args: {
     throw new Error(`openPR HTTP ${r.status}: ${describeBody(r.body, r.raw)}`);
   }
   return { url: r.body.html_url, number: r.body.number };
+}
+
+export async function verifyPullRequestUrl(
+  url: string,
+  token?: string,
+): Promise<{ url: string; number: number; state?: string }> {
+  const ref = parsePullRequestUrl(url);
+  if (!ref) throw new Error(`Not a GitHub pull request URL: ${url}`);
+  const r = await ghOptional<{ html_url: string; number: number; state?: string }>(
+    `/repos/${ref.owner}/${ref.repo}/pulls/${ref.number}`,
+    { method: "GET", token },
+  );
+  if (r.status !== 200 || typeof r.body === "string") {
+    throw new Error(`verifyPR HTTP ${r.status}: ${describeBody(r.body, r.raw)}`);
+  }
+  return {
+    url: r.body.html_url,
+    number: r.body.number,
+    state: r.body.state,
+  };
 }

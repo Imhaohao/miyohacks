@@ -18,6 +18,7 @@ import { isConversionDropPrompt } from "@/lib/conversion-drop-demo";
 import { useStickToLatest } from "@/lib/use-stick-to-latest";
 import { ArrowDown } from "@phosphor-icons/react";
 import type {
+  AgentToolCallDoc,
   TaskDoc,
   EscrowDoc,
   LifecycleEventDoc,
@@ -36,8 +37,11 @@ export function TaskView({ taskId }: { taskId: string }) {
   const lifecycle = useQuery(api.lifecycle.forTask, { task_id: id }) as
     | LifecycleEventDoc[]
     | undefined;
+  const toolCalls = useQuery(api.agentToolCalls.forTask, { task_id: id }) as
+    | AgentToolCallDoc[]
+    | undefined;
 
-  if (task === undefined || lifecycle === undefined) {
+  if (task === undefined || lifecycle === undefined || toolCalls === undefined) {
     return <TaskLoading />;
   }
   if (task === null) {
@@ -71,6 +75,7 @@ export function TaskView({ taskId }: { taskId: string }) {
       task={task}
       escrow={escrow}
       lifecycle={lifecycle}
+      toolCalls={toolCalls}
       taskId={taskId}
       isMultiStepParent={isMultiStepParent}
     />
@@ -81,12 +86,14 @@ function RegularTaskView({
   task,
   escrow,
   lifecycle,
+  toolCalls,
   taskId,
   isMultiStepParent,
 }: {
   task: TaskDoc;
   escrow: EscrowDoc | null | undefined;
   lifecycle: LifecycleEventDoc[];
+  toolCalls: AgentToolCallDoc[];
   taskId: string;
   isMultiStepParent: boolean;
 }) {
@@ -101,7 +108,7 @@ function RegularTaskView({
       {isMultiStepParent ? (
         <>
           <PlanPanel task={task} />
-          <ExecutionPanel task={task} events={lifecycle} />
+          <ExecutionPanel task={task} events={lifecycle} toolCalls={toolCalls} />
           <JudgeVerdictPanel task={task} events={lifecycle} />
         </>
       ) : (
@@ -109,7 +116,7 @@ function RegularTaskView({
           <BidWindow task={task} events={lifecycle} />
           <AuctionResolution events={lifecycle} />
           <ValueImpactPanel task={task} events={lifecycle} />
-          <ExecutionPanel task={task} events={lifecycle} />
+          <ExecutionPanel task={task} events={lifecycle} toolCalls={toolCalls} />
           <JudgeVerdictPanel task={task} events={lifecycle} />
           <SettlementPanel
             task={task}

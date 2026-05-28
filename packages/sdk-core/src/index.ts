@@ -11,6 +11,13 @@ export interface AuctionClientOptions {
   baseUrl?: string;
   /** Identifier sent as posted_by. Default "agent:sdk". */
   agentId?: string;
+  /**
+   * Optional Arbor API key. When set, every request includes
+   * `Authorization: Bearer <apiKey>`. The current REST surface is
+   * anonymous; this option is wired now so it picks up free when
+   * identity lands.
+   */
+  apiKey?: string;
   /** Override fetch (e.g. for retry middleware). */
   fetch?: typeof fetch;
 }
@@ -71,6 +78,8 @@ export interface TaskState {
   }>;
 }
 
+export type MarketReadyReason = "no_endpoint" | "missing_credential";
+
 export interface Specialist {
   agent_id: string;
   sponsor: string;
@@ -79,6 +88,15 @@ export interface Specialist {
   one_liner: string;
   reputation_score: number;
   total_tasks_completed: number;
+  /**
+   * Aggregated readiness flag computed server-side. True when the specialist
+   * has an `mcp_endpoint` set and any required credential env var is present.
+   * Falsy in two cases: no endpoint, or endpoint with missing credential.
+   * Stricter callers can also gate on the existing `mcp_connected` (verified).
+   */
+  market_ready?: boolean;
+  /** Reason `market_ready` is false; `null` when `market_ready` is true. */
+  market_ready_reason?: MarketReadyReason | null;
 }
 
 export interface AwaitTaskOptions {
@@ -91,11 +109,13 @@ const TERMINAL_STATUSES = new Set(["complete", "disputed", "failed"]);
 export class AuctionClient {
   private readonly baseUrl: string;
   private readonly agentId: string;
+  private readonly apiKey: string | undefined;
   private readonly _fetch: typeof fetch;
 
   constructor(opts: AuctionClientOptions = {}) {
     this.baseUrl = (opts.baseUrl ?? "http://localhost:3000").replace(/\/$/, "");
     this.agentId = opts.agentId ?? "agent:sdk";
+    this.apiKey = opts.apiKey;
     this._fetch = opts.fetch ?? fetch;
   }
 
@@ -159,9 +179,12 @@ export class AuctionClient {
     path: string,
     body?: unknown,
   ): Promise<T> {
+    const headers: Record<string, string> = {};
+    if (body) headers["content-type"] = "application/json";
+    if (this.apiKey) headers["authorization"] = `Bearer ${this.apiKey}`;
     const res = await this._fetch(`${this.baseUrl}${path}`, {
       method,
-      headers: body ? { "content-type": "application/json" } : undefined,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {

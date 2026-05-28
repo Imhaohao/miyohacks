@@ -14,6 +14,7 @@ export const BID_WINDOW_SECONDS = 15;
 const taskStatusValidator = v.union(
   v.literal("open"),
   v.literal("planning"),
+  v.literal("plan_review"),
   v.literal("bidding"),
   v.literal("awarded"),
   v.literal("executing"),
@@ -21,6 +22,7 @@ const taskStatusValidator = v.union(
   v.literal("synthesizing"),
   v.literal("complete"),
   v.literal("disputed"),
+  v.literal("cancelled"),
   v.literal("failed"),
 );
 

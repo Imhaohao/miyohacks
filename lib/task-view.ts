@@ -11,6 +11,7 @@ import type {
   EscrowStatus,
   ExecutionArtifact,
   JudgeVerdict,
+  SpecialistProvenance,
   TaskStatus,
 } from "./types";
 
@@ -32,7 +33,14 @@ export interface TaskDoc {
   bid_window_closes_at: number;
   winning_bid_id?: string;
   price_paid?: number;
-  result?: { text: string; agent_id: string; artifact?: ExecutionArtifact } | unknown;
+  result?:
+    | {
+        text: string;
+        agent_id: string;
+        artifact?: ExecutionArtifact;
+        provenance?: SpecialistProvenance;
+      }
+    | unknown;
   judge_verdict?: JudgeVerdict;
   output_schema?: Record<string, unknown>;
   parent_task_id?: string;
@@ -68,6 +76,29 @@ export interface LifecycleEventDoc {
   event_type: string;
   payload: Record<string, unknown>;
   timestamp: number;
+}
+
+export interface AgentToolCallDoc {
+  _id: string;
+  _creationTime: number;
+  task_id: string;
+  agent_id: string;
+  phase: string;
+  transport: string;
+  provider: string;
+  endpoint_host?: string;
+  method: string;
+  tool_name?: string;
+  status: "started" | "succeeded" | "failed";
+  started_at: number;
+  completed_at?: number;
+  duration_ms?: number;
+  error_message?: string;
+  result_preview?: string;
+  external_session_id?: string;
+  external_task_id?: string;
+  pr_url?: string;
+  pr_number?: number;
 }
 
 // ─── lifecycle event payload shapes (match what convex/auctions.ts writes) ──

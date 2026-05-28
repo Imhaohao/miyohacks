@@ -1,0 +1,48 @@
+[2026-05-24T08:37:48.556Z] [info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[2026-05-24T08:37:48.901Z] [warning] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview
+[2026-05-24T08:37:52.525Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:37:53.258Z] [log] [Fast Refresh] done in 734ms
+[2026-05-24T08:37:53.746Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:37:54.392Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:37:54.774Z] [log] [Fast Refresh] done in 381ms
+[2026-05-24T08:37:55.499Z] [log] [Fast Refresh] done in 1106ms
+[2026-05-24T08:38:57.785Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:39:00.857Z] [log] [Fast Refresh] done in 3072ms
+[2026-05-24T08:40:01.439Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:40:03.510Z] [log] [Fast Refresh] done in 2072ms
+[2026-05-24T08:40:07.640Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:40:08.359Z] [log] [Fast Refresh] done in 720ms
+[2026-05-24T08:40:15.143Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:40:17.856Z] [log] [Fast Refresh] done in 2713ms
+[2026-05-24T08:40:39.977Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:40:41.030Z] [log] [Fast Refresh] done in 1052ms
+[2026-05-24T08:40:58.711Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:41:01.700Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:41:01.863Z] [log] [Fast Refresh] done in 164ms
+[2026-05-24T08:41:03.270Z] [log] [Fast Refresh] done in 1571ms
+[2026-05-24T08:41:06.441Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:41:07.330Z] [log] [Fast Refresh] done in 889ms
+[2026-05-24T08:41:34.745Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:41:35.099Z] [log] [Fast Refresh] done in 353ms
+[2026-05-24T08:41:49.379Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:41:49.904Z] [log] [Fast Refresh] done in 526ms
+[2026-05-24T08:42:17.514Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:42:18.991Z] [log] [Fast Refresh] done in 1477ms
+[2026-05-24T08:43:51.954Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:43:52.881Z] [log] [Fast Refresh] done in 928ms
+[2026-05-24T08:45:00.549Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:45:01.508Z] [log] [Fast Refresh] done in 960ms
+[2026-05-24T08:45:50.276Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:45:51.674Z] [log] [Fast Refresh] done in 1398ms
+[2026-05-24T08:46:33.584Z] [log] [Fast Refresh] rebuilding
+[2026-05-24T08:46:35.191Z] [log] [Fast Refresh] done in 1608ms
+[2026-05-24T08:46:39.825Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-24T08:46:39.838Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-24T08:46:39.846Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-24T08:46:39.862Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-24T08:46:39.956Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-24T08:46:41.437Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-24T08:46:42.701Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-24T08:46:42.710Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-24T08:46:42.725Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-24T08:46:42.735Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)

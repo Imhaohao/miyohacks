@@ -6,6 +6,8 @@ import type {
   BidPayload,
   DeclineDecision,
   SpecialistOutput,
+  SpecialistExecuteResult,
+  SpecialistProvenance,
 } from "../types";
 import { buildTaskContext } from "../campaign-context";
 
@@ -70,16 +72,25 @@ export function makeMockSpecialist(config: SpecialistConfig): SpecialistRunner {
       return bid;
     },
 
-    async execute(prompt, taskType): Promise<SpecialistOutput> {
+    async execute(prompt, taskType): Promise<SpecialistExecuteResult> {
       const systemPrompt = `${config.system_prompt}\n\nYou were picked for this task. Produce a complete, useful work product in markdown that directly addresses the user's actual goal — not your specialty's generic deliverables. If the goal is to set up Stripe Connect, give them an integration plan; if it's to design a landing page, give them a design; don't pivot to creator shortlists unless that's literally the goal. Stay in character as ${config.display_name}.`;
       const userPrompt = buildTaskContext(prompt, taskType);
-      return await callOpenAI({
+      const raw = await callOpenAI({
         systemPrompt,
         userPrompt,
         maxTokens: 1500,
         timeoutMs: 60_000,
         retries: 0,
       });
+      const output: SpecialistOutput = `[MOCK — no live tools called]\n\n${raw}`;
+      const provenance: SpecialistProvenance = {
+        tier: "mock",
+        live_tools_called: false,
+        transport: "mock",
+        proof_level: "none",
+        successful_tool_call_count: 0,
+      };
+      return { output, provenance };
     },
   };
 }

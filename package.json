@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "tsx lib/intake-normalize.test.ts && tsx lib/tool-call-audit.test.ts",
     "convex:dev": "convex dev",
     "typecheck": "tsc --noEmit"
   },

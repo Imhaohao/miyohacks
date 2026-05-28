@@ -9,6 +9,7 @@ import type { SpecialistConfig, SpecialistRunner } from "../types";
 
 export const NIA_CONTEXT_CONFIG: SpecialistConfig = {
   agent_id: "nia-context",
+  tier: "mcp-forwarding",
   display_name: "nia-context",
   sponsor: "Nia (Nozomio)",
   capabilities: [

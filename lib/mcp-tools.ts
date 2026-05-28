@@ -364,6 +364,21 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
   );
   return all.map((s) => {
     const l = liveById.get(s.agent_id);
+    // market_ready: a single boolean callers can filter on without
+    // assembling three fields. Predicate is intentionally weak — we don't
+    // yet have runtime connection probes or tool_availability on bids,
+    // so the strongest signal we have is "endpoint configured and any
+    // required credential is set". Verified status is reported separately
+    // via `mcp_connected` for stricter callers.
+    const hasEndpoint = !!s.mcp_endpoint;
+    const credSatisfied =
+      !s.mcp_api_key_env || !!process.env[s.mcp_api_key_env];
+    const marketReady = hasEndpoint && credSatisfied;
+    const marketReadyReason: string | null = marketReady
+      ? null
+      : !hasEndpoint
+        ? "no_endpoint"
+        : "missing_credential";
     return {
       agent_id: s.agent_id,
       sponsor: s.sponsor,
@@ -388,6 +403,8 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
       homepage_url: s.homepage_url,
       discovered: !!s.discovered,
       discovered_for: s.discovered_for,
+      market_ready: marketReady,
+      market_ready_reason: marketReadyReason,
     };
   });
 }
@@ -424,6 +441,7 @@ async function loadAllSpecialists(): Promise<SpecialistConfig[]> {
     discovered: true,
     discovery_source: d.discovery_source,
     discovered_for: d.discovered_for,
+    tier: d.mcp_endpoint ? "mcp-forwarding" as const : "mock" as const,
   }));
   for (const cfg of discoveredConfigs) registerDiscoveredSpecialist(cfg);
   return [...SPECIALISTS, ...discoveredConfigs];

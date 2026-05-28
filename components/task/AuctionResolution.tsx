@@ -29,6 +29,13 @@ export function AuctionResolution({ events }: Props) {
   );
 
   if (failed) {
+    const reason =
+      typeof failed.payload.reason === "string"
+        ? failed.payload.reason
+        : "No executable specialist bid was available.";
+    const explanation = reason.includes("under budget")
+      ? "No executable specialist bid met the auction requirements. Nothing was charged."
+      : "The auction could not select an executable specialist. Nothing was charged.";
     return (
       <Card className="animate-fade-up">
         <CardHeader
@@ -36,8 +43,9 @@ export function AuctionResolution({ events }: Props) {
           meta={<Pill tone="danger">Failed</Pill>}
         />
         <p className="text-sm text-ink-muted">
-          No specialist bid under your budget. Nothing was charged.
+          {explanation}
         </p>
+        <p className="mt-2 font-mono text-xs text-ink-subtle">{reason}</p>
       </Card>
     );
   }

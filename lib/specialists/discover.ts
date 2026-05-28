@@ -229,6 +229,7 @@ function catalogEntryToConfig(
     discovered: true,
     discovery_source: "catalog",
     discovered_for: query.trim().slice(0, 240),
+    tier: "mcp-forwarding",
   };
 }
 
@@ -385,6 +386,7 @@ function registryCandidateToConfig(
     discovered: true,
     discovery_source: "registry",
     discovered_for: query.trim().slice(0, 240),
+    tier: "mcp-forwarding",
   };
 }
 
@@ -492,6 +494,7 @@ Do not duplicate any existing agent_id.`;
     discovered: true,
     discovery_source: "synthesized",
     discovered_for: query.trim().slice(0, 240),
+    tier: "mock",
   };
 
   return {

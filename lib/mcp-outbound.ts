@@ -38,6 +38,10 @@ export interface ToolCallResult {
   isError?: boolean;
 }
 
+export interface McpRequestOptions {
+  headers?: Record<string, string>;
+}
+
 let nextId = 1;
 
 async function rpc<T>(
@@ -46,6 +50,7 @@ async function rpc<T>(
   params?: Record<string, unknown>,
   timeoutMs = 15_000,
   apiKey?: string,
+  options?: McpRequestOptions,
 ): Promise<T> {
   const body: JsonRpcRequest = {
     jsonrpc: "2.0",
@@ -58,6 +63,9 @@ async function rpc<T>(
     accept: "application/json, text/event-stream",
   };
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  for (const [key, value] of Object.entries(options?.headers ?? {})) {
+    if (value.trim()) headers[key] = value;
+  }
 
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
@@ -97,6 +105,7 @@ async function rpc<T>(
 export async function discoverTools(
   url: string,
   apiKey?: string,
+  options?: McpRequestOptions,
 ): Promise<RemoteMcpTool[]> {
   // Conventional handshake first; many servers tolerate skipping but a few require it.
   try {
@@ -110,11 +119,19 @@ export async function discoverTools(
       },
       8_000,
       apiKey,
+      options,
     );
   } catch {
     // Tolerate servers that don't require initialize.
   }
-  const result = await rpc<ToolsListResult>(url, "tools/list", {}, 12_000, apiKey);
+  const result = await rpc<ToolsListResult>(
+    url,
+    "tools/list",
+    {},
+    12_000,
+    apiKey,
+    options,
+  );
   return result.tools ?? [];
 }
 
@@ -124,6 +141,7 @@ export async function callRemoteTool(
   args: Record<string, unknown>,
   timeoutMs = 30_000,
   apiKey?: string,
+  options?: McpRequestOptions,
 ): Promise<ToolCallResult> {
   return await rpc<ToolCallResult>(
     url,
@@ -131,6 +149,7 @@ export async function callRemoteTool(
     { name, arguments: args },
     timeoutMs,
     apiKey,
+    options,
   );
 }
 

@@ -8,13 +8,18 @@ import type {
   SpecialistConfig,
   SpecialistOutput,
   SpecialistRunner,
+  SpecialistExecuteResult,
+  SpecialistProvenance,
 } from "../types";
 import { buildTaskContext } from "../campaign-context";
 
 const V0_API_URL = "https://api.v0.dev/v1/chats";
+const V0_POLL_TIMEOUT_MS = 120_000;
+const V0_POLL_INTERVAL_MS = 3_000;
 
 export const VERCEL_V0_CONFIG: SpecialistConfig = {
   agent_id: "vercel-v0",
+  tier: "real",
   display_name: "vercel-v0",
   sponsor: "Vercel (v0)",
   capabilities: [
@@ -33,19 +38,36 @@ export const VERCEL_V0_CONFIG: SpecialistConfig = {
   is_verified: Boolean(process.env.V0_API_KEY),
 };
 
+type V0File = {
+  name?: string;
+  content?: string;
+  source?: string;
+  meta?: { file?: string };
+};
+
 type V0ChatResponse = {
   id?: string;
   webUrl?: string;
   web_url?: string;
   latestVersion?: {
     id?: string;
-    files?: Array<{ name?: string; content?: string }>;
+    status?: string;
+    demoUrl?: string;
+    demo_url?: string;
+    screenshotUrl?: string;
+    screenshot_url?: string;
+    files?: V0File[];
   };
   latest_version?: {
     id?: string;
-    files?: Array<{ name?: string; content?: string }>;
+    status?: string;
+    demoUrl?: string;
+    demo_url?: string;
+    screenshotUrl?: string;
+    screenshot_url?: string;
+    files?: V0File[];
   };
-  files?: Array<{ name?: string; content?: string }>;
+  files?: V0File[];
   text?: string;
   error?: unknown;
 };
@@ -110,30 +132,147 @@ Return production-ready React/Tailwind UI. If this is a landing page, include co
     );
   }
 
+  return await pollV0Chat(data, key);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function versionOf(data: V0ChatResponse) {
+  return data.latestVersion ?? data.latest_version;
+}
+
+function filesOf(data: V0ChatResponse): V0File[] {
+  return data.files ?? versionOf(data)?.files ?? [];
+}
+
+function demoUrlOf(data: V0ChatResponse): string | undefined {
+  const version = versionOf(data);
+  return version?.demoUrl ?? version?.demo_url;
+}
+
+function hasCompletedV0Payload(data: V0ChatResponse) {
+  const version = versionOf(data);
+  const status = version?.status?.toLowerCase();
+  return (
+    filesOf(data).some((file) => fileContent(file).trim()) ||
+    Boolean(demoUrlOf(data)) ||
+    status === "completed"
+  );
+}
+
+async function fetchV0Chat(chatId: string, key: string): Promise<V0ChatResponse> {
+  const response = await fetch(`${V0_API_URL}/${chatId}`, {
+    headers: { authorization: `Bearer ${key}` },
+  });
+  const text = await response.text();
+  let data: V0ChatResponse;
+  try {
+    data = text ? (JSON.parse(text) as V0ChatResponse) : {};
+  } catch {
+    data = { text };
+  }
+  if (!response.ok) {
+    throw new Error(
+      `v0 API polling error ${response.status}: ${text.slice(0, 300) || response.statusText}`,
+    );
+  }
   return data;
+}
+
+async function pollV0Chat(initial: V0ChatResponse, key: string) {
+  if (!initial.id || hasCompletedV0Payload(initial)) {
+    return initial;
+  }
+
+  const deadline = Date.now() + V0_POLL_TIMEOUT_MS;
+  let latest = initial;
+  while (Date.now() < deadline) {
+    await sleep(V0_POLL_INTERVAL_MS);
+    latest = await fetchV0Chat(initial.id, key);
+    if (hasCompletedV0Payload(latest)) {
+      return latest;
+    }
+  }
+  return latest;
+}
+
+function fileName(file: V0File): string {
+  return file.name ?? file.meta?.file ?? "generated-file";
+}
+
+function fileContent(file: V0File): string {
+  return file.content ?? file.source ?? "";
+}
+
+function filePriority(file: V0File): number {
+  const name = fileName(file);
+  if (name === "app/page.tsx") return 0;
+  if (/tic-tac-toe|game|board|cell|status|player|hook/i.test(name)) return 1;
+  if (name.endsWith(".tsx") || name.endsWith(".ts")) return 2;
+  if (name === "lib/utils.ts" || name === "utils.ts") return 3;
+  if (name === "package.json") return 4;
+  return 5;
 }
 
 function summarizeV0Response(data: V0ChatResponse) {
   const webUrl = data.webUrl ?? data.web_url;
-  const version = data.latestVersion ?? data.latest_version;
-  const files = data.files ?? version?.files ?? [];
+  const version = versionOf(data);
+  const demoUrl = demoUrlOf(data);
+  const screenshotUrl = version?.screenshotUrl ?? version?.screenshot_url;
+  const files = filesOf(data);
   const fileList = files
-    .map((file) => file.name)
+    .map(fileName)
     .filter((name): name is string => Boolean(name))
-    .slice(0, 8);
-  const codePreview = files
-    .map((file) => file.content)
-    .find((content): content is string => Boolean(content?.trim()))
-    ?.slice(0, 1400);
+    .slice(0, 12);
+  const sortedFiles = [...files].sort((a, b) => filePriority(a) - filePriority(b));
+  const sourceSections = sortedFiles
+    .map((file) => {
+      const content = fileContent(file).trim();
+      if (!content) return null;
+      const name = fileName(file);
+      const lang = name.endsWith(".css")
+        ? "css"
+        : name.endsWith(".json")
+          ? "json"
+          : name.endsWith(".tsx") || name.endsWith(".ts")
+            ? "tsx"
+            : "";
+      return `### ${name}\n\n\`\`\`${lang}\n${content.slice(0, 8000)}\n\`\`\``;
+    })
+    .filter((section): section is string => Boolean(section))
+    .slice(0, 16);
+  const combinedSource = files.map(fileContent).join("\n");
+  const fileNames = new Set(files.map(fileName));
+  if (
+    combinedSource.includes("@/lib/utils") &&
+    !fileNames.has("lib/utils.ts") &&
+    !fileNames.has("lib/utils.tsx")
+  ) {
+    sourceSections.push(`### lib/utils.ts (compatibility helper)
+
+\`\`\`ts
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+\`\`\``);
+  }
 
   return [
     "# v0 generation",
     "",
     webUrl ? `Open in v0: ${webUrl}` : "v0 returned a chat without a web URL.",
+    demoUrl ? `Demo URL: ${demoUrl}` : null,
+    screenshotUrl ? `Screenshot: ${screenshotUrl}` : null,
     data.id ? `Chat id: ${data.id}` : null,
     version?.id ? `Version id: ${version.id}` : null,
+    version?.status ? `Version status: ${version.status}` : null,
     fileList.length ? `Files: ${fileList.join(", ")}` : null,
-    codePreview ? `\n## Code preview\n\n\`\`\`tsx\n${codePreview}\n\`\`\`` : null,
+    sourceSections.length ? `\n## Generated source\n\n${sourceSections.join("\n\n")}` : null,
     data.text ? `\n## v0 text\n\n${data.text}` : null,
   ]
     .filter(Boolean)
@@ -158,8 +297,17 @@ export const vercelV0: SpecialistRunner = {
     };
   },
 
-  async execute(prompt, taskType): Promise<SpecialistOutput> {
+  async execute(prompt, taskType): Promise<SpecialistExecuteResult> {
     const data = await createV0Chat(prompt, taskType);
-    return summarizeV0Response(data);
+    const output: SpecialistOutput = summarizeV0Response(data);
+    const provenance: SpecialistProvenance = {
+      tier: "real",
+      live_tools_called: true,
+      transport: "api",
+      proof_level: "api_call",
+      external_task_id: data.id,
+      endpoint: V0_API_URL,
+    };
+    return { output, provenance };
   },
 };

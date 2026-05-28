@@ -1,13 +1,32 @@
 // Specialist: insforge-backend (powered by InsForge).
-// MOCKED until InsForge ships an official MCP endpoint. Imitates the
-// production-backend-for-agentic-development workflow: spin up Postgres +
-// auth + storage + edge functions for a campaign in one motion.
+// MOCKED until InsForge's remote MCP supports bearer-token authentication.
+//
+// TODO(real-wiring): 2026-05-27
+//   Queries used:
+//     - "InsForge insforge.dev MCP server public API backend 2025 2026"
+//     - "InsForge MCP server API token bearer authentication env var site:docs.insforge.dev"
+//     - "InsForge remote MCP server endpoint URL INSFORGE_API_KEY authentication"
+//
+//   Findings:
+//     - Remote MCP endpoint exists: https://mcp.insforge.dev/mcp (confirmed live,
+//       curl -I returns HTTP 400 indicating it received an unauthenticated request).
+//     - Authentication uses OAuth 2.0 with PKCE + browser redirect, not a static
+//       bearer token. The docs explicitly say "No API keys to copy-paste".
+//     - Local/self-hosted MCP uses API_KEY + API_BASE_URL env vars, but those
+//       point to the user's own InsForge instance (not the cloud service).
+//     - No programmatic/machine-usable API key env var exists for the hosted remote MCP.
+//
+//   To unblock: either (a) InsForge ships a service-account token for CI/agent use,
+//   or (b) wire against a self-hosted InsForge instance with INSFORGE_API_KEY +
+//   INSFORGE_API_BASE_URL and set tier:"mcp-forwarding" with mcp_endpoint pointing
+//   at that instance's /mcp route.
 
 import { makeMockSpecialist } from "./base";
 import type { SpecialistConfig, SpecialistRunner } from "../types";
 
 export const INSFORGE_BACKEND_CONFIG: SpecialistConfig = {
   agent_id: "insforge-backend",
+  tier: "mock",
   display_name: "insforge-backend",
   sponsor: "InsForge",
   capabilities: [

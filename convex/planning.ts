@@ -319,7 +319,15 @@ export const synthesize = internalAction({
 
     await ctx.runMutation(internal.tasks._setResult, {
       task_id: args.task_id,
-      result: { text: synthesized, agent_id: "synthesizer" },
+      result: {
+        text: synthesized,
+        agent_id: "synthesizer",
+        provenance: {
+          tier: "mock",
+          live_tools_called: false,
+          fallback_reason: "synthesizer",
+        },
+      },
     });
     await ctx.runMutation(internal.lifecycle.log, {
       task_id: args.task_id,

@@ -1,4 +1,86 @@
 /**
+ * Which execution tier a specialist runs on.
+ *   - "real"            → hand-written runner with direct API/tool calls.
+ *   - "mcp-forwarding"  → LLM-driven loop forwarding to a remote MCP server.
+ *   - "a2a"             → outbound A2A protocol (Stream C).
+ *   - "a2a-bridge"      → A2A-shaped lifecycle backed by provider MCP/API.
+ *   - "mock"            → OpenAI-in-persona; no live tools called. Explicit opt-in.
+ *   - "disabled"        → never registered; filtered out at startup.
+ */
+export type SpecialistTier =
+  | "real"
+  | "mcp-forwarding"
+  | "a2a"
+  | "a2a-bridge"
+  | "mock"
+  | "disabled";
+
+export type TransportKind = "api" | "mcp" | "a2a" | "a2a-bridge" | "mock";
+
+export type ProofLevel =
+  | "none"
+  | "api_call"
+  | "tool_call"
+  | "agent_session"
+  | "pr_opened";
+
+/**
+ * Provenance record attached to every specialist output so the UI can render
+ * an honest tier badge. Flows from runner.execute → _setResult → task.result.
+ */
+export interface SpecialistProvenance {
+  tier: SpecialistTier;
+  live_tools_called: boolean;
+  fallback_reason?: string;
+  endpoint?: string;
+  transport?: TransportKind;
+  proof_level?: ProofLevel;
+  successful_tool_call_count?: number;
+  tool_call_ids?: string[];
+  external_session_id?: string;
+  external_task_id?: string;
+  pr_url?: string;
+  pr_number?: number;
+}
+
+export interface ToolCallAuditInput {
+  agent_id?: string;
+  phase: "bid" | "execute" | "verify" | "pr";
+  transport: TransportKind;
+  provider: string;
+  endpoint?: string;
+  method: string;
+  tool_name?: string;
+  call_id?: string;
+  arguments?: Record<string, unknown>;
+}
+
+export interface ToolCallAuditOutcome {
+  ok: boolean;
+  result_preview?: string;
+  error_message?: string;
+  external_session_id?: string;
+  external_task_id?: string;
+  pr_url?: string;
+  pr_number?: number;
+}
+
+export interface ToolCallRecorder {
+  record<T>(
+    input: ToolCallAuditInput,
+    run: () => Promise<T>,
+    outcome?: (result: T) => ToolCallAuditOutcome,
+  ): Promise<T>;
+  successfulCallIds(): string[];
+}
+
+export interface SpecialistExecuteContext {
+  task_id?: string;
+  agent_id?: string;
+  toolRecorder?: ToolCallRecorder;
+}
+
+/**
  * Static sponsor agents shipped in the registry. Discovered specialists use
  * arbitrary kebab-case ids, so the broader `AgentId` type is just `string`.
  */
@@ -122,6 +204,21 @@ export interface SpecialistConfig {
   cost_baseline: number;
   starting_reputation: number;
   one_liner: string;
+  /** Execution tier — determines which runner factory is used. Required. */
+  tier: SpecialistTier;
+  /** A2A endpoint URL (Stream C will use this). */
+  a2a_endpoint?: string;
+  /**
+   * Optional explicit URL for this agent's card JSON. If omitted the runner
+   * defaults to `${origin(a2a_endpoint)}/.well-known/agent.json`.
+   */
+  a2a_agent_card_url?: string;
+  /**
+   * Env-var name whose value is used as a bearer / API-key token when the
+   * agent card requires authentication. Mirrors the existing `mcp_api_key_env`
+   * convention — no derived naming from agent_id.
+   */
+  a2a_api_key_env?: string;
   /**
    * If set, this specialist is wired to a real remote MCP server. Bid + execute
    * are forwarded to that endpoint via an LLM-driven tool-calling loop, instead
@@ -131,6 +228,12 @@ export interface SpecialistConfig {
   mcp_endpoint?: string;
   /** Optional env var name used as a bearer token for the remote MCP server. */
   mcp_api_key_env?: string;
+  /**
+   * Optional extra headers sourced from env vars for remote MCP requests.
+   * Shape is HTTP header name -> env var name. Values are never embedded in
+   * persisted specialist config.
+   */
+  mcp_header_env_vars?: Record<string, string>;
   /** True when the MCP endpoint has been successfully exercised end-to-end. */
   is_verified?: boolean;
   /** Public homepage / docs URL for the sponsor. */
@@ -151,10 +254,19 @@ export interface SpecialistConfig {
   discovered_for?: string;
 }
 
+export interface SpecialistExecuteResult {
+  output: SpecialistOutput;
+  provenance: SpecialistProvenance;
+}
+
 export interface SpecialistRunner {
   config: SpecialistConfig;
   /** Decide whether to bid on a task. */
   bid(prompt: string, taskType: string): Promise<SpecialistDecision>;
-  /** Execute the task once awarded. */
-  execute(prompt: string, taskType: string): Promise<SpecialistOutput>;
+  /** Execute the task once awarded. Returns output + provenance. */
+  execute(
+    prompt: string,
+    taskType: string,
+    context?: SpecialistExecuteContext,
+  ): Promise<SpecialistExecuteResult>;
 }

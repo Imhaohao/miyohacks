@@ -22,12 +22,20 @@ import {
 } from "../mcp-outbound";
 import { parseJSONLoose } from "../openai";
 import { buildTaskContext } from "../campaign-context";
+import {
+  mcpToolOutcome,
+  previewValue,
+} from "../tool-call-audit";
 import type {
   SpecialistConfig,
   SpecialistDecision,
   SpecialistRunner,
   BidPayload,
   SpecialistOutput,
+  SpecialistExecuteResult,
+  SpecialistProvenance,
+  SpecialistExecuteContext,
+  ToolCallAuditInput,
 } from "../types";
 
 const MODEL = "gpt-5.5";
@@ -90,6 +98,19 @@ function sanitizeName(n: string): string {
   return n.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
 }
 
+function resolveMcpHeaders(config: SpecialistConfig): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const [header, envName] of Object.entries(config.mcp_header_env_vars ?? {})) {
+    const value = process.env[envName]?.trim();
+    if (value) headers[header] = value;
+  }
+  return headers;
+}
+
+function providerFromConfig(config: SpecialistConfig): string {
+  return config.sponsor || config.agent_id;
+}
+
 async function chatCompletion(body: Record<string, unknown>, timeoutMs: number): Promise<ChatResponse> {
   // gpt-5.5 rejects `reasoning_effort` together with `tools` on /v1/chat/completions
   // ("Function tools with reasoning_effort are not supported"). Strip it when
@@ -135,6 +156,7 @@ export function makeMcpForwardingSpecialist(
   const remoteApiKey = config.mcp_api_key_env
     ? process.env[config.mcp_api_key_env]
     : undefined;
+  const mcpOptions = { headers: resolveMcpHeaders(config) };
   let cachedTools: RemoteMcpTool[] | null = null;
   let toolDiscoveryFailed = false;
 
@@ -142,7 +164,7 @@ export function makeMcpForwardingSpecialist(
     if (cachedTools) return cachedTools;
     if (toolDiscoveryFailed) return [];
     try {
-      cachedTools = await discoverTools(endpoint, remoteApiKey);
+      cachedTools = await discoverTools(endpoint, remoteApiKey, mcpOptions);
       return cachedTools;
     } catch {
       toolDiscoveryFailed = true;
@@ -193,19 +215,62 @@ export function makeMcpForwardingSpecialist(
       return bid;
     },
 
-    async execute(prompt, taskType): Promise<SpecialistOutput> {
+    async execute(
+      prompt,
+      taskType,
+      context?: SpecialistExecuteContext,
+    ): Promise<SpecialistExecuteResult> {
       const tools = await getTools();
+      const successfulToolCallIds: string[] = [];
+      const callInputBase = {
+        agent_id: context?.agent_id ?? config.agent_id,
+        phase: "execute" as const,
+        transport: "mcp" as const,
+        provider: providerFromConfig(config),
+        endpoint,
+        method: "tools/call",
+      };
+
+      async function runMcpTool(realName: string, args: Record<string, unknown>) {
+        const input: ToolCallAuditInput = {
+          ...callInputBase,
+          tool_name: realName,
+          arguments: args,
+        };
+        const run = () =>
+          callRemoteTool(endpoint, realName, args, 25_000, remoteApiKey, mcpOptions);
+        if (!context?.toolRecorder) {
+          const result = await run();
+          if (result.isError !== true) successfulToolCallIds.push("unpersisted");
+          return result;
+        }
+        return await context.toolRecorder.record(input, run, (result) => {
+          const preview = previewValue(result.content);
+          return mcpToolOutcome({ result, preview });
+        });
+      }
 
       // No tools discovered → fall back to a plain completion in persona, with
-      // a note that the MCP server was unreachable. Degrades gracefully.
+      // a banner that the MCP server was unreachable. No silent mock.
       if (tools.length === 0) {
         const sys = `${config.system_prompt}\n\nYou are normally connected to ${endpoint} but tool discovery is unavailable right now. Produce your best persona-driven answer to the user's actual goal and clearly note in the output that live MCP tool calls were not made.`;
-        return await callPlain(
+        const raw = await callPlain(
           sys,
           buildTaskContext(prompt, taskType),
           4000,
           60_000,
         );
+        const provenance: SpecialistProvenance = {
+          tier: "mcp-forwarding",
+          live_tools_called: false,
+          transport: "mcp",
+          proof_level: "none",
+          successful_tool_call_count: 0,
+          fallback_reason: "tool discovery unavailable",
+          endpoint,
+        };
+        const output: SpecialistOutput = `[FALLBACK — MCP endpoint unreachable, no tools called]\n\n${raw}`;
+        return { output, provenance };
       }
 
       const openaiTools = toOpenAITools(tools);
@@ -236,7 +301,17 @@ export function makeMcpForwardingSpecialist(
         messages.push(msg);
 
         if (!msg.tool_calls || msg.tool_calls.length === 0) {
-          return (msg.content ?? "").trim();
+          const provenance: SpecialistProvenance = {
+            tier: "mcp-forwarding",
+            live_tools_called: successfulToolCallIds.length > 0,
+            transport: "mcp",
+            proof_level:
+              successfulToolCallIds.length > 0 ? "tool_call" : "none",
+            successful_tool_call_count: successfulToolCallIds.length,
+            tool_call_ids: successfulToolCallIds,
+            endpoint,
+          };
+          return { output: (msg.content ?? "").trim(), provenance };
         }
 
         for (const call of msg.tool_calls) {
@@ -249,13 +324,14 @@ export function makeMcpForwardingSpecialist(
           }
           let toolText: string;
           try {
-            const r = await callRemoteTool(
-              endpoint,
-              realName,
-              args,
-              25_000,
-              remoteApiKey,
-            );
+            const before = context?.toolRecorder?.successfulCallIds().length ?? 0;
+            const r = await runMcpTool(realName, args);
+            const after = context?.toolRecorder?.successfulCallIds().length ?? before;
+            if (after > before) {
+              successfulToolCallIds.push(
+                ...context!.toolRecorder!.successfulCallIds().slice(before),
+              );
+            }
             toolText = flattenToolResult(r);
             if (r.isError) toolText = `tool reported error: ${toolText}`;
           } catch (err) {
@@ -287,7 +363,16 @@ export function makeMcpForwardingSpecialist(
         },
         45_000,
       );
-      return (final.choices[0]?.message?.content ?? "").trim();
+      const provenance: SpecialistProvenance = {
+        tier: "mcp-forwarding",
+        live_tools_called: successfulToolCallIds.length > 0,
+        transport: "mcp",
+        proof_level: successfulToolCallIds.length > 0 ? "tool_call" : "none",
+        successful_tool_call_count: successfulToolCallIds.length,
+        tool_call_ids: successfulToolCallIds,
+        endpoint,
+      };
+      return { output: (final.choices[0]?.message?.content ?? "").trim(), provenance };
     },
   };
 }

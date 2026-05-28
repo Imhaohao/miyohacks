@@ -1,8 +1,9 @@
 "use node";
 
-import { internalAction } from "./_generated/server";
+import { internalAction, type ActionCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import {
   SPECIALISTS,
   getRunner,
@@ -16,9 +17,19 @@ import type {
   JudgeVerdict,
   SpecialistConfig,
   SpecialistOutput,
+  SpecialistProvenance,
+  ToolCallAuditInput,
+  ToolCallAuditOutcome,
+  ToolCallRecorder,
 } from "../lib/types";
 import { callOpenAIJSON } from "../lib/openai";
 import { buildTaskContext } from "../lib/campaign-context";
+import {
+  endpointHost,
+  finalizeProvenance,
+  previewValue,
+  redactToolArguments,
+} from "../lib/tool-call-audit";
 
 const BUYER_ID = "buyer:default";
 
@@ -39,6 +50,85 @@ function formatResultForJudge(result: unknown): string {
     return JSON.stringify(result, null, 2);
   }
   return JSON.stringify(result);
+}
+
+function cleanArgs<T extends Record<string, unknown>>(input: T): T {
+  const entries = Object.entries(input).filter(([, value]) => value !== undefined);
+  return Object.fromEntries(entries) as T;
+}
+
+function makeToolCallRecorder(
+  ctx: ActionCtx,
+  task_id: Id<"tasks">,
+  defaultAgentId: string,
+): ToolCallRecorder {
+  const successfulIds: string[] = [];
+
+  return {
+    async record(input, run, outcome) {
+      const callId: Id<"agent_tool_calls"> = await ctx.runMutation(
+        internal.agentToolCalls.start,
+        cleanArgs({
+          task_id,
+          agent_id: input.agent_id ?? defaultAgentId,
+          phase: input.phase,
+          transport: input.transport,
+          provider: input.provider,
+          endpoint_host: endpointHost(input.endpoint),
+          method: input.method,
+          tool_name: input.tool_name,
+          call_id: input.call_id,
+          arguments_redacted: redactToolArguments(input.arguments ?? {}),
+        }),
+      );
+
+      try {
+        const result = await run();
+        const audit: ToolCallAuditOutcome = outcome
+          ? outcome(result)
+          : { ok: true, result_preview: previewValue(result) };
+        if (audit.ok) {
+          await ctx.runMutation(
+            internal.agentToolCalls.succeed,
+            cleanArgs({
+              call_id: callId,
+              result_preview: audit.result_preview,
+              external_session_id: audit.external_session_id,
+              external_task_id: audit.external_task_id,
+              pr_url: audit.pr_url,
+              pr_number: audit.pr_number,
+            }),
+          );
+          successfulIds.push(callId);
+        } else {
+          await ctx.runMutation(
+            internal.agentToolCalls.fail,
+            cleanArgs({
+              call_id: callId,
+              error_message:
+                audit.error_message ?? "Tool call returned an error result.",
+              result_preview: audit.result_preview,
+              external_session_id: audit.external_session_id,
+              external_task_id: audit.external_task_id,
+            }),
+          );
+        }
+        return result;
+      } catch (err) {
+        await ctx.runMutation(
+          internal.agentToolCalls.fail,
+          cleanArgs({
+            call_id: callId,
+            error_message: err instanceof Error ? err.message : String(err),
+          }),
+        );
+        throw err;
+      }
+    },
+    successfulCallIds() {
+      return [...successfulIds];
+    },
+  };
 }
 
 // ─── Phase 2: bid solicitation ───────────────────────────────────────────
@@ -74,6 +164,7 @@ export const solicitBids = internalAction({
         discovered: true,
         discovery_source: d.discovery_source,
         discovered_for: d.discovered_for,
+        tier: d.mcp_endpoint ? "mcp-forwarding" : "mock",
       };
       registerDiscoveredSpecialist(cfg);
       return cfg;
@@ -103,6 +194,7 @@ export const solicitBids = internalAction({
         discovered: true,
         discovery_source: "catalog",
         discovered_for: "auto-enrolled from catalog",
+        tier: "mcp-forwarding",
       };
       registerDiscoveredSpecialist(cfg);
       return cfg;
@@ -151,7 +243,20 @@ export const solicitBids = internalAction({
             return;
           }
           const bid = decision satisfies BidPayload;
-          const score = reputation / Math.max(0.01, bid.bid_price);
+          // Tier-weighted Vickrey score: real bidders outrank mocks even
+          // when their headline price is identical. A `tier:"mock"` bid is
+          // worth 1/5 of a real bid; `tier:"disabled"` can never win.
+          const tierWeight =
+            spec.tier === "real" ||
+            spec.tier === "mcp-forwarding" ||
+            spec.tier === "a2a" ||
+            spec.tier === "a2a-bridge"
+              ? 1.0
+              : spec.tier === "mock"
+                ? 0.2
+                : 0;
+          const score =
+            (reputation / Math.max(0.01, bid.bid_price)) * tierWeight;
           const bid_id = await ctx.runMutation(internal.bids._insert, {
             task_id: args.task_id,
             agent_id: spec.agent_id,
@@ -326,20 +431,30 @@ export const execute = internalAction({
           discovered: true,
           discovery_source: discoveredEntry.discovery_source,
           discovered_for: discoveredEntry.discovered_for,
+          tier: discoveredEntry.mcp_endpoint ? "mcp-forwarding" : "mock",
         });
       }
       const runner = getRunner(winner.agent_id as AgentId);
+      const toolRecorder = makeToolCallRecorder(ctx, args.task_id, winner.agent_id);
       // 180s cap on execute. MCP-forwarding specialists run multi-round
       // tool-calling loops (6 rounds × ~30s each worst case for Reacher /
       // Nia), so 60s would force a timeout before they finish. Plain
       // (mock) specialists return well under this.
-      const result = await Promise.race([
-        runner.execute(promptForExecution, task.task_type),
-        new Promise<SpecialistOutput>((_, reject) =>
+      const executeResult = await Promise.race([
+        runner.execute(promptForExecution, task.task_type, {
+          task_id: args.task_id,
+          agent_id: winner.agent_id,
+          toolRecorder,
+        }),
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("execution timeout (180s)")), 180_000),
         ),
       ]);
-      const normalized = normalizeSpecialistOutput(result);
+      const normalized = normalizeSpecialistOutput(executeResult.output);
+      const provenance: SpecialistProvenance = finalizeProvenance(
+        executeResult.provenance,
+        toolRecorder.successfulCallIds(),
+      );
 
       await ctx.runMutation(internal.tasks._setResult, {
         task_id: args.task_id,
@@ -347,12 +462,22 @@ export const execute = internalAction({
           text: normalized.text,
           agent_id: winner.agent_id,
           artifact: normalized.artifact,
+          provenance,
         },
       });
       await ctx.runMutation(internal.lifecycle.log, {
         task_id: args.task_id,
         event_type: "execution_complete",
-        payload: { agent_id: winner.agent_id, length: normalized.text.length },
+        payload: {
+          agent_id: winner.agent_id,
+          length: normalized.text.length,
+          successful_tool_call_count:
+            provenance.successful_tool_call_count ?? 0,
+          proof_level: provenance.proof_level ?? "none",
+          external_session_id: provenance.external_session_id,
+          pr_url: provenance.pr_url,
+          pr_number: provenance.pr_number,
+        },
       });
 
       // Phase 5 — judge.
