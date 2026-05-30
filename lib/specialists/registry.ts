@@ -28,6 +28,7 @@ import { makeA2aForwardingSpecialist } from "./a2a-forwarding";
 import { makeMockSpecialist } from "./base";
 import { makeDevinMcpBridgeSpecialist } from "./devin-bridge";
 import type { SpecialistConfig, SpecialistRunner, AgentId } from "../types";
+export { toPublicTier } from "./tiers";
 
 /**
  * Seed A2A specialist that round-trips to Arbor's own /api/a2a/market gateway.

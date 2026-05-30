@@ -193,6 +193,45 @@ export default defineSchema({
     value_score: v.optional(v.number()),
   }).index("by_task", ["task_id"]),
 
+  bid_probes: defineTable({
+    task_id: v.id("tasks"),
+    bid_id: v.optional(v.id("bids")),               // null when probe failed and no bid was inserted
+    agent_id: v.string(),
+    public_tier: v.string(),                          // "native-a2a" | "a2a-bridge" | "not-a2a-yet"
+    probe_status: v.union(
+      v.literal("pass"),
+      v.literal("fail"),
+      v.literal("demo_lane"),
+    ),
+    duration_ms: v.number(),
+    response_excerpt: v.optional(v.string()),         // first 300 chars of the agent's response
+    error_message: v.optional(v.string()),
+    created_at: v.number(),
+  })
+    .index("by_task", ["task_id"])
+    .index("by_bid", ["bid_id"]),
+
+  // ─── HMAC signing & replay protection (plan §H follow-ups) ──────────────
+  // Per-agent shared secret. The secret is stored base64-encoded so that
+  // operators can paste it as an env var without escaping. Revoked rows
+  // are kept for audit; _getSecretForAgent ignores them.
+  agent_keys: defineTable({
+    agent_id: v.string(),
+    secret_b64: v.string(),
+    created_at: v.number(),
+    revoked_at: v.optional(v.number()),
+  }).index("by_agent_id", ["agent_id"]),
+
+  // Nonces seen on signed inbound callbacks. Each row is one accepted
+  // request; replay attempts hit the by_nonce index and 403.
+  a2a_nonces: defineTable({
+    nonce: v.string(),
+    agent_id: v.string(),
+    created_at: v.number(),
+  })
+    .index("by_nonce", ["nonce"])
+    .index("by_created_at", ["created_at"]),
+
   escrow: defineTable({
     task_id: v.id("tasks"),
     buyer_id: v.string(),
@@ -280,6 +319,10 @@ export default defineSchema({
     external_task_id: v.optional(v.string()),
     pr_url: v.optional(v.string()),
     pr_number: v.optional(v.number()),
+    events_observed: v.optional(v.number()),
+    artifact_present: v.optional(v.boolean()),
+    artifact_hash: v.optional(v.string()),
+    probe_id: v.optional(v.id("bid_probes")),
     created_at: v.number(),
     updated_at: v.number(),
   })

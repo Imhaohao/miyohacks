@@ -23,6 +23,7 @@ import type {
   EscrowDoc,
   LifecycleEventDoc,
 } from "@/lib/task-view";
+import type { BidProbeDoc } from "./ProbeReceiptPanel";
 
 export function TaskView({ taskId }: { taskId: string }) {
   const id = taskId as Id<"tasks">;
@@ -40,8 +41,11 @@ export function TaskView({ taskId }: { taskId: string }) {
   const toolCalls = useQuery(api.agentToolCalls.forTask, { task_id: id }) as
     | AgentToolCallDoc[]
     | undefined;
+  const probes = useQuery(api.bidProbes.forTask, { task_id: id }) as
+    | BidProbeDoc[]
+    | undefined;
 
-  if (task === undefined || lifecycle === undefined || toolCalls === undefined) {
+  if (task === undefined || lifecycle === undefined || toolCalls === undefined || probes === undefined) {
     return <TaskLoading />;
   }
   if (task === null) {
@@ -76,6 +80,7 @@ export function TaskView({ taskId }: { taskId: string }) {
       escrow={escrow}
       lifecycle={lifecycle}
       toolCalls={toolCalls}
+      probes={probes}
       taskId={taskId}
       isMultiStepParent={isMultiStepParent}
     />
@@ -87,6 +92,7 @@ function RegularTaskView({
   escrow,
   lifecycle,
   toolCalls,
+  probes,
   taskId,
   isMultiStepParent,
 }: {
@@ -94,6 +100,7 @@ function RegularTaskView({
   escrow: EscrowDoc | null | undefined;
   lifecycle: LifecycleEventDoc[];
   toolCalls: AgentToolCallDoc[];
+  probes: BidProbeDoc[];
   taskId: string;
   isMultiStepParent: boolean;
 }) {
@@ -108,15 +115,15 @@ function RegularTaskView({
       {isMultiStepParent ? (
         <>
           <PlanPanel task={task} />
-          <ExecutionPanel task={task} events={lifecycle} toolCalls={toolCalls} />
+          <ExecutionPanel task={task} events={lifecycle} toolCalls={toolCalls} probes={probes} />
           <JudgeVerdictPanel task={task} events={lifecycle} />
         </>
       ) : (
         <>
           <BidWindow task={task} events={lifecycle} />
-          <AuctionResolution events={lifecycle} />
+          <AuctionResolution events={lifecycle} probes={probes} />
           <ValueImpactPanel task={task} events={lifecycle} />
-          <ExecutionPanel task={task} events={lifecycle} toolCalls={toolCalls} />
+          <ExecutionPanel task={task} events={lifecycle} toolCalls={toolCalls} probes={probes} />
           <JudgeVerdictPanel task={task} events={lifecycle} />
           <SettlementPanel
             task={task}

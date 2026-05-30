@@ -5,6 +5,7 @@
 import type {
   BidPayload,
   DeclineDecision,
+  ProbeResult,
   SpecialistConfig,
   SpecialistOutput,
   SpecialistRunner,
@@ -12,6 +13,7 @@ import type {
   SpecialistProvenance,
 } from "../types";
 import { buildTaskContext } from "../campaign-context";
+import { toPublicTier } from "./tiers";
 
 const V0_API_URL = "https://api.v0.dev/v1/chats";
 const V0_POLL_TIMEOUT_MS = 120_000;
@@ -282,6 +284,49 @@ export function cn(...inputs: ClassValue[]) {
 export const vercelV0: SpecialistRunner = {
   config: VERCEL_V0_CONFIG,
 
+  async probe(_taskType: string): Promise<ProbeResult> {
+    const t0 = Date.now();
+    const key = v0Key();
+    if (!key) {
+      return {
+        status: "fail",
+        duration_ms: Date.now() - t0,
+        error_message: "V0_API_KEY is not set",
+      };
+    }
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 8000);
+    let response: Response;
+    try {
+      response = await fetch(V0_API_URL, {
+        headers: { authorization: `Bearer ${key}` },
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(id);
+      return {
+        status: "fail",
+        duration_ms: Date.now() - t0,
+        error_message: err instanceof Error ? err.message : String(err),
+      };
+    }
+    clearTimeout(id);
+    const duration_ms = Date.now() - t0;
+    if (response.status >= 500) {
+      return {
+        status: "fail",
+        duration_ms,
+        error_message: `v0 server error ${response.status}`,
+      };
+    }
+    const body = await response.text().catch(() => "");
+    return {
+      status: "pass",
+      duration_ms,
+      response_excerpt: `status=${response.status}; ${body.slice(0, 260)}`.slice(0, 300),
+    };
+  },
+
   async bid(prompt, taskType): Promise<BidPayload | DeclineDecision> {
     if (!v0Key()) {
       return decline("V0_API_KEY is not configured, so real v0 generation is unavailable.");
@@ -301,7 +346,7 @@ export const vercelV0: SpecialistRunner = {
     const data = await createV0Chat(prompt, taskType);
     const output: SpecialistOutput = summarizeV0Response(data);
     const provenance: SpecialistProvenance = {
-      tier: "real",
+      tier: toPublicTier(VERCEL_V0_CONFIG.tier),
       live_tools_called: true,
       transport: "api",
       proof_level: "api_call",

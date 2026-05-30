@@ -40,18 +40,32 @@ export interface ToolCallResult {
 
 export interface McpRequestOptions {
   headers?: Record<string, string>;
+  /**
+   * When true, the caller is responsible for the Streamable-HTTP session
+   * handshake (see `mcp_requires_session` in SpecialistConfig). This flag is
+   * read by `discoverTools` / `callRemoteTool` to decide whether to capture
+   * and echo `Mcp-Session-Id`. The low-level `rpcSession` always captures the
+   * header; this only changes the orchestration above it.
+   */
+  requiresSession?: boolean;
 }
 
 let nextId = 1;
 
-async function rpc<T>(
+/**
+ * Single JSON-RPC round-trip. Returns the result plus any `Mcp-Session-Id`
+ * the server issued (or echoed back). Pass `sessionId` to thread an existing
+ * session onto this request.
+ */
+async function rpcSession<T>(
   url: string,
   method: string,
-  params?: Record<string, unknown>,
-  timeoutMs = 15_000,
-  apiKey?: string,
-  options?: McpRequestOptions,
-): Promise<T> {
+  params: Record<string, unknown> | undefined,
+  timeoutMs: number,
+  apiKey: string | undefined,
+  options: McpRequestOptions | undefined,
+  sessionId: string | undefined,
+): Promise<{ result: T; sessionId?: string }> {
   const body: JsonRpcRequest = {
     jsonrpc: "2.0",
     id: nextId++,
@@ -66,6 +80,7 @@ async function rpc<T>(
   for (const [key, value] of Object.entries(options?.headers ?? {})) {
     if (value.trim()) headers[key] = value;
   }
+  if (sessionId) headers["mcp-session-id"] = sessionId;
 
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
@@ -76,6 +91,7 @@ async function rpc<T>(
       body: JSON.stringify(body),
       signal: ctl.signal,
     });
+    const returnedSession = res.headers.get("mcp-session-id") ?? sessionId;
     if (!res.ok) {
       throw new Error(`MCP ${method} → ${url} HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
     }
@@ -96,41 +112,74 @@ async function rpc<T>(
         `MCP ${method} error ${envelope.error.code}: ${envelope.error.message}`,
       );
     }
-    return envelope.result as T;
+    return { result: envelope.result as T, sessionId: returnedSession ?? undefined };
   } finally {
     clearTimeout(timer);
   }
 }
+
+async function rpc<T>(
+  url: string,
+  method: string,
+  params?: Record<string, unknown>,
+  timeoutMs = 15_000,
+  apiKey?: string,
+  options?: McpRequestOptions,
+): Promise<T> {
+  const { result } = await rpcSession<T>(
+    url,
+    method,
+    params,
+    timeoutMs,
+    apiKey,
+    options,
+    undefined,
+  );
+  return result;
+}
+
+const INIT_PARAMS = {
+  protocolVersion: "2024-11-05",
+  clientInfo: { name: "agent-auction", version: "0.1.0" },
+  capabilities: {},
+} as const;
 
 export async function discoverTools(
   url: string,
   apiKey?: string,
   options?: McpRequestOptions,
 ): Promise<RemoteMcpTool[]> {
-  // Conventional handshake first; many servers tolerate skipping but a few require it.
-  try {
-    await rpc(
+  let sessionId: string | undefined;
+  if (options?.requiresSession) {
+    // Session-enforcing server: initialize MUST succeed and yields the session
+    // id we have to echo on tools/list. Let failures propagate so the probe
+    // reports them honestly.
+    const init = await rpcSession(
       url,
       "initialize",
-      {
-        protocolVersion: "2024-11-05",
-        clientInfo: { name: "agent-auction", version: "0.1.0" },
-        capabilities: {},
-      },
+      { ...INIT_PARAMS },
       8_000,
       apiKey,
       options,
+      undefined,
     );
-  } catch {
-    // Tolerate servers that don't require initialize.
+    sessionId = init.sessionId;
+  } else {
+    // Conventional handshake first; many servers tolerate skipping but a few require it.
+    try {
+      await rpc(url, "initialize", { ...INIT_PARAMS }, 8_000, apiKey, options);
+    } catch {
+      // Tolerate servers that don't require initialize.
+    }
   }
-  const result = await rpc<ToolsListResult>(
+  const { result } = await rpcSession<ToolsListResult>(
     url,
     "tools/list",
     {},
     12_000,
     apiKey,
     options,
+    sessionId,
   );
   return result.tools ?? [];
 }
@@ -143,14 +192,30 @@ export async function callRemoteTool(
   apiKey?: string,
   options?: McpRequestOptions,
 ): Promise<ToolCallResult> {
-  return await rpc<ToolCallResult>(
+  let sessionId: string | undefined;
+  if (options?.requiresSession) {
+    // Establish a fresh session for this call so the server accepts tools/call.
+    const init = await rpcSession(
+      url,
+      "initialize",
+      { ...INIT_PARAMS },
+      8_000,
+      apiKey,
+      options,
+      undefined,
+    );
+    sessionId = init.sessionId;
+  }
+  const { result } = await rpcSession<ToolCallResult>(
     url,
     "tools/call",
     { name, arguments: args },
     timeoutMs,
     apiKey,
     options,
+    sessionId,
   );
+  return result;
 }
 
 /** Compact tool-call result text from MCP `content` blocks. */

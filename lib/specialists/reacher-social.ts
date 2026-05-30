@@ -5,11 +5,12 @@
 // execution calls the key Reacher tools directly and formats a concise launch
 // plan instead of letting a generic tool-calling loop spend the full timeout.
 
-import { callRemoteTool, flattenToolResult } from "../mcp-outbound";
+import { callRemoteTool, discoverTools, flattenToolResult } from "../mcp-outbound";
 import { mcpToolOutcome, previewValue } from "../tool-call-audit";
 import type {
   CampaignLaunchArtifact,
   CampaignLaunchCreator,
+  ProbeResult,
   SpecialistConfig,
   SpecialistRunner,
   SpecialistExecuteResult,
@@ -17,6 +18,7 @@ import type {
   SpecialistProvenance,
   ToolCallAuditInput,
 } from "../types";
+import { toPublicTier } from "./tiers";
 
 /**
  * Reacher's domain is TikTok Shop creator-commerce. The bid is rule-based
@@ -229,6 +231,43 @@ function buildArtifact(args: {
 export const reacherSocial: SpecialistRunner = {
   config: REACHER_SOCIAL_CONFIG,
 
+  async probe(_taskType: string): Promise<ProbeResult> {
+    const t0 = Date.now();
+    const key = process.env.REACHER_API_KEY?.trim();
+    if (!key) {
+      return {
+        status: "fail",
+        duration_ms: Date.now() - t0,
+        error_message: "REACHER_API_KEY is not set",
+      };
+    }
+    const endpoint = REACHER_SOCIAL_CONFIG.mcp_endpoint!;
+    let tools: { name: string }[];
+    try {
+      tools = await discoverTools(endpoint, key);
+    } catch (err) {
+      return {
+        status: "fail",
+        duration_ms: Date.now() - t0,
+        error_message: err instanceof Error ? err.message : String(err),
+      };
+    }
+    const duration_ms = Date.now() - t0;
+    if (tools.length === 0) {
+      return {
+        status: "fail",
+        duration_ms,
+        error_message: "reacher MCP returned 0 tools",
+      };
+    }
+    const names = tools.slice(0, 5).map((t) => t.name).join(", ");
+    return {
+      status: "pass",
+      duration_ms,
+      response_excerpt: `tools=${tools.length}: ${names}`.slice(0, 300),
+    };
+  },
+
   async bid(prompt, taskType) {
     if (!isInScope(prompt, taskType)) {
       return {
@@ -315,7 +354,7 @@ export const reacherSocial: SpecialistRunner = {
     });
 
     const provenance: SpecialistProvenance = {
-      tier: "real",
+      tier: toPublicTier(REACHER_SOCIAL_CONFIG.tier),
       live_tools_called: true,
       transport: "mcp",
       proof_level: "tool_call",

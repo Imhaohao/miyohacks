@@ -36,7 +36,9 @@ import type {
   SpecialistProvenance,
   SpecialistExecuteContext,
   ToolCallAuditInput,
+  ProbeResult,
 } from "../types";
+import { toPublicTier } from "./tiers";
 
 const MODEL = "gpt-5.5";
 const CHAT_URL = "https://api.openai.com/v1/chat/completions";
@@ -107,6 +109,16 @@ function resolveMcpHeaders(config: SpecialistConfig): Record<string, string> {
   return headers;
 }
 
+/**
+ * Names of declared header env vars that are missing at runtime. Used to
+ * decline/probe-fail loudly instead of hitting the endpoint unauthenticated.
+ */
+function missingHeaderEnvVars(config: SpecialistConfig): string[] {
+  return Object.values(config.mcp_header_env_vars ?? {}).filter(
+    (envName) => !process.env[envName]?.trim(),
+  );
+}
+
 function providerFromConfig(config: SpecialistConfig): string {
   return config.sponsor || config.agent_id;
 }
@@ -156,7 +168,10 @@ export function makeMcpForwardingSpecialist(
   const remoteApiKey = config.mcp_api_key_env
     ? process.env[config.mcp_api_key_env]
     : undefined;
-  const mcpOptions = { headers: resolveMcpHeaders(config) };
+  const mcpOptions = {
+    headers: resolveMcpHeaders(config),
+    requiresSession: config.mcp_requires_session,
+  };
   let cachedTools: RemoteMcpTool[] | null = null;
   let toolDiscoveryFailed = false;
 
@@ -174,6 +189,65 @@ export function makeMcpForwardingSpecialist(
 
   return {
     config,
+
+    async probe(_taskType: string): Promise<ProbeResult> {
+      // taskType is intentionally unused: MCP-forwarding agents claim to cover
+      // whatever capabilities their tools provide. The tools list itself is the
+      // liveness signal — if tools/list succeeds and returns at least one tool,
+      // the endpoint is alive and functional.
+      const t0 = Date.now();
+
+      // If the config declares a required API key env var, verify it is set
+      // before hitting the network.
+      if (config.mcp_api_key_env && !remoteApiKey) {
+        return {
+          status: "fail",
+          duration_ms: Date.now() - t0,
+          error_message: `missing api key: ${config.mcp_api_key_env}`,
+        };
+      }
+      // Same for header-based auth (e.g. X-Api-Key): decline loudly rather than
+      // hitting the endpoint unauthenticated and reporting an opaque 401.
+      const missingHeaders = missingHeaderEnvVars(config);
+      if (missingHeaders.length > 0) {
+        return {
+          status: "fail",
+          duration_ms: Date.now() - t0,
+          error_message: `missing api key: ${missingHeaders.join(", ")}`,
+        };
+      }
+
+      let tools: RemoteMcpTool[];
+      try {
+        tools = await discoverTools(endpoint, remoteApiKey, mcpOptions);
+        // Update the cache so subsequent bid/execute calls benefit.
+        cachedTools = tools;
+      } catch (err) {
+        return {
+          status: "fail",
+          duration_ms: Date.now() - t0,
+          error_message: String((err as Error)?.message ?? err),
+        };
+      }
+
+      const duration_ms = Date.now() - t0;
+
+      if (tools.length === 0) {
+        return {
+          status: "fail",
+          duration_ms,
+          error_message: "mcp endpoint returned 0 tools",
+          response_excerpt: "[]",
+        };
+      }
+
+      return {
+        status: "pass",
+        duration_ms,
+        response_excerpt: `tools=${tools.length}: ${tools.slice(0, 5).map((t) => t.name).join(", ")}`.slice(0, 300),
+      };
+    },
+
     async bid(prompt, taskType): Promise<SpecialistDecision> {
       const tools = await getTools();
       if (tools.length === 0) {
@@ -261,7 +335,7 @@ export function makeMcpForwardingSpecialist(
           60_000,
         );
         const provenance: SpecialistProvenance = {
-          tier: "mcp-forwarding",
+          tier: toPublicTier(config.tier),
           live_tools_called: false,
           transport: "mcp",
           proof_level: "none",
@@ -302,7 +376,7 @@ export function makeMcpForwardingSpecialist(
 
         if (!msg.tool_calls || msg.tool_calls.length === 0) {
           const provenance: SpecialistProvenance = {
-            tier: "mcp-forwarding",
+            tier: toPublicTier(config.tier),
             live_tools_called: successfulToolCallIds.length > 0,
             transport: "mcp",
             proof_level:
@@ -364,7 +438,7 @@ export function makeMcpForwardingSpecialist(
         45_000,
       );
       const provenance: SpecialistProvenance = {
-        tier: "mcp-forwarding",
+        tier: toPublicTier(config.tier),
         live_tools_called: successfulToolCallIds.length > 0,
         transport: "mcp",
         proof_level: successfulToolCallIds.length > 0 ? "tool_call" : "none",

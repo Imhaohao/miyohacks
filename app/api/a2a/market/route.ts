@@ -557,9 +557,40 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Read the raw body up front so HMAC verification can sign exactly what
+  // the caller sent (re-stringifying parsed JSON loses key order and would
+  // break signatures generated against the wire format).
+  const rawBody = await req.text();
+
+  // Opt-in HMAC verification. Demos and unsigned A2A clients keep working
+  // unless ARBOR_A2A_HMAC_REQUIRED=true is set; that flag flips the gateway
+  // into "every inbound POST must be signed" mode.
+  if (process.env.ARBOR_A2A_HMAC_REQUIRED === "true") {
+    const client = convex();
+    const verdict = await client.action(api.a2aAuth.verifyInboundCallback, {
+      raw_body: rawBody,
+      agent_id: req.headers.get("X-Arbor-Agent") ?? undefined,
+      timestamp: req.headers.get("X-Arbor-Timestamp") ?? undefined,
+      nonce: req.headers.get("X-Arbor-Nonce") ?? undefined,
+      signature: req.headers.get("X-Arbor-Signature") ?? undefined,
+    });
+    if (!verdict.ok) {
+      return new Response(
+        JSON.stringify({
+          error: verdict.error,
+          detail: verdict.detail,
+        }),
+        {
+          status: verdict.status,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    }
+  }
+
   let body: JsonRpcRequest;
   try {
-    body = (await req.json()) as JsonRpcRequest;
+    body = rawBody ? (JSON.parse(rawBody) as JsonRpcRequest) : ({} as JsonRpcRequest);
   } catch {
     return jsonRpcError({
       id: null,

@@ -12,9 +12,11 @@
 // Env var:                TENSORLAKE_API_KEY (required)
 
 import { buildTaskContext } from "../campaign-context";
+import { toPublicTier } from "./tiers";
 import type {
   BidPayload,
   DeclineDecision,
+  ProbeResult,
   SpecialistConfig,
   SpecialistExecuteResult,
   SpecialistOutput,
@@ -152,6 +154,49 @@ async function submitAndPoll(
 export const tensorlakeExec: SpecialistRunner = {
   config: TENSORLAKE_EXEC_CONFIG,
 
+  async probe(_taskType: string): Promise<ProbeResult> {
+    const t0 = Date.now();
+    const key = apiKey();
+    if (!key) {
+      return {
+        status: "fail",
+        duration_ms: Date.now() - t0,
+        error_message: "TENSORLAKE_API_KEY is not set",
+      };
+    }
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 8000);
+    let response: Response;
+    try {
+      response = await fetch(TENSORLAKE_DOCS_URL, {
+        headers: { Authorization: `Bearer ${key}` },
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(id);
+      return {
+        status: "fail",
+        duration_ms: Date.now() - t0,
+        error_message: err instanceof Error ? err.message : String(err),
+      };
+    }
+    clearTimeout(id);
+    const duration_ms = Date.now() - t0;
+    if (response.status >= 500) {
+      return {
+        status: "fail",
+        duration_ms,
+        error_message: `tensorlake server error ${response.status}`,
+      };
+    }
+    const body = await response.text().catch(() => "");
+    return {
+      status: "pass",
+      duration_ms,
+      response_excerpt: `status=${response.status}; ${body.slice(0, 260)}`.slice(0, 300),
+    };
+  },
+
   async bid(prompt, taskType): Promise<BidPayload | DeclineDecision> {
     const key = apiKey();
     if (!key) {
@@ -197,7 +242,7 @@ export const tensorlakeExec: SpecialistRunner = {
     ].join("\n");
 
     const provenance: SpecialistProvenance = {
-      tier: "real",
+      tier: toPublicTier(TENSORLAKE_EXEC_CONFIG.tier),
       live_tools_called: true,
       transport: "api",
       proof_level: "api_call",

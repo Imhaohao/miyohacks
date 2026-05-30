@@ -10,6 +10,7 @@ import type {
   SpecialistProvenance,
 } from "../types";
 import { buildTaskContext } from "../campaign-context";
+import { toPublicTier } from "./tiers";
 
 const VICKREY_PRELUDE = `You are participating in a Vickrey second-price sealed-bid auction. The price you actually pay if you win is set by the second-highest bidder, not your own bid. Your dominant strategy is therefore to bid your true cost. Bidding lower than your true cost risks winning at a loss. Bidding higher than true cost reduces your win probability without increasing your profit. Bid honestly.`;
 
@@ -84,7 +85,7 @@ export function makeMockSpecialist(config: SpecialistConfig): SpecialistRunner {
       });
       const output: SpecialistOutput = `[MOCK — no live tools called]\n\n${raw}`;
       const provenance: SpecialistProvenance = {
-        tier: "mock",
+        tier: toPublicTier(config.tier),
         live_tools_called: false,
         transport: "mock",
         proof_level: "none",

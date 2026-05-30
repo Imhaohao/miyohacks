@@ -8,6 +8,7 @@ import {
   SPECIALISTS,
   getRunner,
   registerDiscoveredSpecialist,
+  toPublicTier,
 } from "../lib/specialists/registry";
 import { MCP_CATALOG } from "../lib/specialists/catalog";
 import type {
@@ -15,6 +16,7 @@ import type {
   BidPayload,
   ExecutionArtifact,
   JudgeVerdict,
+  ProbeResult,
   SpecialistConfig,
   SpecialistOutput,
   SpecialistProvenance,
@@ -30,6 +32,7 @@ import {
   previewValue,
   redactToolArguments,
 } from "../lib/tool-call-audit";
+import { sha256Hex } from "../lib/a2a-hmac";
 
 const BUYER_ID = "buyer:default";
 
@@ -88,6 +91,10 @@ function makeToolCallRecorder(
           ? outcome(result)
           : { ok: true, result_preview: previewValue(result) };
         if (audit.ok) {
+          const artifact_hash =
+            audit.result_preview && audit.result_preview.trim().length > 0
+              ? sha256Hex(audit.result_preview)
+              : undefined;
           await ctx.runMutation(
             internal.agentToolCalls.succeed,
             cleanArgs({
@@ -97,6 +104,7 @@ function makeToolCallRecorder(
               external_task_id: audit.external_task_id,
               pr_url: audit.pr_url,
               pr_number: audit.pr_number,
+              artifact_hash,
             }),
           );
           successfulIds.push(callId);
@@ -231,6 +239,48 @@ export const solicitBids = internalAction({
           agent_id: spec.agent_id,
         });
         const reputation = agent?.reputation_score ?? spec.starting_reputation;
+        const public_tier = toPublicTier(spec.tier);
+
+        // ─── Capability probe: every bidder must prove liveness before
+        // it is allowed to enter the sealed auction. Runners without a
+        // probe() implementation (mock, unconfigured catalog entries) are
+        // routed to the demo lane and never reach internal.bids._insert.
+        const probeStart = Date.now();
+        const probe: ProbeResult = runner.probe
+          ? await runner.probe(task.task_type).catch((err) => ({
+              status: "fail" as const,
+              duration_ms: Date.now() - probeStart,
+              error_message: err instanceof Error ? err.message : String(err),
+            }))
+          : { status: "demo_lane" as const, duration_ms: 0 };
+
+        const probe_id = await ctx.runMutation(internal.bidProbes._insert, {
+          task_id: args.task_id,
+          agent_id: spec.agent_id,
+          public_tier,
+          probe_status: probe.status,
+          duration_ms: probe.duration_ms,
+          response_excerpt: probe.response_excerpt,
+          error_message: probe.error_message,
+          created_at: Date.now(),
+        });
+
+        if (probe.status !== "pass") {
+          await ctx.runMutation(internal.lifecycle.log, {
+            task_id: args.task_id,
+            event_type: "bid_declined",
+            payload: {
+              agent_id: spec.agent_id,
+              reason:
+                probe.status === "demo_lane"
+                  ? "demo_lane — no live probe"
+                  : `probe_failed: ${probe.error_message ?? "unknown"}`,
+              public_tier,
+              probe_id,
+            },
+          });
+          return;
+        }
 
         try {
           const decision = await runner.bid(promptForAgents, task.task_type);
@@ -238,23 +288,23 @@ export const solicitBids = internalAction({
             await ctx.runMutation(internal.lifecycle.log, {
               task_id: args.task_id,
               event_type: "bid_declined",
-              payload: { agent_id: spec.agent_id, reason: decision.reason },
+              payload: {
+                agent_id: spec.agent_id,
+                reason: decision.reason,
+                public_tier,
+                probe_id,
+              },
             });
             return;
           }
           const bid = decision satisfies BidPayload;
-          // Tier-weighted Vickrey score: real bidders outrank mocks even
-          // when their headline price is identical. A `tier:"mock"` bid is
-          // worth 1/5 of a real bid; `tier:"disabled"` can never win.
+          // Tier weight is now a safety net — probe-pass already filtered
+          // out demo-lane bidders. Only public tiers that proved liveness
+          // get any weight at all.
           const tierWeight =
-            spec.tier === "real" ||
-            spec.tier === "mcp-forwarding" ||
-            spec.tier === "a2a" ||
-            spec.tier === "a2a-bridge"
+            public_tier === "native-a2a" || public_tier === "a2a-bridge"
               ? 1.0
-              : spec.tier === "mock"
-                ? 0.2
-                : 0;
+              : 0;
           const score =
             (reputation / Math.max(0.01, bid.bid_price)) * tierWeight;
           const bid_id = await ctx.runMutation(internal.bids._insert, {
@@ -264,6 +314,10 @@ export const solicitBids = internalAction({
             capability_claim: bid.capability_claim,
             estimated_seconds: bid.estimated_seconds,
             score,
+          });
+          await ctx.runMutation(internal.bidProbes._setBidId, {
+            probe_id,
+            bid_id,
           });
           await ctx.runMutation(internal.lifecycle.log, {
             task_id: args.task_id,
@@ -276,6 +330,8 @@ export const solicitBids = internalAction({
               // until the resolver writes the auction_resolved event.
               capability_claim: bid.capability_claim,
               estimated_seconds: bid.estimated_seconds,
+              public_tier,
+              probe_id,
             },
           });
         } catch (err) {
@@ -285,6 +341,8 @@ export const solicitBids = internalAction({
             payload: {
               agent_id: spec.agent_id,
               reason: `error: ${err instanceof Error ? err.message : String(err)}`,
+              public_tier,
+              probe_id,
             },
           });
         }
@@ -456,6 +514,35 @@ export const execute = internalAction({
         toolRecorder.successfulCallIds(),
       );
 
+      // ─── Receipt rule: a task is only fulfilled when the winner produced
+      // a real external session id, at least one observed event, and a
+      // captured artifact. Anything less means we cannot prove the agent
+      // actually did the work — fail the task honestly rather than mark
+      // it complete on the strength of returned text alone.
+      const receipt = await ctx.runQuery(
+        internal.agentToolCalls._fulfilmentSummaryForTask,
+        { task_id: args.task_id, agent_id: winner.agent_id },
+      );
+      const external_session_id =
+        receipt.external_session_id ?? provenance.external_session_id;
+      const artifact_present =
+        receipt.artifact_present ||
+        !!provenance.pr_url ||
+        (normalized.text?.trim().length ?? 0) > 0;
+      const events_observed_total = receipt.events_observed_total;
+
+      const missing: string[] = [];
+      if (!external_session_id) missing.push("external_session_id");
+      if (events_observed_total <= 0) missing.push("events_observed");
+      if (!artifact_present) missing.push("artifact_present");
+
+      if (missing.length > 0) {
+        // Throw to fall into the catch block below, which refunds escrow,
+        // sets task status to failed, and writes execution_failed with the
+        // structured reason.
+        throw new Error(`partial_receipt: missing ${missing.join(", ")}`);
+      }
+
       await ctx.runMutation(internal.tasks._setResult, {
         task_id: args.task_id,
         result: {
@@ -474,7 +561,9 @@ export const execute = internalAction({
           successful_tool_call_count:
             provenance.successful_tool_call_count ?? 0,
           proof_level: provenance.proof_level ?? "none",
-          external_session_id: provenance.external_session_id,
+          external_session_id,
+          events_observed: events_observed_total,
+          artifact_present,
           pr_url: provenance.pr_url,
           pr_number: provenance.pr_number,
         },

@@ -99,6 +99,9 @@ export interface AgentToolCallDoc {
   external_task_id?: string;
   pr_url?: string;
   pr_number?: number;
+  events_observed?: number;
+  artifact_present?: boolean;
+  artifact_hash?: string;
 }
 
 // ─── lifecycle event payload shapes (match what convex/auctions.ts writes) ──

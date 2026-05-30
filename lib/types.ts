@@ -1,13 +1,13 @@
-/**
- * Which execution tier a specialist runs on.
- *   - "real"            → hand-written runner with direct API/tool calls.
- *   - "mcp-forwarding"  → LLM-driven loop forwarding to a remote MCP server.
- *   - "a2a"             → outbound A2A protocol (Stream C).
- *   - "a2a-bridge"      → A2A-shaped lifecycle backed by provider MCP/API.
- *   - "mock"            → OpenAI-in-persona; no live tools called. Explicit opt-in.
- *   - "disabled"        → never registered; filtered out at startup.
- */
+// Public-facing tier shown in UI and provenance.
 export type SpecialistTier =
+  | "native-a2a"
+  | "a2a-bridge"
+  | "not-a2a-yet"
+  | "disabled";
+
+// Internal tier the runner factory uses to pick a runner implementation.
+// Maps to a SpecialistTier via toPublicTier() in lib/specialists/registry.ts.
+export type InternalSpecialistTier =
   | "real"
   | "mcp-forwarding"
   | "a2a"
@@ -205,7 +205,7 @@ export interface SpecialistConfig {
   starting_reputation: number;
   one_liner: string;
   /** Execution tier — determines which runner factory is used. Required. */
-  tier: SpecialistTier;
+  tier: InternalSpecialistTier;
   /** A2A endpoint URL (Stream C will use this). */
   a2a_endpoint?: string;
   /**
@@ -234,6 +234,13 @@ export interface SpecialistConfig {
    * persisted specialist config.
    */
   mcp_header_env_vars?: Record<string, string>;
+  /**
+   * When true, the remote MCP server enforces the Streamable-HTTP session
+   * handshake: the client captures `Mcp-Session-Id` from the `initialize`
+   * response and echoes it on every subsequent call. Off by default — only
+   * set it for servers that reject calls without a session (e.g. InsForge).
+   */
+  mcp_requires_session?: boolean;
   /** True when the MCP endpoint has been successfully exercised end-to-end. */
   is_verified?: boolean;
   /** Public homepage / docs URL for the sponsor. */
@@ -259,6 +266,13 @@ export interface SpecialistExecuteResult {
   provenance: SpecialistProvenance;
 }
 
+export interface ProbeResult {
+  status: "pass" | "fail" | "demo_lane";
+  duration_ms: number;
+  response_excerpt?: string;
+  error_message?: string;
+}
+
 export interface SpecialistRunner {
   config: SpecialistConfig;
   /** Decide whether to bid on a task. */
@@ -269,4 +283,6 @@ export interface SpecialistRunner {
     taskType: string,
     context?: SpecialistExecuteContext,
   ): Promise<SpecialistExecuteResult>;
+  /** Optional liveness probe used by the A2A protocol gate. */
+  probe?(taskType: string): Promise<ProbeResult>;
 }

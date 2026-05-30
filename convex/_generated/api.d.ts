@@ -8,10 +8,15 @@
  * @module
  */
 
+import type * as a2aAuth from "../a2aAuth.js";
+import type * as a2aNonces from "../a2aNonces.js";
 import type * as a2aTaskRuns from "../a2aTaskRuns.js";
+import type * as agentKeys from "../agentKeys.js";
+import type * as agentKeysAdmin from "../agentKeysAdmin.js";
 import type * as agentToolCalls from "../agentToolCalls.js";
 import type * as agents from "../agents.js";
 import type * as auctions from "../auctions.js";
+import type * as bidProbes from "../bidProbes.js";
 import type * as bids from "../bids.js";
 import type * as contextEnrichment from "../contextEnrichment.js";
 import type * as demos from "../demos.js";
@@ -37,10 +42,15 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  a2aAuth: typeof a2aAuth;
+  a2aNonces: typeof a2aNonces;
   a2aTaskRuns: typeof a2aTaskRuns;
+  agentKeys: typeof agentKeys;
+  agentKeysAdmin: typeof agentKeysAdmin;
   agentToolCalls: typeof agentToolCalls;
   agents: typeof agents;
   auctions: typeof auctions;
+  bidProbes: typeof bidProbes;
   bids: typeof bids;
   contextEnrichment: typeof contextEnrichment;
   demos: typeof demos;

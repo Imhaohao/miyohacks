@@ -91,6 +91,21 @@ The `Agent` tool does **not** return exact token counts to the parent. Estimate 
 
 This makes cost tracking and quality regressions visible across sessions.
 
+### Per-task delegation in plans
+
+Every plan file MUST end with a Delegation map: a table assigning each
+implementation task to one of {Opus inline, Sonnet subagent, Haiku
+subagent, convex:convex-expert subagent, local `<model>` via ollama}.
+
+The default is to push work down the cost ladder. Opus keeps only:
+- multi-file refactors where compile errors can't catch a mistake,
+- changes to critical money/auction/auth paths,
+- routing/architecture decisions,
+- final verification that requires judgment.
+
+Everything else delegates. A plan that puts every task on Opus is a bug
+report — fix the plan before starting implementation.
+
 Project Orientation
 This repository is the Arbor agent marketplace/protocol app.
 The primary user-facing app is the root Next.js app, started with npm run dev.

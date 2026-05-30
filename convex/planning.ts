@@ -323,7 +323,7 @@ export const synthesize = internalAction({
         text: synthesized,
         agent_id: "synthesizer",
         provenance: {
-          tier: "mock",
+          tier: "not-a2a-yet" as const,
           live_tools_called: false,
           fallback_reason: "synthesizer",
         },

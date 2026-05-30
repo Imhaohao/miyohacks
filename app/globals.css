@@ -11,9 +11,73 @@
 
 :root {
   color-scheme: light;
-  --font-encode-sans: "Encode Sans Semi Expanded", system-ui, sans-serif;
-  --font-display: "Plus Jakarta Sans", "Encode Sans Semi Expanded", system-ui,
-    sans-serif;
+  /* Both type tokens resolve to Nunito (set on <html> via next/font). */
+  --font-encode-sans: var(--font-nunito), system-ui, sans-serif;
+  --font-display: var(--font-nunito), system-ui, sans-serif;
+
+  /* shadcn semantic tokens, mapped to Arbor's blue brand. HSL channels only
+   * (consumed as hsl(var(--token))). primary = brand-600 #1877f2. */
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 214 89% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 214 89% 52%;
+
+  /* Sidebar surface tokens (used by the dashboard shell). */
+  --sidebar-background: 210 40% 98%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-primary: 214 89% 52%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 210 40% 96%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-border: 214 32% 91%;
+  --sidebar-ring: 214 89% 52%;
+}
+
+/* Dark surfaces (applied via a `.dark` wrapper on the marketing hero and the
+ * orbital timeline). Keeps the same brand-blue identity on a near-black base. */
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 10%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 10%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 214 89% 60%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 20%;
+  --input: 217 33% 20%;
+  --ring: 214 89% 60%;
+  --sidebar-background: 222 47% 9%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-primary: 214 89% 60%;
+  --sidebar-primary-foreground: 222 47% 11%;
+  --sidebar-accent: 217 33% 17%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 217 33% 20%;
+  --sidebar-ring: 214 89% 60%;
 }
 
 html,
@@ -193,6 +257,47 @@ textarea,
 }
 .deck-stagger > *:nth-child(7) {
   animation-delay: 840ms;
+}
+
+/* Animated shader hero (components/ui/animated-shader-hero.tsx) entrance. */
+@keyframes fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-down {
+  animation: fade-in-down 0.8s ease-out forwards;
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out forwards;
+  opacity: 0;
+}
+.animation-delay-200 {
+  animation-delay: 0.2s;
+}
+.animation-delay-400 {
+  animation-delay: 0.4s;
+}
+.animation-delay-600 {
+  animation-delay: 0.6s;
+}
+.animation-delay-800 {
+  animation-delay: 0.8s;
 }
 
 /* Mini horizontal score bar used in lists. Solid brand fill, no gradient. */

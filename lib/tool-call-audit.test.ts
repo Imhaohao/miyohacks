@@ -67,13 +67,13 @@ function testPrExtraction() {
 function testFinalizeMcpProvenance() {
   assert.equal(
     finalizeProvenance(
-      { tier: "mcp-forwarding", transport: "mcp", live_tools_called: true },
+      { tier: "not-a2a-yet", transport: "mcp", live_tools_called: true },
       [],
     ).live_tools_called,
     false,
   );
   const proven = finalizeProvenance(
-    { tier: "mcp-forwarding", transport: "mcp", live_tools_called: false },
+    { tier: "not-a2a-yet", transport: "mcp", live_tools_called: false },
     ["call1"],
   );
   assert.equal(proven.live_tools_called, true);

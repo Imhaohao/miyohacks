@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { formatMoney, formatScore, cn } from "@/lib/utils";
 import { Trophy, ArrowRight } from "@phosphor-icons/react";
@@ -9,12 +10,14 @@ import type {
   AuctionResolvedPayload,
   LifecycleEventDoc,
 } from "@/lib/task-view";
+import type { BidProbeDoc } from "./ProbeReceiptPanel";
 
 interface Props {
   events: LifecycleEventDoc[];
+  probes?: BidProbeDoc[];
 }
 
-export function AuctionResolution({ events }: Props) {
+export function AuctionResolution({ events, probes }: Props) {
   const resolved = events.find((e) => e.event_type === "auction_resolved");
   const failed = events.find((e) => e.event_type === "auction_failed");
   const bidCount = events.filter((e) => e.event_type === "bid_received").length;
@@ -26,6 +29,18 @@ export function AuctionResolution({ events }: Props) {
     events.find((e) => e.event_type === "task_posted");
   const elapsed = useElapsedSeconds(
     !resolved && !failed ? startEvent?.timestamp : undefined,
+  );
+
+  // Hoisted above the early returns below so hook order stays stable across
+  // renders (Rules of Hooks). Depends only on `probes`, which is always present.
+  const demoLaneProbes = useMemo(
+    () =>
+      probes
+        ? probes.filter(
+            (p) => p.probe_status === "demo_lane" || p.probe_status === "fail",
+          )
+        : [],
+    [probes],
   );
 
   if (failed) {
@@ -121,6 +136,8 @@ export function AuctionResolution({ events }: Props) {
         {bids.map((b, i) => {
           const isWinner = i === 0;
           const widthPct = Math.max(8, Math.round((b.score / maxScore) * 100));
+          const probe = probes?.find((p) => p.bid_id === b.bid_id);
+          const publicTier = probe?.public_tier;
           return (
             <div
               key={b.bid_id}
@@ -153,6 +170,26 @@ export function AuctionResolution({ events }: Props) {
                         Winner
                       </span>
                     )}
+                    {publicTier === "native-a2a" && (
+                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800">
+                        A2A
+                      </span>
+                    )}
+                    {publicTier === "a2a-bridge" && (
+                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold bg-teal-100 text-teal-800">
+                        BRIDGE
+                      </span>
+                    )}
+                    {publicTier === "not-a2a-yet" && (
+                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium italic bg-gray-200 text-gray-600">
+                        DEMO
+                      </span>
+                    )}
+                    {!publicTier && probes && probes.length > 0 && (
+                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-400">
+                        —
+                      </span>
+                    )}
                   </div>
                   <p
                     className={cn(
@@ -182,6 +219,34 @@ export function AuctionResolution({ events }: Props) {
           );
         })}
       </div>
+
+      {/* Demo lane — agents that did not enter the auction */}
+      {demoLaneProbes.length > 0 && (
+        <details className="mt-4 rounded-lg border-dashed border border-gray-300 bg-gray-50">
+          <summary className="cursor-pointer px-4 py-2.5 text-xs font-medium text-gray-600 select-none">
+            Demo lane ({demoLaneProbes.length}{" "}
+            {demoLaneProbes.length === 1 ? "agent" : "agents"} · not in auction)
+          </summary>
+          <div className="px-4 pb-3 pt-1 space-y-1.5">
+            {demoLaneProbes.map((p) => (
+              <div
+                key={p._id}
+                className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500"
+              >
+                <span className="font-mono text-gray-700">{p.agent_id}</span>
+                <span className="text-gray-400">·</span>
+                <span className="italic text-gray-500">{p.public_tier}</span>
+                <span className="text-gray-400">·</span>
+                <span className="text-gray-500">
+                  {p.probe_status === "fail"
+                    ? (p.error_message ?? "probe failed")
+                    : "demo_lane — no live probe"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </Card>
   );
 }

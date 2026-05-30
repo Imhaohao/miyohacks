@@ -152,7 +152,7 @@ export function finalizeProvenance(
   successfulToolCallIds: string[],
 ): SpecialistProvenance {
   const isAuditedToolTransport =
-    provenance.tier === "mcp-forwarding" ||
+    provenance.tier === "not-a2a-yet" ||
     provenance.tier === "a2a-bridge" ||
     provenance.transport === "mcp" ||
     provenance.transport === "a2a-bridge";

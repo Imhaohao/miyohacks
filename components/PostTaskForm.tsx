@@ -99,6 +99,17 @@ export function PostTaskForm() {
     }
   }, [finalDraft, intake?.final_prompt]);
 
+  // The compact hero form (HeroQuickPost) hands its prompt off here before
+  // scrolling down, so the visitor lands on the full form pre-filled.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (typeof detail === "string" && detail) setPrompt(detail);
+    };
+    window.addEventListener("arbor:prefill-task", handler);
+    return () => window.removeEventListener("arbor:prefill-task", handler);
+  }, []);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;

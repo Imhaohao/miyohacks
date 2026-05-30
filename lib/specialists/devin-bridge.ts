@@ -14,6 +14,7 @@ import {
 import type {
   BidPayload,
   DeclineDecision,
+  ProbeResult,
   SpecialistConfig,
   SpecialistExecuteContext,
   SpecialistExecuteResult,
@@ -24,6 +25,7 @@ import type {
 } from "../types";
 import { buildTaskContext } from "../campaign-context";
 import { verifyPullRequestUrl } from "../github-pr";
+import { toPublicTier } from "./tiers";
 
 const CREATE_TOOL = "devin_session_create";
 const GATHER_TOOL = "devin_session_gather";
@@ -228,7 +230,7 @@ export function makeDevinMcpBridgeSpecialist(
 
   function fallback(reason: string): SpecialistExecuteResult {
     const provenance: SpecialistProvenance = {
-      tier: "a2a-bridge",
+      tier: toPublicTier(config.tier),
       transport: "a2a-bridge",
       live_tools_called: false,
       proof_level: "none",
@@ -276,6 +278,38 @@ export function makeDevinMcpBridgeSpecialist(
       };
     },
 
+    async probe(_taskType: string): Promise<ProbeResult> {
+      // taskType is intentionally unused: Devin's capability claim is "I can do
+      // code work," which is decided solely by whether devin_session_create is
+      // advertised by the MCP server, not by the incoming task category.
+      const t0 = Date.now();
+      let tools: RemoteMcpTool[];
+      try {
+        tools = await getTools();
+      } catch (err) {
+        return {
+          status: "fail",
+          duration_ms: Date.now() - t0,
+          error_message: String((err as Error)?.message ?? err),
+        };
+      }
+      const duration_ms = Date.now() - t0;
+      const createTool = toolByName(tools, CREATE_TOOL);
+      if (!createTool) {
+        return {
+          status: "fail",
+          duration_ms,
+          error_message: `Devin MCP did not expose ${CREATE_TOOL}`,
+          response_excerpt: JSON.stringify(tools.map((t) => t.name)).slice(0, 300),
+        };
+      }
+      return {
+        status: "pass",
+        duration_ms,
+        response_excerpt: `devin_session_create available; tools=${tools.length}`,
+      };
+    },
+
     async execute(prompt, taskType, context): Promise<SpecialistExecuteResult> {
       const problem = configProblem(config);
       if (problem) return fallback(problem);
@@ -311,7 +345,7 @@ export function makeDevinMcpBridgeSpecialist(
 
       if (!sessionId) {
         const provenance: SpecialistProvenance = {
-          tier: "a2a-bridge",
+          tier: toPublicTier(config.tier),
           transport: "a2a-bridge",
           live_tools_called:
             (context?.toolRecorder?.successfulCallIds().length ?? 0) > 0,
@@ -383,7 +417,7 @@ export function makeDevinMcpBridgeSpecialist(
       }
       const successfulToolIds = context?.toolRecorder?.successfulCallIds() ?? [];
       const provenance: SpecialistProvenance = {
-        tier: "a2a-bridge",
+        tier: toPublicTier(config.tier),
         transport: "a2a-bridge",
         live_tools_called: successfulToolIds.length > 0,
         proof_level: pr.pr_url ? "pr_opened" : "agent_session",

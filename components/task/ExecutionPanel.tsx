@@ -11,11 +11,13 @@ import type {
 import { MarkdownLite } from "./MarkdownLite";
 import { LaunchProduct } from "./LaunchProduct";
 import type { ExecutionArtifact, SpecialistProvenance } from "@/lib/types";
+import ProbeReceiptPanel, { type BidProbeDoc } from "./ProbeReceiptPanel";
 
 interface Props {
   task: TaskDoc;
   events: LifecycleEventDoc[];
   toolCalls: AgentToolCallDoc[];
+  probes: BidProbeDoc[];
 }
 
 interface ResultShape {
@@ -43,21 +45,21 @@ function TierBadge({ provenance }: { provenance?: SpecialistProvenance }) {
       </span>
     );
   }
-  if (tier === "real" && live_tools_called) {
+  if (tier === "not-a2a-yet" && live_tools_called) {
     return (
       <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
         LIVE API
       </span>
     );
   }
-  if (tier === "mcp-forwarding" && !live_tools_called) {
+  if (tier === "not-a2a-yet" && !live_tools_called) {
     return (
       <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
         MCP FALLBACK
       </span>
     );
   }
-  if (tier === "a2a") {
+  if (tier === "native-a2a") {
     return (
       <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
         A2A LIVE
@@ -161,7 +163,7 @@ function isResult(v: unknown): v is ResultShape {
   );
 }
 
-export function ExecutionPanel({ task, events, toolCalls }: Props) {
+export function ExecutionPanel({ task, events, toolCalls, probes }: Props) {
   const started = events.find((e) => e.event_type === "execution_started");
   const completed = events.find((e) => e.event_type === "execution_complete");
   const failed = events.find((e) => e.event_type === "execution_failed");
@@ -268,6 +270,14 @@ export function ExecutionPanel({ task, events, toolCalls }: Props) {
         <p className="text-sm text-ink-muted">No output captured</p>
       )}
       <ProofSummary provenance={provenance} toolCalls={toolCalls} />
+      <div className="mt-5">
+        <ProbeReceiptPanel
+          probes={probes}
+          toolCalls={toolCalls}
+          provenance={provenance}
+          winnerAgentId={agentId}
+        />
+      </div>
     </Card>
   );
 }

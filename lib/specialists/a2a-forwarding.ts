@@ -19,7 +19,7 @@
  */
 
 import { buildTaskContext } from "../campaign-context";
-import { getAuthForEndpoint } from "./a2a-agent-card";
+import { getAuthForEndpoint, fetchAgentCard } from "./a2a-agent-card";
 import type {
   SpecialistConfig,
   SpecialistDecision,
@@ -28,7 +28,9 @@ import type {
   SpecialistOutput,
   SpecialistExecuteResult,
   SpecialistProvenance,
+  ProbeResult,
 } from "../types";
+import { toPublicTier } from "./tiers";
 
 // ─── A2A protocol types ───────────────────────────────────────────────────
 
@@ -270,7 +272,7 @@ export function makeA2aForwardingSpecialist(
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         const provenance: SpecialistProvenance = {
-          tier: "a2a",
+          tier: toPublicTier(config.tier),
           live_tools_called: false,
           transport: "a2a",
           proof_level: "none",
@@ -284,7 +286,7 @@ export function makeA2aForwardingSpecialist(
       }
       if (auth.kind === "decline") {
         const provenance: SpecialistProvenance = {
-          tier: "a2a",
+          tier: toPublicTier(config.tier),
           live_tools_called: false,
           transport: "a2a",
           proof_level: "none",
@@ -327,7 +329,7 @@ export function makeA2aForwardingSpecialist(
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         const provenance: SpecialistProvenance = {
-          tier: "a2a",
+          tier: toPublicTier(config.tier),
           live_tools_called: false,
           transport: "a2a",
           proof_level: "none",
@@ -350,7 +352,7 @@ export function makeA2aForwardingSpecialist(
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         const provenance: SpecialistProvenance = {
-          tier: "a2a",
+          tier: toPublicTier(config.tier),
           live_tools_called: false,
           transport: "a2a",
           proof_level: "none",
@@ -367,7 +369,7 @@ export function makeA2aForwardingSpecialist(
       if (finalTask.status.state === "failed") {
         const errorText = extractText(finalTask);
         const provenance: SpecialistProvenance = {
-          tier: "a2a",
+          tier: toPublicTier(config.tier),
           live_tools_called: false,
           transport: "a2a",
           proof_level: "none",
@@ -383,7 +385,7 @@ export function makeA2aForwardingSpecialist(
       // Completed successfully.
       const text = extractText(finalTask);
       const provenance: SpecialistProvenance = {
-        tier: "a2a",
+        tier: toPublicTier(config.tier),
         live_tools_called: true,
         transport: "a2a",
         proof_level: "agent_session",
@@ -391,6 +393,119 @@ export function makeA2aForwardingSpecialist(
         endpoint,
       };
       return { output: text, provenance };
+    },
+
+    async probe(taskType: string): Promise<ProbeResult> {
+      const t0 = Date.now();
+
+      // Step 1: Fetch agent card
+      let card: Awaited<ReturnType<typeof fetchAgentCard>>;
+      try {
+        card = await fetchAgentCard(endpoint, config.a2a_agent_card_url);
+      } catch (err) {
+        return {
+          status: "fail",
+          duration_ms: Date.now() - t0,
+          error_message: String((err as Error)?.message ?? err),
+        };
+      }
+
+      // Step 2: Skill overlap check (deterministic, no LLM)
+      const STOPWORDS = new Set(["general", "task", "the", "a", "for", "with", "to", "of"]);
+      const lowerType = taskType.toLowerCase();
+      const tokens = lowerType
+        .split(/[^a-z0-9]+/)
+        .filter((t) => t.length > 0 && !STOPWORDS.has(t));
+
+      interface AgentSkill {
+        id?: string;
+        name?: string;
+        tags?: string[];
+        description?: string;
+      }
+      const skills = (card.skills ?? []) as AgentSkill[];
+
+      // If skills are declared, check overlap. Empty/missing skills → skip check.
+      if (skills.length > 0 && lowerType !== "general") {
+        const haystack = skills
+          .map((s) =>
+            [s.id ?? "", s.name ?? "", ...(s.tags ?? []), (s.description ?? "").slice(0, 200)]
+              .join(" ")
+              .toLowerCase(),
+          )
+          .join(" ");
+
+        const hasOverlap = tokens.some((token) => haystack.includes(token));
+        if (!hasOverlap) {
+          return {
+            status: "fail",
+            duration_ms: Date.now() - t0,
+            error_message: `skill mismatch: ${taskType} not declared by agent`,
+            response_excerpt: JSON.stringify(skills).slice(0, 300),
+          };
+        }
+      }
+
+      // Step 3: Send a small probe ping
+      const probeId = `probe-${Date.now()}`;
+      const messageId = `msg-${Date.now()}`;
+      const body = JSON.stringify({
+        jsonrpc: "2.0",
+        id: probeId,
+        method: "message/send",
+        params: {
+          message: {
+            role: "user",
+            parts: [{ kind: "text", text: "probe" }],
+            messageId,
+          },
+          metadata: { intent: "probe" },
+        },
+      });
+
+      try {
+        const authResult = await getAuthForEndpoint(endpoint, config);
+        const authHeaders: Record<string, string> =
+          authResult.kind === "bearer"
+            ? { Authorization: `Bearer ${authResult.token}` }
+            : authResult.kind === "api-key"
+              ? { [authResult.headerName]: authResult.token }
+              : {};
+
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+
+        let res: Response;
+        try {
+          res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "content-type": "application/json", ...authHeaders },
+            body,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => "(no body)");
+          return {
+            status: "fail",
+            duration_ms: Date.now() - t0,
+            error_message: `HTTP ${res.status}: ${text.slice(0, 200)}`,
+          };
+        }
+
+        const json = await res.json();
+        const response_excerpt = JSON.stringify(json).slice(0, 300);
+        return { status: "pass", duration_ms: Date.now() - t0, response_excerpt };
+      } catch (err) {
+        return {
+          status: "fail",
+          duration_ms: Date.now() - t0,
+          error_message: String((err as Error)?.message ?? err),
+        };
+      }
     },
   };
 }
