@@ -1,167 +1,370 @@
-AGENTS.md
-Guidance for AI agents working in /Users/yanzihao/Documents/miyohacks.
+# CLAUDE.md — Arbor Agent Marketplace
 
-## Model Routing (Executive Delegation)
+Guidance for AI agents working in this repository. Read this file before making any changes.
 
-The main agent here is **Opus 4.7** — treat it as the executive. Delegate downward whenever the task fits a cheaper or more specialized model, and only keep work on Opus that genuinely needs it. Approximate cost ratio: **Opus ≈ 5× Sonnet ≈ 60× Haiku ≈ free for local Ollama** (compute only, no network, slower).
+---
 
-Delegation mechanisms:
-- **Cloud (Anthropic) subagents**: `Agent` tool with `model: "sonnet" | "haiku" | "opus"`.
-- **Local models**: `Bash` tool running `ollama run <model> "<prompt>"` (pipe long prompts via stdin or a temp file).
+## Project Overview
 
-### Stay on Opus 4.7 (executive — do not delegate)
+**Arbor** is an agent-specialist marketplace/protocol app built for the Nozomio hackathon. It lets users post tasks that are routed through a Vickrey auction to competing AI specialist agents, which bid, execute, and get judged — with escrow-based settlement and multi-dimensional reputation tracking.
+
+The primary interface is a **Next.js 15 App Router** application. The backend is **Convex** (real-time serverless database + functions). Specialists are connected via **MCP (Model Context Protocol)** endpoints.
+
+---
+
+## Repository Layout
+
+```
+miyohacks/
+├── app/                    # Next.js App Router (primary user-facing app)
+│   ├── page.tsx            # Landing page: hero, task posting form, scroll demo
+│   ├── layout.tsx          # Root layout with Nunito font and providers
+│   ├── globals.css         # Brand HSL color tokens and semantic variables
+│   ├── providers.tsx       # ConvexClientProvider wrapper
+│   ├── agents/page.tsx     # Browse specialists / leaderboard
+│   ├── task/[id]/page.tsx  # Task detail: real-time auction, bids, judgment, settlement
+│   ├── dashboard/page.tsx  # User dashboard
+│   ├── present/page.tsx    # Presentation/demo view
+│   └── api/
+│       ├── v1/tasks/       # REST: POST task, GET by ID, dispute/override
+│       ├── v1/suggest/     # Score and rank MCP specialists
+│       ├── v1/discover/    # Synthesize or discover new specialists
+│       ├── v1/specialists/ # List known specialists
+│       ├── a2a/market/     # Agent-to-Agent protocol endpoint
+│       ├── mcp/route.ts    # MCP server (tools: post_task, suggest_specialists, discover_specialist)
+│       ├── .well-known/mcp.json/       # MCP manifest
+│       ├── .well-known/ai-plugin.json/ # OpenAI plugin manifest
+│       └── openapi.json/   # OpenAPI schema export
+├── components/
+│   ├── ui/                 # Shadcn-style headless + custom (ArborMark, buttons, cards)
+│   ├── landing/            # Hero, scroll demo, orbital steps, footer
+│   ├── agents/             # Agent cards, filtering, leaderboard
+│   ├── task/               # Task lifecycle, bid list, verdict, settlement displays
+│   ├── present/            # Presentation mode slides
+│   ├── PostTaskForm.tsx    # Main task submission form
+│   ├── AgentSuggestions.tsx
+│   └── SpecialistLeaderboard.tsx
+├── lib/
+│   ├── specialists/        # 23 specialist definitions (MCP forwarding + mock fallbacks)
+│   │   ├── catalog.ts      # Curated HTTP MCP servers (Stripe, Notion, GitHub, Linear, v0…)
+│   │   ├── mcp-forwarding.ts    # Proxy calls to remote MCP endpoints
+│   │   ├── mcp-registry.ts      # Query live registry at registry.modelcontextprotocol.io
+│   │   ├── discover.ts          # LLM-based fallback specialist synthesis
+│   │   ├── reacher-social.ts    # TikTok Shop creator/GMV lookup (primary sponsor)
+│   │   ├── nia-context.ts       # Campaign memory & brand context
+│   │   ├── hyperspell-brain.ts  # Brand persona synthesis
+│   │   ├── devin-bridge.ts      # Devin AI integration
+│   │   └── vercel-v0.ts         # Vercel v0 integration
+│   ├── mcp-tools.ts        # MCP tool definitions for the marketplace
+│   ├── mcp-outbound.ts     # Outbound MCP client + tool caching
+│   ├── types.ts            # TypeScript types: Specialist, Bid, Task, etc.
+│   ├── intake-normalize.ts # Task intake validation
+│   ├── tool-call-audit.ts  # Tool call logging & auditing
+│   ├── openai.ts           # OpenAI API wrapper
+│   ├── suggest.ts          # Specialist ranking & discovery
+│   └── registry.ts         # Specialist registry helpers
+├── convex/                 # Backend: schema, functions, and generated code
+│   ├── schema.ts           # Database schema (17 tables)
+│   ├── auctions.ts         # Vickrey auction logic, winner selection
+│   ├── tasks.ts            # Task creation, status updates, lifecycle
+│   ├── bids.ts             # Bid submission & scoring
+│   ├── intake.ts           # Multi-turn intake conversation
+│   ├── planning.ts         # Task decomposition into sub-steps
+│   ├── demos.ts            # Demo task seeding
+│   ├── contextEnrichment.ts # Nia/Hyperspell context fetching
+│   ├── agents.ts           # Agent registry management
+│   ├── disputes.ts         # Dispute/appeal workflow
+│   ├── reputation*.ts      # Reputation tracking
+│   ├── seed.ts             # Database seeding
+│   └── _generated/ai/guidelines.md  # ← READ THIS before touching Convex code
+├── packages/               # Monorepo workspaces
+│   ├── sdk-core/           # Zero-dep TypeScript REST client for the auction protocol
+│   ├── cli/                # Command-line interface
+│   ├── langchain/          # LangChain integration
+│   ├── mastra/             # Mastra framework integration
+│   └── vercel-ai/          # Vercel AI SDK integration
+├── docs/
+│   └── agent-quickstart.md # External agent integration guide (A2A, MCP, REST)
+├── examples/
+│   ├── mcp-client.ts       # Standalone MCP client demo
+│   └── provision-agent-key.ts  # HMAC key provisioning
+├── my-app/                 # Separate Convex/React/Vite template — NOT the main app
+├── .env.example            # Source of truth for required environment variables
+├── next.config.ts
+├── tailwind.config.ts
+├── tsconfig.json
+└── vercel.json
+```
+
+---
+
+## Local Development Commands
+
+```bash
+npm install           # Install dependencies
+npm run dev           # Start Next.js app (default: http://localhost:3000)
+npm run build         # Production build
+npm run typecheck     # TypeScript type check
+npm test              # Run test scripts (tsx-based)
+npm run lint          # ESLint
+npm run convex:dev    # Run Convex backend in watch mode
+npm run convex:once   # One-shot Convex codegen / schema push
+```
+
+If port 3000 is in use, Next.js picks the next free port — watch the terminal output.
+
+---
+
+## Architecture
+
+```
+User / External Agent
+        │
+        ▼
+Next.js App (app/)
+  REST API endpoints  ──→  /api/v1/tasks, /api/v1/suggest, /api/v1/discover
+  MCP server          ──→  /api/mcp
+  A2A endpoint        ──→  /api/a2a/market
+        │
+        ▼
+Convex Backend (convex/)
+  ├─ Intake          multi-turn task intake conversation
+  ├─ Planning        decompose task into ordered sub-steps
+  ├─ Auction         open bid window → collect bids → Vickrey winner selection
+  ├─ Execution       winning specialist runs with MCP tools
+  ├─ Judging         LLM judge evaluates delivery quality
+  └─ Settlement      escrow release, reputation delta, lifecycle close
+        │
+        ▼
+Specialist Agents (lib/specialists/)
+  Tier 1 ── Curated HTTP MCP servers (Stripe, Notion, GitHub, Linear, v0, …)
+  Tier 2 ── Live MCP registry (registry.modelcontextprotocol.io)
+  Tier 3 ── LLM-synthesized fallback (labeled as demo — never presented as real)
+```
+
+### Key Design Choices
+
+- **Vickrey (2nd-price) auction** — winner pays the runner-up's bid, so honest bidding is the dominant strategy.
+- **Multi-dimensional reputation** — speed, accuracy, quality, value scores (not a single number).
+- **Graceful degradation** — if a remote MCP endpoint fails, the specialist falls back to an LLM persona; this must be labeled.
+- **Context enrichment** — Hyperspell seeds brand context; Nia adds campaign memory before bidding opens.
+- **Parent/child tasks** — a task can be decomposed into sub-tasks (`parent_task_id`/`step_index`); each runs the full auction lifecycle independently.
+
+---
+
+## Database Schema (Convex)
+
+Key tables in `convex/schema.ts`:
+
+| Table | Purpose |
+|---|---|
+| `agents` | Specialist metadata, reputation score, capabilities |
+| `tasks` | Full task lifecycle; status flows open → planning → bidding → executing → judging → complete |
+| `bids` | Per-agent bids with Vickrey scoring dimensions |
+| `escrow` | Payment escrow (locked / released / refunded) |
+| `reputation_events` | Reputation delta log per task |
+| `reputation_dimensions` | Per-dimension scores (speed/accuracy/quality/value) |
+| `lifecycle_events` | Full audit trail of state transitions |
+| `agent_tool_calls` | Tool call log for auditing |
+| `product_context_profiles` | User product/repo context for Hyperspell |
+| `task_contexts` | Business + repo context enrichment |
+| `task_intakes` | Multi-turn intake conversation state |
+| `task_intake_messages` | Intake message history |
+| `agent_keys` / `a2a_nonces` | HMAC signing & replay protection |
+| `discovered_specialists` | Cache of dynamically discovered agents |
+
+Task status union: `open | planning | plan_review | bidding | awarded | executing | judging | synthesizing | complete | disputed | cancelled | failed`
+
+---
+
+## Convex-Specific Rules
+
+**Always read `convex/_generated/ai/guidelines.md` before touching any Convex code.** That file is the source of truth for validators, HTTP endpoints, function registration, and generated API usage — it overrides anything from training data.
+
+- Use generated `api` and `internal` references; never invent Convex function paths.
+- Prefer `internal.*` functions for complex business logic; public functions are thin wrappers.
+- Actions are for long-running work (OpenAI calls, external APIs). Queries are read-only. Mutations write.
+- After schema or function changes, run `npm run convex:once` before testing in the browser.
+- If the browser reports "Could not find public function", the generated Convex code or local backend is stale — re-run `npm run convex:dev`.
+- Seed agents with: `npx convex run seed:seedAgents`
+
+---
+
+## Authentication & External Services
+
+- **Auth**: Clerk (root app). Dev keys go in `.env.local` — never print secrets in responses.
+- **Backend**: Convex (separate from Next.js; env vars for production are set on the Convex dashboard).
+- **OpenAI**: Required for specialist bidding, execution, and judging. `OPENAI_API_KEY` must be set both in `.env.local` and on the Convex backend dashboard.
+
+Do not create, delete, or mutate external resources unless the user explicitly requested that action. For signup/login flows, use disposable test credentials only — pause and confirm before any real account creation.
+
+---
+
+## Environment Variables
+
+See `.env.example` for the full list. Required for local dev:
+
+```
+OPENAI_API_KEY
+CONVEX_DEPLOYMENT
+NEXT_PUBLIC_CONVEX_URL
+NEXT_PUBLIC_APP_URL          # default: http://localhost:3000
+```
+
+Optional sponsor integrations (app degrades gracefully without them):
+```
+REACHER_API_KEY
+NIA_API_KEY
+HYPERSPELL_API_KEY / HYPERSPELL_USER_ID
+TENSORLAKE_API_KEY / TENSORLAKE_A2A_ENDPOINT / TENSORLAKE_A2A_AGENT_CARD_URL
+DEVIN_API_KEY / DEVIN_ORG_ID / DEVIN_A2A_ENDPOINT / DEVIN_A2A_AGENT_CARD_URL
+V0_API_KEY
+INSFORGE_API_KEY / INSFORGE_API_BASE_URL
+```
+
+---
+
+## Frontend Conventions
+
+- **Framework**: Next.js 15 App Router with React 19. Server components by default; add `"use client"` only when necessary.
+- **Styling**: Tailwind CSS with a custom brand palette (`brand-50` through `brand-900`, `surface-*`, `ink-*`, semantic success/warning/danger/info). Dark mode is class-based.
+- **Components**: Shadcn/Radix headless pattern — unstyled primitives styled with Tailwind. Use CVA for variants.
+- **Animations**: Framer Motion (`fade-in`, `scale-in`, `soft-pulse`). Custom Tailwind keyframes are defined in `tailwind.config.ts`.
+- **Icons**: Phosphor Icons (`@phosphor-icons/react`) are preferred; Lucide is also installed.
+- **Class merging**: Use `cn()` (clsx + tailwind-merge) for conditional classNames.
+- **Font**: Nunito variable (300–900) loaded in `app/layout.tsx` via `next/font/google`.
+
+---
+
+## Testing
+
+Tests are plain TypeScript scripts run via `tsx`:
+
+```bash
+npm test
+# runs: tsx lib/intake-normalize.test.ts && tsx lib/tool-call-audit.test.ts
+```
+
+No Jest or Vitest config. When adding new test files, follow the same pattern — import and call assertions directly with `tsx`.
+
+---
+
+## Browser / E2E Checks
+
+- Use the in-app Browser plugin when asked to inspect, click through, or screenshot the local site.
+- Start from the root Next.js URL (usually `http://localhost:3000`).
+- Verify visible UI after each meaningful action with a DOM snapshot or screenshot.
+- For agent-specialist flows, confirm at least one visible bid, recommendation, or delivery appears before reporting success.
+
+---
+
+## Product Expectations
+
+Arbor is an agent-specialist marketplace. The expected task flow is:
+
+**task description → intake → planning → specialist shortlist → bids → execution → judge verdict → settlement**
+
+- Keep UI copy concrete and product-facing. No instructional filler unless the user asks.
+- Specialist responses must be clearly labeled: real tool-backed / A2A/MCP-backed / fallback / mock-synthesized.
+- **Never** make fallback specialists appear to have live tools when they do not.
+- The `my-app/` directory is a separate Convex/React/Vite template. Do not treat it as part of the main Arbor app.
+
+---
+
+## Expected Workflow for AI Agents
+
+1. Read existing code and local conventions before changing behavior.
+2. Prefer small, targeted edits that preserve the product direction already in the repository.
+3. Use `rg` / `rg --files` for search. Avoid `find` or `grep` as Bash commands — use the Grep tool instead.
+4. Do not revert or overwrite user changes unless explicitly asked.
+5. When changing frontend behavior, run the local app and verify the actual browser experience.
+6. After Convex changes, run codegen before browser verification.
+7. Report blockers clearly: auth verification, missing env vars, Convex codegen mismatch, provider-side rate limits.
+
+---
+
+## Model Routing (AI Agent Delegation)
+
+The main agent is **Opus** — treat it as the executive. Delegate downward whenever the task fits a cheaper or more specialized model. Approximate cost ratio: **Opus ≈ 5× Sonnet ≈ 60× Haiku ≈ free for local Ollama**.
+
+### Stay on Opus (do not delegate)
 
 - Multi-file refactors, architecture decisions, ambiguous specs.
-- Long-context synthesis (reading large parts of the repo to answer one question).
-- Routing decisions themselves — picking which subagent or model to use.
+- Long-context synthesis (reading large parts of the repo).
+- Routing decisions themselves.
 - Debugging where the root cause may span unfamiliar files.
-- Anything where a wrong answer is expensive to undo (auth, schema migrations, money/account flows in Arbor).
+- Anything where a wrong answer is expensive to undo (auth, schema migrations, escrow/payment flows).
 
-### Delegate to Sonnet 4.6 — fast, capable coding
+### Delegate to Sonnet — fast, capable coding
 
 `Agent(model: "sonnet", ...)`
 
 - Single-file or well-scoped code changes with a clear spec.
 - Writing or updating tests for a known module.
 - Code review of a small diff.
-- Mechanical refactors (rename, extract function, inline) once the plan is decided.
-- Anything Opus *could* do but where the path is already obvious — Sonnet finishes faster and ~5× cheaper.
+- Mechanical refactors (rename, extract, inline) once the plan is decided.
 
-### Delegate to Haiku 4.5 — cheap, fast, simple
+### Delegate to Haiku — cheap, fast, simple
 
 `Agent(model: "haiku", ...)`
 
-- Simple lookups (find where X is defined, list files matching Y).
+- Simple lookups (find where X is defined, list files matching a pattern).
 - One-line edits, commit message drafts, PR descriptions, changelog entries.
 - Summarization, classification, format conversions (JSON ↔ YAML, kebab ↔ snake).
 - Polishing prose where the substance is already correct.
-- Avoid for multi-step reasoning — Haiku is shallow on purpose.
+- Avoid for multi-step reasoning.
 
-### Delegate to local models via Ollama — private, free, but **not fast**
+### Delegate to local Ollama — private, free, slow
 
-`Bash`: `ollama run <model> "<prompt>"`. Pipe long inputs via stdin. Strip Ollama's TUI escape codes with `sed 's/\x1b\[[0-9;]*[a-zA-Z]//g'` when capturing for downstream parsing.
+`Bash`: `ollama run <model> "<prompt>"`. Pipe long inputs via stdin. Strip TUI escape codes with `sed 's/\x1b\[[0-9;]*[a-zA-Z]//g'` when capturing output.
 
-Use a local model when **at least one** applies:
+Use local when **at least one** applies: sensitive data that can't leave the machine, offline / quota exhausted, bulk batch tolerant of 30s–3min latency.
 
-- **Sensitive data**: code or content that shouldn't leave the machine.
-- **Offline**: no network, or API quota exhausted.
-- **Quality bulk** where you can wait: hundreds of items, each tolerant of ~30s–3min per call.
-
-**Do not** reach for local for "bulk speed" — see latency numbers below. A Haiku API call finishes in ~1s; a local 35B model takes minutes. Local wins on price and privacy, not throughput.
-
-**Installed on this machine** (verified 2026-05-27). Split by lane:
-
-**Fast lane — no built-in CoT, seconds per call. Use these for bulk and inner loops.**
+**Fast lane (seconds per call):**
 
 | Model | Best for | Avoid for | Cold latency |
 |---|---|---|---|
-| `qwen2.5-coder:7b` | Default local code worker. Code generation, refactor, structured extraction. Clean output, no thinking preamble. | Architecture / ambiguous specs (any local model). | **~4 s** |
-| `llama3.2:3b` | Bulk classification, labeling, one-word answers. Most obedient to short-output constraints. | Anything needing depth. | **~10 s** |
-| `qwen2.5:7b` | General fast-lane: structured prose, summaries, CHANGELOGs, light writing. Strong instruction-following — reliably honors strict-format prompts. Replaces `gemma3:4b` for English structured work. Verified 2026-05-27 against the same CHANGELOG prompt gemma3 failed: kept all 5 enum values, used the requested `[Unreleased]` header, hit all 3 sections. Bucket categorization (Added vs Changed vs Fixed) still benefits from sharper prompts. | Multilingual nuance — use `gemma3:4b` or `gemma4:31b-mlx` for that. | **~2 s warm, ~5 s cold** |
-| `gemma3:4b` | Multilingual translation **only**. Empirically drops format constraints and hallucinates list contents on English structured-prose prompts (e.g. dropped one item from a 5-item enum, ignored requested section headers). Reserve for: translating short copy, classifying multilingual text. | English structured prose, strict-format outputs, anything where missing one item is a real bug. | ~10 s |
+| `qwen2.5-coder:7b` | Default local code worker. Generation, refactor, structured extraction. | Architecture / ambiguous specs. | ~4 s |
+| `llama3.2:3b` | Bulk classification, labeling, one-word answers. | Anything needing depth. | ~10 s |
+| `qwen2.5:7b` | Structured prose, summaries, CHANGELOGs. Strong format-following. | Multilingual nuance. | ~2 s warm / ~5 s cold |
+| `gemma3:4b` | Multilingual translation only. | English structured prose, strict-format outputs. | ~10 s |
 
-**Deliberate lane — built-in CoT, 30s–3min per call. Use only when quality matters more than wall-clock.**
+**Deliberate lane (30s–3min per call — quality over speed):**
 
 | Model | Best for | Avoid for | Cold latency |
 |---|---|---|---|
-| `gemma4:31b-mlx` | Multilingual / translation / classification with nuance. | Heavy coding — weaker than Qwen for code. | ~31 s |
-| `deepseek-r1:14b` | Reasoning, math, structured decomposition where output is cheaply verifiable. Heavy chain-of-thought is the point. | Production prose, hallucination-sensitive output, anything time-sensitive. | ~40 s |
-| `qwen3.5:35b-mlx` | Highest-quality local code generation. Built-in CoT — thinks before answering even simple prompts. | Anything latency-sensitive. Not a "-coder" variant, but base Qwen3.5 is still strong at code. | ~3 min 10 s |
+| `gemma4:31b-mlx` | Multilingual / translation / nuanced classification. | Heavy coding. | ~31 s |
+| `deepseek-r1:14b` | Reasoning, math, structured decomposition. | Production prose, time-sensitive. | ~40 s |
+| `qwen3.5:35b-mlx` | Highest-quality local code generation. | Anything latency-sensitive. | ~3 min 10 s |
 
-Rule of thumb: stay in the fast lane unless you have a specific reason (hard reasoning step, code quality short, multilingual nuance) to pay the latency cost. For local code work, `qwen2.5-coder:7b` is ~48× faster than `qwen3.5:35b-mlx` on simple prompts and produces equivalent output. Always verify local-model output before acting on it — they hallucinate file paths and APIs more readily than Claude models.
+**Decision order:**
+1. Sensitive data or offline? → local fast lane.
+2. Bulk batch (hundreds of calls)? → local fast lane.
+3. Haiku sufficient with a one-shot prompt? → Haiku subagent.
+4. Clear spec exists? → Sonnet subagent.
+5. Multilingual nuance or hard reasoning needed? → local deliberate lane.
+6. Otherwise → handle inline on Opus.
 
-### Decision order
+### Reporting Agent Activity
 
-1. Is the data **sensitive** (cannot leave the machine) or are we **offline**? → local Ollama, fast lane (pick model from table). Hard constraint, comes first.
-2. Is this a **bulk batch** (hundreds–thousands of similar calls) where total cost matters more than wall-clock per item? → local fast lane (`llama3.2:3b` for classification, `qwen2.5-coder:7b` for code, `qwen2.5:7b` for general prose, `gemma3:4b` for multilingual). ~5–10 s/call vs Haiku's ~1 s/call, but $0 vs metered.
-3. Otherwise, can **Haiku** do it correctly with a one-shot prompt? → Haiku subagent. Still the throughput winner for low-volume work.
-4. If not, can **Sonnet** do it given a clear spec? → write the spec on Opus, then hand off to Sonnet.
-5. Need deeper reasoning, multilingual nuance, or top local code quality? → local **deliberate lane** (`deepseek-r1:14b`, `gemma4:31b-mlx`, `qwen3.5:35b-mlx`). Pay the 30s–3min latency for the quality bump.
-6. Otherwise → **handle on Opus inline**.
+End-of-turn summaries **must** include a per-agent line when delegation occurred:
 
-### Reporting agent activity in turn summaries
+- **Who**: subagent type + model (e.g., `Explore (Sonnet)`, `Plan (Opus)`, `local qwen2.5-coder:7b`)
+- **What**: one-phrase task description
+- **Cost signal**: approximate token usage for Anthropic agents, or wall-clock seconds for local models
 
-When the executive agent delegates to subagents (`Agent` tool, `ollama run`, or a Skill that fans out), the end-of-turn summary **must** include a per-agent line:
+The `Agent` tool does not return exact token counts — estimate from prompt + response length × 3–10× multiplier for internal tool-use loops.
 
-- **Who**: subagent type + model — e.g. `Explore (Sonnet)`, `Plan (Opus)`, `local qwen2.5-coder:7b`.
-- **What**: one-phrase description of the task.
-- **Cost signal**: approximate token usage for Anthropic agents (input + output + internal tool loops), or wall-clock seconds for local models.
+### Per-Task Delegation in Plans
 
-The `Agent` tool does **not** return exact token counts to the parent. Estimate from prompt + response length plus a ~3–10× multiplier for internal tool-use loops (file reads, greps, web fetches add up fast). When unsure, write `~Nk tokens (est.)` rather than inventing precision.
+Every plan **must** end with a delegation table assigning each task to one of: `{Opus inline, Sonnet subagent, Haiku subagent, local <model>}`. A plan that puts every task on Opus is a bug — fix the plan before starting.
 
-This makes cost tracking and quality regressions visible across sessions.
+---
 
-### Per-task delegation in plans
+## Deployment
 
-Every plan file MUST end with a Delegation map: a table assigning each
-implementation task to one of {Opus inline, Sonnet subagent, Haiku
-subagent, convex:convex-expert subagent, local `<model>` via ollama}.
+- **Frontend**: Vercel (auto-deploys on push via `vercel.json`).
+- **Backend**: Convex (separate deployment; env vars managed on the Convex dashboard).
+- **Live app**: `https://miyohacks.vercel.app`
 
-The default is to push work down the cost ladder. Opus keeps only:
-- multi-file refactors where compile errors can't catch a mistake,
-- changes to critical money/auction/auth paths,
-- routing/architecture decisions,
-- final verification that requires judgment.
-
-Everything else delegates. A plan that puts every task on Opus is a bug
-report — fix the plan before starting implementation.
-
-Project Orientation
-This repository is the Arbor agent marketplace/protocol app.
-The primary user-facing app is the root Next.js app, started with npm run dev.
-If port 3000 is already in use, Next.js may choose another port such as 3001; use the port printed by the dev server.
-The my-app/ directory is a separate Convex React/Vite template-style app. Do not assume it is the main Arbor site unless the user specifically points you there.
-CLAUDE.md, when present, should be checked for agent-facing project notes. At the time this file was written, it mirrors the Convex block below.
-Expected Workflow
-Read the existing code and local conventions before changing behavior.
-Prefer small, targeted edits that preserve the product direction already in the repository.
-Use rg / rg --files for search.
-Use apply_patch for manual file edits.
-Do not revert or overwrite user changes unless the user explicitly asks.
-When changing frontend behavior, run the local app and verify the actual browser experience.
-After meaningful frontend work, use the in-app Browser plugin for local site checks rather than only relying on static inspection.
-Local Commands
-Install dependencies: npm install
-Run the main app: npm run dev
-Build: npm run build
-Typecheck: npm run typecheck
-Test: npm test
-Lint: npm run lint
-Run Convex locally: npm run convex:dev
-Run Convex once/codegen check: npm run convex:once
-Browser / E2E Checks
-Use the in-app Browser plugin when the user asks to open, inspect, test, click through, screenshot, or perform an end-to-end check of the local site.
-For local Arbor checks, start from the root Next.js app URL, usually http://localhost:3000 or the fallback port printed by npm run dev.
-Verify the visible UI after each meaningful action with a DOM snapshot or screenshot.
-For signup/login flows, use disposable test credentials only.
-Creating a real account in Clerk/AuthKit or another auth provider is a persistent external side effect. If the user has not already explicitly approved account creation with the specific test data, pause immediately before the final submit and ask for confirmation.
-When the user asks for an agent-specialist response, complete enough of the flow to post or submit a task to the specialists and confirm that at least one visible response, bid, recommendation, plan, or delivery appears.
-Report blockers clearly, including auth verification, missing environment variables, Convex codegen/deployment mismatch, or provider-side rate limits.
-Auth And External Services
-The root app uses Clerk for auth and Convex for backend state.
-Development auth keys are expected in .env.local; do not print secrets or copy sensitive env values into responses.
-Do not create, delete, or mutate external resources unless the user requested that specific action.
-Do not submit forms containing sensitive data without action-time confirmation unless the initial user request clearly pre-approved the exact data and destination.
-<!-- convex-ai-start -->
-This project uses Convex as its backend.
-
-When working on Convex code, always read
-convex/_generated/ai/guidelines.md first for important guidelines on
-how to correctly use Convex APIs and patterns. The file contains rules that
-override what you may have learned about Convex from training data.
-
-Convex agent skills for common tasks can be installed by running
-npx convex ai-files install.
-
-<!-- convex-ai-end -->
-Convex-Specific Notes
-Treat convex/_generated/ai/guidelines.md as the source of truth for Convex API usage.
-If touching Convex functions, schema, auth, or generated API usage, read the guidelines file first in that turn.
-Use generated api and internal references correctly; do not invent Convex function paths.
-Convex code changes often require codegen or npm run convex:once before browser verification.
-If the browser or server reports Could not find public function ... Did you forget to run npx convex dev?, check whether generated Convex code or the deployed/local Convex backend is stale.
-Product Expectations
-Arbor is an agent-specialist marketplace: tasks should flow through task description, specialist shortlist/recommendations, bids or execution planning, judge/review signals, and delivery/payment status where applicable.
-Keep UI copy concrete and product-facing. Avoid adding instructional filler inside the app unless the user specifically asks for onboarding text.
-Specialist responses should be clearly labeled when they are real tool-backed, A2A/MCP-backed, fallback, or mock/synthesized.
-Do not make fallback specialists appear to have live tools when they do not.
+Always commit and push before ending a remote session — the container is ephemeral.
