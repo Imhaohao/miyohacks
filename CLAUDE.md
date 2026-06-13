@@ -14,6 +14,17 @@ The primary interface is a **Next.js 15 App Router** application. The backend is
 
 ---
 
+## Task Resumability
+
+Break large tasks into small, resumable chunks. After each chunk:
+
+1. Commit progress with a descriptive message.
+2. Write (or update) a `STATUS.md` in the repo root describing what is done and what comes next.
+
+This ensures work survives session-limit interruptions — the next session can read `STATUS.md` and continue without re-deriving state.
+
+---
+
 ## Repository Layout
 
 ```
@@ -346,6 +357,26 @@ npm test
 ```
 
 No Jest/Vitest. Tests are plain `tsx` scripts. Follow the same pattern when adding new test files.
+
+## Verification Standard
+
+After **any** code change, run both checks before declaring a task done:
+
+```bash
+npm run typecheck   # must exit 0
+npm test            # must exit 0
+```
+
+Report the actual pass/fail output in your response — do not write "should work" or assume success without running these.
+
+## Tooling Notes
+
+- Use ripgrep with `-g` for file-glob filtering (not `--include`): `rg -g "*.ts" <pattern>`
+- When adding new test scripts, follow the existing `main()` wrapper pattern rather than top-level `await` — see `lib/intake-normalize.test.ts` for the canonical shape.
+
+## Default Model
+
+Pin a known-available model in config. Do not rely on experimental model IDs (e.g. `claude-fable-5`) — these have repeatedly been unavailable on session resume. Use a stable model identifier from the current Claude 4.x family when configuring any AI client code in this repo.
 
 ---
 
