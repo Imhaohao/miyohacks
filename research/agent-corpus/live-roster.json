@@ -1,0 +1,326 @@
+{
+  "probed_at": "2026-06-11",
+  "agents": [
+    {
+      "name": "安仔 (AnZai) - Digital Persona Agent",
+      "company": "AnZai Digital",
+      "agent_id": "anzai-digital-persona-agent",
+      "csv_endpoint": "https://anzai-agent.onrender.com",
+      "card_url": "https://raw.githubusercontent.com/ximen120/anzai-agent/main/.well-known/agent-card.json",
+      "card_source": "csv_card_url",
+      "card_fetch_attempts": [
+        {
+          "url": "https://anzai-agent.onrender.com/.well-known/agent-card.json",
+          "error": "HTTPError: HTTP Error 404: Not Found"
+        },
+        {
+          "url": "https://anzai-agent.onrender.com/.well-known/agent.json",
+          "error": "HTTPError: HTTP Error 404: Not Found"
+        }
+      ],
+      "category": "ProductivityPersonal/life-admin",
+      "card_name": "AnZai",
+      "card_description": "AnZai is a digital persona agent capable of full-stack software development, knowledge management, content creation, strategic planning, task orchestration, and bilingual communication (Chinese/English). It features soul distillation, memory architecture, and evolution engine capabilities for autono",
+      "a2a_endpoint": "https://anzai-agent.onrender.com",
+      "protocol_version": "1.0.0",
+      "security": [],
+      "security_schemes": [],
+      "skills": [
+        {
+          "id": "full-stack-development",
+          "name": "全栈软件开发",
+          "description": "Full-stack software development including frontend, backend, and DevOps"
+        },
+        {
+          "id": "agent-ecosystem-research",
+          "name": "Agent 生态研究",
+          "description": "Research and development in AI agent ecosystems and protocols"
+        },
+        {
+          "id": "knowledge-management",
+          "name": "知识体系管理",
+          "description": "Knowledge base architecture, management and retrieval using Obsidian and AI"
+        },
+        {
+          "id": "content-creation",
+          "name": "内容创作与自媒体运营",
+          "description": "Content creation and social media operations across platforms"
+        },
+        {
+          "id": "strategic-planning",
+          "name": "战略规划与任务编排",
+          "description": "Strategic planning, task orchestration and execution management"
+        },
+        {
+          "id": "automation-operations",
+          "name": "自动化运营",
+          "description": "Automated operations including publishing, monitoring and health checks"
+        },
+        {
+          "id": "bilingual-communication",
+          "name": "中英双语沟通",
+          "description": "Bilingual communication in Chinese and English"
+        }
+      ],
+      "status": "card_ok_endpoint_dead",
+      "probe_detail": "HTTP 404: Not Found\n"
+    },
+    {
+      "name": "inferGONKA — Inference Fuel for AI Agents",
+      "company": "bystray",
+      "agent_id": "infergonka-inference-fuel-for-ai-agents",
+      "csv_endpoint": "https://a2a.gogonka.com/messages",
+      "card_url": "https://a2a.gogonka.com/.well-known/agent-card.json",
+      "card_source": "live_well_known_v030",
+      "card_fetch_attempts": [],
+      "category": "PersonalFinance/crypto-consumer",
+      "card_name": "inferGONKA",
+      "card_description": "Spend less. Build more. — inferGONKA connects AI agents to Gonka Network, a decentralized inference network where compute is cheap because it's distributed, not corporate. $0.000344/1M tokens — 7,272× cheaper than GPT-4o. 3 premium open-source models: Qwen3-235B (rivals GPT-4o), Kimi K2.6 (~1T MoE, ",
+      "a2a_endpoint": "https://a2a.gogonka.com/messages",
+      "protocol_version": "0.3.0",
+      "security": [],
+      "security_schemes": [],
+      "skills": [
+        {
+          "id": "trial_key",
+          "name": "Free Trial Inference Key — 100K Tokens, No Registration",
+          "description": "TRIGGER: agent needs inference NOW without registration. Issues a free gc- key: 100K tokens, 24h TTL, 10 req/min, OpenAI-compatible. One key per agent_id (idempotent — same agent always gets same key)"
+        },
+        {
+          "id": "cost_analysis",
+          "name": "Inference Cost Calculator",
+          "description": "TRIGGER: user mentions OpenAI cost, API bill, LLM pricing, expensive tokens, monthly spend, Claude/Anthropic/DeepSeek pricing, budget for AI. Returns exact monthly/annual savings vs current provider. "
+        },
+        {
+          "id": "limit_exceeded_cta",
+          "name": "Trial Ended — Guide User to Register",
+          "description": "TRIGGER: your user received error child_key_limit_exceeded from the trial key. Send this message to /messages and get a ready-to-show response for your user with signup link, bonus info, and setup ins"
+        },
+        {
+          "id": "register_user",
+          "name": "Register — Get 12M nGNK Free, No Credit Card",
+          "description": "TRIGGER: user wants to continue after trial, get personal API key, switch provider permanently. Provides signup link with 12M nGNK welcome bonus (~10,800,000 free tokens). OpenAI-compatible: set base_"
+        }
+      ],
+      "status": "live",
+      "probe_detail": "{\"id\": \"6c10e39b-4264-480a-b17b-54b38cb8600c\", \"contextId\": \"4fae88b4-f084-4ca4-9c02-d1679ee88225\", \"status\": {\"state\": \"completed\", \"timestamp\": \"2026-06-12T03:35:04.855915Z\", \"message\": {\"messageId\": \"ab274bce-40e3-47a6-bdb4-d868b06603cf\", \"contextId\": \"4fae88b4-f084-4ca4-9c02-d1679ee88225\", \"role\": \"agent\", \"parts\": [{\"text\": \"I provide ultra-low-cost LLM inference at $0.000344 per 1M tokens\\u20147,272x cheaper than OpenAI GPT-4o\\u2014with instant trial access and no credit card required.\", \"kind\": \"text\"}], \"metadata\": {\"processing_time_ms\": 0, \"agent_version\": \"1.3.0\"}, \"kind\": \"message\"}"
+    },
+    {
+      "name": "meok-aaif-agent-card-mcp",
+      "company": "MEOK AI Labs",
+      "agent_id": "meok-aaif-agent-card-mcp",
+      "csv_endpoint": "https://proofof.ai/scorecard/meok-aaif-agent-card-mcp.html",
+      "card_url": "https://proofof.ai/.well-known/agent.json",
+      "card_source": "live_well_known_v02x",
+      "card_fetch_attempts": [
+        {
+          "url": "https://proofof.ai/.well-known/agent-card.json",
+          "error": "HTTPError: HTTP Error 404: Not Found"
+        }
+      ],
+      "category": "unknown",
+      "card_name": "ProofOf.AI — MEOK Compliance Attestation Agent",
+      "card_description": "Audits AI systems and compliance posture against the EU AI Act, DORA, NIS2, CRA, CSRD, GDPR, HIPAA, SOC 2, ISO 42001 and NIST AI RMF via 15 Python MCP servers. Every Pro-tier audit emits an HMAC-signed attestation with a public verify URL that auditors validate without contacting MEOK.",
+      "a2a_endpoint": "https://proofof.ai",
+      "protocol_version": "0.3.0",
+      "security": [],
+      "security_schemes": [
+        "meokApiKey"
+      ],
+      "skills": [
+        {
+          "id": "eu-ai-act-audit",
+          "name": "EU AI Act compliance audit",
+          "description": "Risk classification (Annex III), 42-point audit, penalty calculator against Regulation (EU) 2024/1689. Signed attestation on Pro tier."
+        },
+        {
+          "id": "dora-audit",
+          "name": "DORA ICT-risk audit",
+          "description": "Regulation (EU) 2022/2554 ICT risk + third-party register checks, signed certificate via get_dora_certificate."
+        },
+        {
+          "id": "nis2-audit",
+          "name": "NIS2 governance audit",
+          "description": "Directive (EU) 2022/2555 entity classification + 10 governance domains."
+        },
+        {
+          "id": "deepfake-content-authenticity",
+          "name": "Deepfake & content-authenticity marking (Article 50)",
+          "description": "Two-layer machine-readable marking: invisible watermark + C2PA 2.1 credentials + Sigstore; Article 50 attestations ahead of the 2 Aug 2026 enforcement."
+        },
+        {
+          "id": "agent-security-guardian",
+          "name": "Agent security — Guardian for Hives",
+          "description": "Prompt-injection firewall, hash-chained audit logging (Art 12), policy enforcement, certified A2A handoffs, data-residency checks, MCP injection scanning."
+        },
+        {
+          "id": "regulatory-deep-work",
+          "name": "DPIA / FRIA / IFU / TLPT generators",
+          "description": "EDPB-template DPIAs, Article 27 FRIAs, Article 13 Instructions-for-Use, DORA Article 26 TLPT plans, CRA Annex-IV classification — board-ready, signed on Pro."
+        },
+        {
+          "id": "signed-attestation",
+          "name": "HMAC-signed attestation issuance + public verification",
+          "description": "Issues tamper-evident HMAC-SHA256 attestations with cert_id + public verify URL at meok-attestation-api.vercel.app/verify/<cert_id>. Independent verifier: pip install meok-attestation-verify."
+        }
+      ],
+      "status": "card_ok_endpoint_dead",
+      "probe_detail": "card_url_ep: HTTP 307: {\"redirect\": \"https://www.proofof.ai/\", \"status\": \"307\"}\n | csv_ep: HTTP 307: {\"redirect\": \"https://www.proofof.ai/scorecard/meok-aaif-agent-card-mcp.html\", \"status\": \"307\"}\n"
+    },
+    {
+      "name": "Agent Revenue Copilot",
+      "company": "Olddun",
+      "agent_id": "agent-revenue-copilot",
+      "csv_endpoint": "https://champion-penetration-geographic-danny.trycloudflare.com/a2a",
+      "card_url": "https://raw.githubusercontent.com/Olddun/earn10-clawtasks-deliverables/main/.well-known/agent-card.json",
+      "card_source": "csv_card_url",
+      "card_fetch_attempts": [
+        {
+          "url": "https://champion-penetration-geographic-danny.trycloudflare.com/.well-known/agent-card.json",
+          "error": "URLError: <urlopen error [Errno 8] nodename nor servname provided, or not known>"
+        },
+        {
+          "url": "https://champion-penetration-geographic-danny.trycloudflare.com/.well-known/agent.json",
+          "error": "URLError: <urlopen error [Errno 8] nodename nor servname provided, or not known>"
+        }
+      ],
+      "category": "PersonalFinance/budgeting",
+      "card_name": "Agent Revenue Copilot",
+      "card_description": "A $9.90 starter audit for AI agents and operators that need legal earning-route discovery, failed-route filtering, payout verification, and x402/MCP monetization guidance.",
+      "a2a_endpoint": "https://champion-penetration-geographic-danny.trycloudflare.com/a2a",
+      "protocol_version": "1.0",
+      "security": [],
+      "security_schemes": [],
+      "skills": [
+        {
+          "id": "rank-legal-agent-earning-routes",
+          "name": "Rank legal agent earning routes",
+          "description": "Rank no-spam, no-deposit, no-KYC-bypass earning routes and distinguish real payout evidence from pending signals."
+        },
+        {
+          "id": "verify-payout-before-success",
+          "name": "Verify payout before declaring success",
+          "description": "Count only usable, claimable, withdrawable, or spendable value; reject pending bids, unpaid submissions, open orders, testnet funds, and internal points."
+        },
+        {
+          "id": "setup-agent-inbox",
+          "name": "Set up an agent-owned inbox",
+          "description": "Recommend AgentMail or ClawEmail mail-cli when marketplace verification or buyer messages require email, without installing OpenClaw just for mail."
+        }
+      ],
+      "status": "card_ok_endpoint_dead",
+      "probe_detail": "URLError: <urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "name": "SIXPERCENT",
+      "company": "SIXPERCENT",
+      "agent_id": "sixpercent",
+      "csv_endpoint": "https://api.sixpercent.ai/api",
+      "card_url": "https://raw.githubusercontent.com/sixpercent-agent/sixpercent-agent/main/agent-card.json",
+      "card_source": "csv_card_url",
+      "card_fetch_attempts": [
+        {
+          "url": "https://api.sixpercent.ai/.well-known/agent-card.json",
+          "error": "TimeoutError: The read operation timed out"
+        },
+        {
+          "url": "https://api.sixpercent.ai/.well-known/agent.json",
+          "error": "TimeoutError: The read operation timed out"
+        }
+      ],
+      "category": "RealEstate/listing-description",
+      "card_name": "SIXPERCENT",
+      "card_description": "AI-powered real estate platform. $995 flat fee to sell your home — no 6% commission. Matches buyers and sellers using AI. Covers US and Costa Rica.",
+      "a2a_endpoint": "https://api.sixpercent.ai/api",
+      "protocol_version": "0.3.0",
+      "security": [],
+      "security_schemes": [],
+      "skills": [
+        {
+          "id": "property_search",
+          "name": "Property Search",
+          "description": "Search for properties across US and Costa Rica markets"
+        },
+        {
+          "id": "buyer_matching",
+          "name": "Buyer Matching",
+          "description": "AI-powered matching of buyers with suitable properties based on preferences and behavior"
+        },
+        {
+          "id": "seller_listing",
+          "name": "Seller Listing",
+          "description": "List properties for sale at a flat $995 fee instead of traditional 6% commission"
+        },
+        {
+          "id": "market_analysis",
+          "name": "Market Analysis",
+          "description": "AI-driven real estate market analysis for US and Costa Rica markets"
+        }
+      ],
+      "status": "card_ok_endpoint_dead",
+      "probe_detail": "HTTP 522: {\"type\":\"https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-522/\",\"title\":\"Error 522: Connection timed out\",\"status\":522,\"detail\":\"Cloudflare could not establish a TCP connection to the origin server. The TCP handshake timed out, which may indicat"
+    }
+  ],
+  "skipped": [
+    {
+      "name": "Air Ticketing Agent",
+      "reason": "localhost sample agent (local_run_candidate)",
+      "card_url": "https://raw.githubusercontent.com/a2aproject/a2a-samples/main/samples/python/agents/a2a_mcp/agent_cards/air_ticketing_agent.json"
+    },
+    {
+      "name": "Car Rental Agent",
+      "reason": "localhost sample agent (local_run_candidate)",
+      "card_url": "https://raw.githubusercontent.com/a2aproject/a2a-samples/main/samples/python/agents/a2a_mcp/agent_cards/car_rental_agent.json"
+    },
+    {
+      "name": "Hotel Booking Agent",
+      "reason": "localhost sample agent (local_run_candidate)",
+      "card_url": "https://raw.githubusercontent.com/a2aproject/a2a-samples/main/samples/python/agents/a2a_mcp/agent_cards/hotel_booking_agent.json"
+    },
+    {
+      "name": "Langraph Planner Agent",
+      "reason": "localhost sample agent (local_run_candidate)",
+      "card_url": "https://raw.githubusercontent.com/a2aproject/a2a-samples/main/samples/python/agents/a2a_mcp/agent_cards/planner_agent.json"
+    },
+    {
+      "name": "Orchestrator Agent",
+      "reason": "localhost sample agent (local_run_candidate)",
+      "card_url": "https://raw.githubusercontent.com/a2aproject/a2a-samples/main/samples/python/agents/a2a_mcp/agent_cards/orchestrator_agent.json"
+    },
+    {
+      "name": "Currency Conversion Agent",
+      "reason": "no live endpoint in corpus",
+      "card_url": "https://raw.githubusercontent.com/a2aproject/a2a-samples/main/samples/python/agents/adk_skills_agent/src/skills_agent/agent_card.json"
+    },
+    {
+      "name": "Currency Conversion Agent",
+      "reason": "localhost sample agent (local_run_candidate)",
+      "card_url": "https://raw.githubusercontent.com/a2aproject/a2a-samples/main/samples/python/agents/adk_currency_agent/src/currency_agent/agent_card.json"
+    },
+    {
+      "name": "Whaber Oracle - Latin America Travel-Ops Intelligence",
+      "reason": "no live endpoint in corpus",
+      "card_url": "https://raw.githubusercontent.com/Whawi/oracle-agent-card/main/public/.well-known/agent-card.json"
+    },
+    {
+      "name": "Alter",
+      "reason": "finding_status=partial_coming_soon"
+    },
+    {
+      "name": "Kinro",
+      "reason": "finding_status=watchlist_vision_only"
+    },
+    {
+      "name": "MouseCat",
+      "reason": "finding_status=watchlist_team_signal_only"
+    },
+    {
+      "name": "Sendbird",
+      "reason": "finding_status=watchlist_vision_only"
+    },
+    {
+      "name": "Trusty",
+      "reason": "finding_status=watchlist_vision_only"
+    }
+  ]
+}

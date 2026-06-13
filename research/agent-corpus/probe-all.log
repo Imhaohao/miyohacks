@@ -1,0 +1,38 @@
+probing 850 unique candidates, concurrency=24, rpc=true
+  25/850 probed
+  50/850 probed
+  75/850 probed
+  100/850 probed
+  125/850 probed
+  150/850 probed
+  175/850 probed
+  200/850 probed
+  225/850 probed
+  250/850 probed
+  275/850 probed
+  300/850 probed
+  325/850 probed
+  350/850 probed
+  375/850 probed
+  400/850 probed
+  425/850 probed
+  450/850 probed
+  475/850 probed
+  500/850 probed
+  525/850 probed
+  550/850 probed
+  575/850 probed
+  600/850 probed
+  625/850 probed
+  650/850 probed
+  675/850 probed
+  700/850 probed
+  725/850 probed
+  750/850 probed
+  775/850 probed
+  800/850 probed
+  825/850 probed
+  850/850 probed
+
+this run: 850 probed | 299 live cards | 187 arbor-compatible | 44 callable
+merged:   1006 total | 414 live | 301 compatible | 116 callable

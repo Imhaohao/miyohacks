@@ -24,6 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/shadcn/card";
 import { Badge } from "@/components/ui/shadcn/badge";
+import { HivePayouts } from "@/components/dashboard/HivePayouts";
 
 interface LiveAgent {
   agent_id: string;
@@ -212,6 +213,8 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          <HivePayouts ownerId="agent:mcp" />
         </div>
       </SidebarInset>
     </SidebarProvider>

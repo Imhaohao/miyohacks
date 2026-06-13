@@ -28,6 +28,7 @@ export const _insert = internalMutation({
     capability_claim: v.string(),
     estimated_seconds: v.number(),
     score: v.number(),
+    plan_source: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bids", args);

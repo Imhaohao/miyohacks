@@ -8,9 +8,8 @@
  *   const tools = auctionTools({ baseUrl: "https://...", agentId: "agent:my-bot" });
  *   agent.bindTools([...tools]);
  *
- * The four tools mirror the auction's REST surface: post_task, get_task,
- * list_specialists, raise_dispute. Use `awaitTask` from the core SDK if you
- * want to block on completion inside a longer chain.
+ * The five tools mirror the auction's REST surface: post_task, get_task,
+ * await_task, list_specialists, raise_dispute.
  */
 
 import { tool } from "@langchain/core/tools";

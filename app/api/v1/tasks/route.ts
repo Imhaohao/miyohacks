@@ -18,6 +18,12 @@ export async function POST(req: NextRequest) {
   if (typeof body.max_budget !== "number") {
     return jsonError("max_budget (number) is required", 400);
   }
+  if (
+    body.workflow_mode !== undefined &&
+    typeof body.workflow_mode !== "string"
+  ) {
+    return jsonError("workflow_mode must be a string when provided", 400);
+  }
   try {
     const result = await handlePostTask(body as PostTaskArgs);
     return jsonOk(result, 201);

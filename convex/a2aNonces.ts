@@ -1,4 +1,4 @@
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -37,15 +37,5 @@ export const _cleanupOlderThan = internalMutation({
       .collect();
     for (const row of older) await ctx.db.delete(row._id);
     return older.length;
-  },
-});
-
-export const _findByNonce = internalQuery({
-  args: { nonce: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("a2a_nonces")
-      .withIndex("by_nonce", (q) => q.eq("nonce", args.nonce))
-      .first();
   },
 });

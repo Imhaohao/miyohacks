@@ -35,7 +35,7 @@ export const provision = action({
     const bytes = crypto.randomBytes(32);
     const secret_b64 = bytes.toString("base64");
     const created_at = Date.now();
-    await ctx.runMutation(internal.agentKeys._insert, {
+    await ctx.runMutation(internal.agentKeys._rotate, {
       agent_id: args.agent_id,
       secret_b64,
       created_at,

@@ -17,6 +17,8 @@
 
 const ENDPOINT =
   process.env.MCP_ENDPOINT ?? "http://localhost:3000/api/mcp";
+const POLL_INTERVAL_MS = Number(process.env.MCP_POLL_INTERVAL_MS ?? "2000");
+const POLL_TIMEOUT_MS = Number(process.env.MCP_POLL_TIMEOUT_MS ?? "120000");
 
 interface JsonRpcEnvelope<T = unknown> {
   jsonrpc: "2.0";
@@ -34,15 +36,34 @@ let nextId = 1;
 
 async function rpc<T>(method: string, params?: Record<string, unknown>): Promise<T> {
   const id = nextId++;
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  let res: Response;
+  try {
+    res = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+    });
+  } catch (err) {
+    throw new Error(
+      `Failed to call ${method} on ${ENDPOINT}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
   }
-  const env = (await res.json()) as JsonRpcEnvelope<T>;
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} from ${method} on ${ENDPOINT}: ${text}`);
+  }
+  let env: JsonRpcEnvelope<T>;
+  try {
+    env = JSON.parse(text) as JsonRpcEnvelope<T>;
+  } catch (err) {
+    throw new Error(
+      `Invalid JSON from ${method} on ${ENDPOINT}: ${
+        err instanceof Error ? err.message : String(err)
+      }; body=${text.slice(0, 200)}`,
+    );
+  }
   if (env.error) {
     throw new Error(`RPC error ${env.error.code}: ${env.error.message}`);
   }
@@ -57,8 +78,19 @@ async function callTool<T>(name: string, args: Record<string, unknown>): Promise
   if (result.isError) {
     throw new Error(`tool ${name} error: ${result.content[0]?.text ?? "unknown"}`);
   }
-  const text = result.content[0]?.text ?? "{}";
-  return JSON.parse(text) as T;
+  const text = result.content[0]?.text;
+  if (!text) {
+    throw new Error(`tool ${name} returned no text content`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch (err) {
+    throw new Error(
+      `tool ${name} returned invalid JSON: ${
+        err instanceof Error ? err.message : String(err)
+      }; body=${text.slice(0, 200)}`,
+    );
+  }
 }
 
 async function main() {
@@ -66,6 +98,9 @@ async function main() {
     process.argv[2] ??
     "We are a seed-stage startup launching a clean-label electrolyte drink on TikTok Shop. Find high-fit creators, cite Reacher evidence, draft outreach, request samples, flag risk, and produce a first 7-day launch plan.";
   const max_budget = Number(process.argv[3] ?? "2.00");
+  if (!Number.isFinite(max_budget) || max_budget <= 0) {
+    throw new Error("max_budget must be a positive number");
+  }
 
   console.log(`endpoint: ${ENDPOINT}`);
   console.log(`prompt:   ${prompt}`);
@@ -96,8 +131,14 @@ async function main() {
   // 3. poll for completion
   const terminalStatuses = new Set(["complete", "disputed", "failed"]);
   let lastStatus = "";
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
   for (;;) {
-    await new Promise((r) => setTimeout(r, 2000));
+    if (Date.now() > deadline) {
+      throw new Error(
+        `Timed out after ${POLL_TIMEOUT_MS}ms waiting for ${posted.task_id}; last status: ${lastStatus || "unknown"}`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     const state = await callTool<{
       task: { status: string; price_paid?: number; result?: unknown };
       bids: Array<{ agent_id: string; bid_price: number; score: number }>;

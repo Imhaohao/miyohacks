@@ -374,7 +374,7 @@ const Hero: React.FC<HeroProps> = ({
     >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full touch-none object-contain"
+        className="absolute inset-0 h-full w-full touch-none object-cover"
         style={{ background: "black" }}
       />
 

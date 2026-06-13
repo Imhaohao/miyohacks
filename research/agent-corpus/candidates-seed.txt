@@ -1,0 +1,9 @@
+https://a2a.gogonka.com
+https://proofof.ai
+https://anzai-agent.onrender.com
+https://api.sixpercent.ai
+https://champion-penetration-geographic-danny.trycloudflare.com
+https://raw.githubusercontent.com/Olddun/earn10-clawtasks-deliverables/main/.well-known/agent-card.json
+https://raw.githubusercontent.com/Whawi/oracle-agent-card/main/public/.well-known/agent-card.json
+https://raw.githubusercontent.com/sixpercent-agent/sixpercent-agent/main/agent-card.json
+https://raw.githubusercontent.com/ximen120/anzai-agent/main/.well-known/agent-card.json

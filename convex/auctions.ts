@@ -3,13 +3,14 @@
 import { internalAction, type ActionCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   SPECIALISTS,
   getRunner,
   registerDiscoveredSpecialist,
   toPublicTier,
 } from "../lib/specialists/registry";
+import { makeMockSpecialist } from "../lib/specialists/base";
 import { MCP_CATALOG } from "../lib/specialists/catalog";
 import type {
   AgentId,
@@ -35,6 +36,153 @@ import {
 import { sha256Hex } from "../lib/a2a-hmac";
 
 const BUYER_ID = "buyer:default";
+
+function stripeCheckoutMode(): boolean {
+  return process.env.ARBOR_PAYMENTS_MODE === "stripe_checkout";
+}
+
+function stripeCurrency(): string {
+  return (process.env.STRIPE_CURRENCY ?? "usd").toLowerCase();
+}
+
+function stripeSecretKey(): string {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("STRIPE_SECRET_KEY is required for Stripe settlement");
+  return key;
+}
+
+function latestChargeId(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "id" in value) {
+    const id = (value as { id?: unknown }).id;
+    return typeof id === "string" ? id : undefined;
+  }
+  return undefined;
+}
+
+async function stripePost(
+  path: string,
+  params: URLSearchParams,
+  idempotencyKey: string,
+): Promise<Record<string, unknown>> {
+  const response = await fetch(`https://api.stripe.com/v1/${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${stripeSecretKey()}:`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: params,
+  });
+  const body = (await response.json().catch(() => null)) as
+    | Record<string, unknown>
+    | null;
+  if (!response.ok) {
+    const message =
+      body &&
+      typeof body.error === "object" &&
+      body.error &&
+      "message" in body.error
+        ? String((body.error as { message?: unknown }).message)
+        : `Stripe API error ${response.status}`;
+    throw new Error(message);
+  }
+  return body ?? {};
+}
+
+async function captureStripePaymentForTask(
+  ctx: ActionCtx,
+  task_id: Id<"tasks">,
+) {
+  if (!stripeCheckoutMode()) return;
+  const escrow = (await ctx.runQuery(api.escrow.forTask, { task_id })) as
+    | {
+        payment_processor?: string;
+        payment_status?: string;
+        stripe_payment_intent_id?: string;
+        stripe_charge_id?: string;
+      }
+    | null;
+  if (!escrow || escrow.payment_processor !== "stripe") return;
+  if (escrow.payment_status === "captured") return;
+  if (!escrow.stripe_payment_intent_id) {
+    throw new Error("Stripe payment intent missing for real-money settlement");
+  }
+  if (escrow.payment_status !== "authorized") {
+    throw new Error(
+      `Stripe payment must be authorized before capture; got ${escrow.payment_status ?? "unknown"}`,
+    );
+  }
+  const intent = await stripePost(
+    `payment_intents/${escrow.stripe_payment_intent_id}/capture`,
+    new URLSearchParams(),
+    `arbor_capture_${task_id}_${escrow.stripe_payment_intent_id}`,
+  );
+  const chargeId = latestChargeId(intent.latest_charge) ?? escrow.stripe_charge_id;
+  await ctx.runMutation(internal.escrow._markStripeCaptured, {
+    task_id,
+    stripe_payment_intent_id: escrow.stripe_payment_intent_id,
+    stripe_charge_id: chargeId,
+  });
+  await ctx.runMutation(internal.tasks._setPaymentStatus, {
+    task_id,
+    payment_status: "captured",
+  });
+  await ctx.runMutation(internal.lifecycle.log, {
+    task_id,
+    event_type: "stripe_payment_captured",
+    payload: {
+      stripe_payment_intent_id: escrow.stripe_payment_intent_id,
+      stripe_charge_id: chargeId,
+    },
+  });
+}
+
+async function cancelStripePaymentForTask(
+  ctx: ActionCtx,
+  task_id: Id<"tasks">,
+  reason: string,
+) {
+  if (!stripeCheckoutMode()) return;
+  const escrow = (await ctx.runQuery(api.escrow.forTask, { task_id })) as
+    | {
+        payment_processor?: string;
+        payment_status?: string;
+        stripe_payment_intent_id?: string;
+      }
+    | null;
+  if (!escrow || escrow.payment_processor !== "stripe") return;
+  if (escrow.payment_status === "canceled" || escrow.payment_status === "captured") {
+    return;
+  }
+  if (!escrow.stripe_payment_intent_id) return;
+  if (escrow.payment_status === "authorized") {
+    const params = new URLSearchParams();
+    params.set("cancellation_reason", "requested_by_customer");
+    await stripePost(
+      `payment_intents/${escrow.stripe_payment_intent_id}/cancel`,
+      params,
+      `arbor_cancel_${task_id}_${escrow.stripe_payment_intent_id}`,
+    );
+  }
+  await ctx.runMutation(internal.escrow._markStripeCanceled, {
+    task_id,
+    stripe_payment_intent_id: escrow.stripe_payment_intent_id,
+    reason,
+  });
+  await ctx.runMutation(internal.tasks._setPaymentStatus, {
+    task_id,
+    payment_status: "canceled",
+  });
+  await ctx.runMutation(internal.lifecycle.log, {
+    task_id,
+    event_type: "stripe_payment_canceled",
+    payload: {
+      stripe_payment_intent_id: escrow.stripe_payment_intent_id,
+      reason,
+    },
+  });
+}
 
 function normalizeSpecialistOutput(output: SpecialistOutput): {
   text: string;
@@ -139,6 +287,43 @@ function makeToolCallRecorder(
   };
 }
 
+/**
+ * Auctioneer-side plan screen. Every bid's capability_claim must read as a
+ * plausible, task-specific plan — concrete steps that engage with the task's
+ * actual subject matter. Fail-open: if the screening model is unreachable the
+ * bid stands (the screen improves quality, it must never empty the auction).
+ */
+async function assessPlanPlausibility(
+  taskPrompt: string,
+  plan: string,
+): Promise<{ plausible: boolean; reason: string }> {
+  if (plan.trim().length < 40) {
+    return { plausible: false, reason: "plan too short to be actionable" };
+  }
+  try {
+    const verdict = await callOpenAIJSON<{
+      plausible?: boolean;
+      reason?: string;
+    }>({
+      systemPrompt: `You screen bids in an agent marketplace. Given a user's task and a bidder's plan, decide whether the plan is a plausible, task-specific approach: it must engage with the task's actual subject matter and describe concrete steps. Reject generic capability pitches, plans about a different domain than the task, and filler. A bracketed provenance note like "[Plan drafted by Arbor ...]" is fine and not grounds for rejection. Output JSON only: { "plausible": true|false, "reason": "<short>" }`,
+      userPrompt: `Task:\n${taskPrompt.slice(0, 1200)}\n\nBidder's plan:\n${plan.slice(0, 1200)}`,
+      maxTokens: 128,
+      timeoutMs: 6_000,
+      retries: 0,
+      purpose: "judge",
+    });
+    if (typeof verdict.plausible === "boolean") {
+      return { plausible: verdict.plausible, reason: verdict.reason ?? "" };
+    }
+    return { plausible: true, reason: "screen returned malformed verdict (fail-open)" };
+  } catch (err) {
+    return {
+      plausible: true,
+      reason: `screen unavailable (fail-open): ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
 // ─── Phase 2: bid solicitation ───────────────────────────────────────────
 
 export const solicitBids = internalAction({
@@ -155,7 +340,10 @@ export const solicitBids = internalAction({
       ? `${task.prompt}\n\n---\n\n${taskContext.prompt_addendum}`
       : task.prompt;
 
-    const discovered = await ctx.runQuery(api.discoveredSpecialists.list, {});
+    const discovered = (await ctx.runQuery(
+      api.discoveredSpecialists.list,
+      {},
+    )) as Array<Doc<"discovered_specialists">>;
     const discoveredConfigs: SpecialistConfig[] = discovered.map((d) => {
       const cfg: SpecialistConfig = {
         agent_id: d.agent_id,
@@ -168,15 +356,44 @@ export const solicitBids = internalAction({
         one_liner: d.one_liner,
         mcp_endpoint: d.mcp_endpoint,
         mcp_api_key_env: d.mcp_api_key_env,
+        a2a_endpoint: d.a2a_endpoint,
+        a2a_agent_card_url: d.a2a_agent_card_url,
+        a2a_api_key_env: d.a2a_api_key_env,
+        a2a_auth_mode: d.a2a_auth_mode,
         homepage_url: d.homepage_url,
         discovered: true,
         discovery_source: d.discovery_source,
         discovered_for: d.discovered_for,
-        tier: d.mcp_endpoint ? "mcp-forwarding" : "mock",
+        tier: d.a2a_endpoint
+          ? "a2a"
+          : d.mcp_endpoint
+            ? "mcp-forwarding"
+            : "mock",
       };
       registerDiscoveredSpecialist(cfg);
       return cfg;
     });
+
+    // Hydrate outbound A2A keys from the Convex vault: any specialist whose
+    // key env var is unset gets it populated from a2a_outbound_keys so keyed
+    // agents can bid without env-var redeploys (console-pasted or
+    // auto-acquired keys take effect on the next auction).
+    try {
+      const vaultRows = await ctx.runQuery(internal.a2aOutboundKeys._getAll, {});
+      const byAgent = new Map(vaultRows.map((k) => [k.agent_id, k.api_key]));
+      for (const cfg of discoveredConfigs) {
+        if (
+          cfg.a2a_auth_mode !== "none" &&
+          cfg.a2a_api_key_env &&
+          !process.env[cfg.a2a_api_key_env]
+        ) {
+          const key = byAgent.get(cfg.agent_id);
+          if (key) process.env[cfg.a2a_api_key_env] = key;
+        }
+      }
+    } catch {
+      // Vault read failure -> keyed agents without env vars decline cleanly.
+    }
 
     // Auto-enrol every catalog entry (Stripe, Linear, Vercel, etc.) as a
     // bidder unless it's already covered by a sponsor or discovered config.
@@ -208,9 +425,17 @@ export const solicitBids = internalAction({
       return cfg;
     });
 
-    // Make sure every catalog bidder has an agents row so reputation flows.
+    // Open auction: every registered specialist gets a chance to bid. Each
+    // runner's bid prompt tells it to decline when the task is out of scope,
+    // and the Vickrey score (reputation / bid_price) handles the rest.
+    const roster = [...SPECIALISTS, ...discoveredConfigs, ...catalogConfigs];
+
+    // Make sure every bidder has an agents row so reputation reads use the
+    // live score and settlement's _applyReputationDelta never hits a missing
+    // row (registry-only specialists like arbor-worker-a2a used to crash
+    // settle and strand tasks in "judging").
     await Promise.allSettled(
-      catalogConfigs.map((c) =>
+      roster.map((c) =>
         ctx.runMutation(internal.agents._ensureAgent, {
           agent_id: c.agent_id,
           display_name: c.display_name,
@@ -222,37 +447,137 @@ export const solicitBids = internalAction({
         }),
       ),
     );
-
-    // Open auction: every registered specialist gets a chance to bid. Each
-    // runner's bid prompt tells it to decline when the task is out of scope,
-    // and the Vickrey score (reputation / bid_price) handles the rest.
-    const roster = [...SPECIALISTS, ...discoveredConfigs, ...catalogConfigs];
-    const invitedSpecialists: SpecialistConfig[] =
-      task.task_type === "reacher-live-launch"
-        ? SPECIALISTS.filter((spec) => spec.agent_id === "reacher-social")
-        : roster;
+    const invitedIds =
+      Array.isArray(task.invited_agent_ids) && task.invited_agent_ids.length > 0
+        ? new Set(task.invited_agent_ids)
+        : null;
+    let invitedSpecialists: SpecialistConfig[];
+    if (task.task_type === "reacher-live-launch") {
+      // Sponsor-demo invariant: reacher-live-launch always solicits only
+      // reacher-social, regardless of any per-task shortlist.
+      invitedSpecialists = SPECIALISTS.filter(
+        (spec) => spec.agent_id === "reacher-social",
+      );
+    } else if (invitedIds) {
+      invitedSpecialists = roster.filter((spec) => invitedIds.has(spec.agent_id));
+      if (invitedSpecialists.length === 0) {
+        // Over-restrictive shortlist (no roster member matches): degrade to
+        // the open auction rather than guaranteeing an auction_failed.
+        invitedSpecialists = roster;
+        await ctx.runMutation(internal.lifecycle.log, {
+          task_id: args.task_id,
+          event_type: "auction_shortlist_empty",
+          payload: {
+            invited_agent_ids: task.invited_agent_ids,
+            matched: [],
+          },
+        });
+      } else {
+        await ctx.runMutation(internal.lifecycle.log, {
+          task_id: args.task_id,
+          event_type: "auction_shortlisted",
+          payload: {
+            invited_agent_ids: task.invited_agent_ids,
+            matched: invitedSpecialists.map((s) => s.agent_id),
+          },
+        });
+      }
+    } else {
+      invitedSpecialists = roster;
+    }
 
     await Promise.allSettled(
       invitedSpecialists.map(async (spec) => {
-        const runner = getRunner(spec.agent_id as AgentId);
+        const solicitStart = Date.now();
         const agent = await ctx.runQuery(internal.agents._getByAgentId, {
           agent_id: spec.agent_id,
         });
         const reputation = agent?.reputation_score ?? spec.starting_reputation;
-        const public_tier = toPublicTier(spec.tier);
 
-        // ─── Capability probe: every bidder must prove liveness before
-        // it is allowed to enter the sealed auction. Runners without a
-        // probe() implementation (mock, unconfigured catalog entries) are
-        // routed to the demo lane and never reach internal.bids._insert.
+        // A listed MCP specialist whose declared API key env var is absent
+        // can never run live — its probe would fail with "env not set".
+        // Route it to the demo lane instead of pretending the endpoint is
+        // broken. A2A key envs are NOT checked here: they are optional
+        // (bearer only when the agent card demands it), and the card-auth
+        // resolver already fails closed when auth is genuinely required.
+        const missingKeyEnv =
+          spec.mcp_api_key_env && !process.env[spec.mcp_api_key_env]
+            ? spec.mcp_api_key_env
+            : undefined;
+
+        const runner = getRunner(spec.agent_id as AgentId);
+        const liveCapable = Boolean(runner.probe) && !missingKeyEnv;
+
+        // Demo-lane policy: only Arbor's own listed specialists (the static
+        // roster shown on /agents) may bid via the labeled persona lane.
+        // Discovered/catalog third parties never get plans authored for them.
+        const demoEligible = !spec.discovered;
+        const public_tier = liveCapable
+          ? toPublicTier(spec.tier)
+          : toPublicTier("mock");
+
+        if (!liveCapable && !demoEligible) {
+          const probe_id = await ctx.runMutation(internal.bidProbes._insert, {
+            task_id: args.task_id,
+            agent_id: spec.agent_id,
+            public_tier,
+            probe_status: "demo_lane",
+            duration_ms: 0,
+            error_message: missingKeyEnv
+              ? `unconfigured: ${missingKeyEnv} not set`
+              : undefined,
+            created_at: Date.now(),
+          });
+          await ctx.runMutation(internal.lifecycle.log, {
+            task_id: args.task_id,
+            event_type: "bid_declined",
+            payload: {
+              agent_id: spec.agent_id,
+              reason: "demo_lane — no live probe",
+              public_tier,
+              probe_id,
+            },
+          });
+          return;
+        }
+
+        // ─── Probe and bid run concurrently. The serial probe→bid chain
+        // (8s + 12s worst case) could not fit tunneled A2A agents inside a
+        // 30s window; in parallel the slower leg dominates. A bid whose
+        // probe fails is discarded — liveness still gates the auction.
         const probeStart = Date.now();
-        const probe: ProbeResult = runner.probe
-          ? await runner.probe(task.task_type).catch((err) => ({
+        const probePromise: Promise<ProbeResult> = liveCapable
+          ? runner.probe!(task.task_type).catch((err) => ({
               status: "fail" as const,
               duration_ms: Date.now() - probeStart,
               error_message: err instanceof Error ? err.message : String(err),
             }))
-          : { status: "demo_lane" as const, duration_ms: 0 };
+          : Promise.resolve({
+              status: "demo_lane" as const,
+              duration_ms: 0,
+              error_message: missingKeyEnv
+                ? `unconfigured: ${missingKeyEnv} not set`
+                : undefined,
+            });
+
+        // Demo-lane bids always come from the persona runner with an explicit
+        // mock tier, so provenance labels and bid plans never overstate what
+        // the specialist can actually reach.
+        const bidRunner = liveCapable
+          ? runner
+          : makeMockSpecialist({ ...spec, tier: "mock" });
+        const bidPromise = bidRunner
+          .bid(promptForAgents, task.task_type)
+          .then((decision) => ({ ok: true as const, decision }))
+          .catch((err) => ({
+            ok: false as const,
+            error: err instanceof Error ? err.message : String(err),
+          }));
+
+        const [probe, bidOutcome] = await Promise.all([
+          probePromise,
+          bidPromise,
+        ]);
 
         const probe_id = await ctx.runMutation(internal.bidProbes._insert, {
           task_id: args.task_id,
@@ -265,16 +590,13 @@ export const solicitBids = internalAction({
           created_at: Date.now(),
         });
 
-        if (probe.status !== "pass") {
+        if (probe.status === "fail") {
           await ctx.runMutation(internal.lifecycle.log, {
             task_id: args.task_id,
             event_type: "bid_declined",
             payload: {
               agent_id: spec.agent_id,
-              reason:
-                probe.status === "demo_lane"
-                  ? "demo_lane — no live probe"
-                  : `probe_failed: ${probe.error_message ?? "unknown"}`,
+              reason: `probe_failed: ${probe.error_message ?? "unknown"}`,
               public_tier,
               probe_id,
             },
@@ -282,70 +604,81 @@ export const solicitBids = internalAction({
           return;
         }
 
-        try {
-          const decision = await runner.bid(promptForAgents, task.task_type);
-          if ("decline" in decision) {
-            await ctx.runMutation(internal.lifecycle.log, {
-              task_id: args.task_id,
-              event_type: "bid_declined",
-              payload: {
-                agent_id: spec.agent_id,
-                reason: decision.reason,
-                public_tier,
-                probe_id,
-              },
-            });
-            return;
-          }
-          const bid = decision satisfies BidPayload;
-          // Tier weight is now a safety net — probe-pass already filtered
-          // out demo-lane bidders. Only public tiers that proved liveness
-          // get any weight at all.
-          const tierWeight =
-            public_tier === "native-a2a" || public_tier === "a2a-bridge"
-              ? 1.0
-              : 0;
-          const score =
-            (reputation / Math.max(0.01, bid.bid_price)) * tierWeight;
-          const bid_id = await ctx.runMutation(internal.bids._insert, {
-            task_id: args.task_id,
-            agent_id: spec.agent_id,
-            bid_price: bid.bid_price,
-            capability_claim: bid.capability_claim,
-            estimated_seconds: bid.estimated_seconds,
-            score,
-          });
-          await ctx.runMutation(internal.bidProbes._setBidId, {
-            probe_id,
-            bid_id,
-          });
-          await ctx.runMutation(internal.lifecycle.log, {
-            task_id: args.task_id,
-            event_type: "bid_received",
-            payload: {
-              bid_id,
-              agent_id: spec.agent_id,
-              sponsor: spec.sponsor,
-              // bid_price kept out of payload to preserve sealed-bid property
-              // until the resolver writes the auction_resolved event.
-              capability_claim: bid.capability_claim,
-              estimated_seconds: bid.estimated_seconds,
-              public_tier,
-              probe_id,
-            },
-          });
-        } catch (err) {
+        const declineWith = async (reason: string) => {
           await ctx.runMutation(internal.lifecycle.log, {
             task_id: args.task_id,
             event_type: "bid_declined",
             payload: {
               agent_id: spec.agent_id,
-              reason: `error: ${err instanceof Error ? err.message : String(err)}`,
+              reason,
               public_tier,
               probe_id,
             },
           });
+        };
+
+        if (!bidOutcome.ok) {
+          await declineWith(`error: ${bidOutcome.error}`);
+          return;
         }
+        if ("decline" in bidOutcome.decision) {
+          await declineWith(bidOutcome.decision.reason);
+          return;
+        }
+        const bid = bidOutcome.decision satisfies BidPayload;
+
+        // ─── Plan screen: a bid must carry a plausible, task-specific plan.
+        const screen = await assessPlanPlausibility(
+          task.prompt,
+          bid.capability_claim,
+        );
+        if (!screen.plausible) {
+          await declineWith(`implausible_plan: ${screen.reason}`);
+          return;
+        }
+
+        // Probe-passed live tiers carry full weight; demo-lane personas get a
+        // near-zero weight — visible in the auction, ranked among themselves,
+        // but never above any live bidder.
+        const tierWeight =
+          probe.status === "pass" &&
+          (public_tier === "native-a2a" || public_tier === "a2a-bridge")
+            ? 1.0
+            : probe.status === "demo_lane"
+              ? 0.05
+              : 0;
+        const score =
+          (reputation / Math.max(0.01, bid.bid_price)) * tierWeight;
+        const bid_id = await ctx.runMutation(internal.bids._insert, {
+          task_id: args.task_id,
+          agent_id: spec.agent_id,
+          bid_price: bid.bid_price,
+          capability_claim: bid.capability_claim,
+          estimated_seconds: bid.estimated_seconds,
+          score,
+          plan_source: bid.plan_source,
+        });
+        await ctx.runMutation(internal.bidProbes._setBidId, {
+          probe_id,
+          bid_id,
+        });
+        await ctx.runMutation(internal.lifecycle.log, {
+          task_id: args.task_id,
+          event_type: "bid_received",
+          payload: {
+            bid_id,
+            agent_id: spec.agent_id,
+            sponsor: spec.sponsor,
+            // bid_price kept out of payload to preserve sealed-bid property
+            // until the resolver writes the auction_resolved event.
+            capability_claim: bid.capability_claim,
+            estimated_seconds: bid.estimated_seconds,
+            plan_source: bid.plan_source,
+            bid_latency_ms: Date.now() - solicitStart,
+            public_tier,
+            probe_id,
+          },
+        });
       }),
     );
   },
@@ -359,9 +692,9 @@ export const resolve = internalAction({
     const task = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
     });
-    const allBids = await ctx.runQuery(internal.bids._allForTask, {
+    const allBids = (await ctx.runQuery(internal.bids._allForTask, {
       task_id: args.task_id,
-    });
+    })) as Array<Doc<"bids">>;
 
     const validBids = allBids.filter((b) => b.bid_price <= task.max_budget);
 
@@ -430,6 +763,31 @@ export const resolve = internalAction({
       },
     });
 
+    if (stripeCheckoutMode()) {
+      const currency = stripeCurrency();
+      await ctx.runMutation(internal.escrow._markPaymentRequired, {
+        task_id: args.task_id,
+        processor: "stripe",
+        currency,
+      });
+      await ctx.runMutation(internal.tasks._setPaymentStatus, {
+        task_id: args.task_id,
+        payment_status: "requires_payment",
+        status: "requires_payment",
+      });
+      await ctx.runMutation(internal.lifecycle.log, {
+        task_id: args.task_id,
+        event_type: "stripe_payment_required",
+        payload: {
+          seller_id: winner.agent_id,
+          amount: price_paid,
+          currency,
+          mode: "checkout_manual_capture",
+        },
+      });
+      return;
+    }
+
     // Phase 4 — execution.
     await ctx.scheduler.runAfter(0, internal.auctions.execute, {
       task_id: args.task_id,
@@ -440,7 +798,13 @@ export const resolve = internalAction({
 // ─── Phase 4: execution ──────────────────────────────────────────────────
 
 export const execute = internalAction({
-  args: { task_id: v.id("tasks") },
+  args: {
+    task_id: v.id("tasks"),
+    // Agents that already failed execution on this task. Bounded failover:
+    // when the winner fails, the auctioneer re-awards to the next-best bid
+    // instead of failing the whole task (see catch block below).
+    attempted_agent_ids: v.optional(v.array(v.string())),
+  },
   handler: async (ctx, args) => {
     const task = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
@@ -485,11 +849,18 @@ export const execute = internalAction({
           one_liner: discoveredEntry.one_liner,
           mcp_endpoint: discoveredEntry.mcp_endpoint,
           mcp_api_key_env: discoveredEntry.mcp_api_key_env,
+          a2a_endpoint: discoveredEntry.a2a_endpoint,
+          a2a_agent_card_url: discoveredEntry.a2a_agent_card_url,
+          a2a_api_key_env: discoveredEntry.a2a_api_key_env,
           homepage_url: discoveredEntry.homepage_url,
           discovered: true,
           discovery_source: discoveredEntry.discovery_source,
           discovered_for: discoveredEntry.discovered_for,
-          tier: discoveredEntry.mcp_endpoint ? "mcp-forwarding" : "mock",
+          tier: discoveredEntry.a2a_endpoint
+            ? "a2a"
+            : discoveredEntry.mcp_endpoint
+              ? "mcp-forwarding"
+              : "mock",
         });
       }
       const runner = getRunner(winner.agent_id as AgentId);
@@ -513,6 +884,14 @@ export const execute = internalAction({
         executeResult.provenance,
         toolRecorder.successfulCallIds(),
       );
+
+      // A [FALLBACK] banner is not a deliverable. Fail-closed runners return
+      // it with fallback_reason set when the remote leg didn't actually run —
+      // throw so the failover below can route to the next bidder instead of
+      // settling fallback text as a completed task.
+      if (provenance.fallback_reason) {
+        throw new Error(`specialist_fallback: ${provenance.fallback_reason}`);
+      }
 
       // ─── Receipt rule: a task is only fulfilled when the winner produced
       // a real external session id, at least one observed event, and a
@@ -574,13 +953,14 @@ export const execute = internalAction({
         task_id: args.task_id,
       });
     } catch (err) {
+      await cancelStripePaymentForTask(
+        ctx,
+        args.task_id,
+        `execution_failed:${err instanceof Error ? err.message : String(err)}`,
+      );
       await ctx.runMutation(internal.escrow._settle, {
         task_id: args.task_id,
         status: "refunded",
-      });
-      await ctx.runMutation(internal.tasks._setStatus, {
-        task_id: args.task_id,
-        status: "failed",
       });
       await ctx.runMutation(internal.lifecycle.log, {
         task_id: args.task_id,
@@ -589,6 +969,89 @@ export const execute = internalAction({
           agent_id: winner.agent_id,
           reason: err instanceof Error ? err.message : String(err),
         },
+      });
+
+      // ─── Failover: re-award to the next-best bidder instead of failing
+      // the task outright. The A2A/MCP runners are fail-closed by design
+      // ("the auctioneer should pick another bidder"), so honor that here.
+      // Bounded to MAX_EXECUTION_ATTEMPTS total winners per task.
+      const MAX_EXECUTION_ATTEMPTS = 3;
+      const attempted = [
+        ...(args.attempted_agent_ids ?? []),
+        winner.agent_id,
+      ];
+      if (attempted.length < MAX_EXECUTION_ATTEMPTS) {
+        const allBids = (await ctx.runQuery(internal.bids._allForTask, {
+          task_id: args.task_id,
+        })) as Array<Doc<"bids">>;
+        const remaining = allBids
+          .filter(
+            (b) =>
+              b.bid_price <= task.max_budget &&
+              !attempted.includes(b.agent_id),
+          )
+          .sort((a, b) => b.score - a.score);
+        if (remaining.length > 0) {
+          const next = remaining[0];
+          const price_paid =
+            remaining.length >= 2 ? remaining[1].bid_price : next.bid_price;
+          await ctx.runMutation(internal.escrow._lock, {
+            task_id: args.task_id,
+            buyer_id: task.posted_by || BUYER_ID,
+            seller_id: next.agent_id,
+            locked_amount: price_paid,
+          });
+          await ctx.runMutation(internal.tasks._setWinner, {
+            task_id: args.task_id,
+            winning_bid_id: next._id,
+            price_paid,
+          });
+          await ctx.runMutation(internal.lifecycle.log, {
+            task_id: args.task_id,
+            event_type: "execution_failover",
+            payload: {
+              from_agent_id: winner.agent_id,
+              to_agent_id: next.agent_id,
+              attempt: attempted.length + 1,
+              price_paid,
+            },
+          });
+          if (stripeCheckoutMode()) {
+            const currency = stripeCurrency();
+            await ctx.runMutation(internal.escrow._markPaymentRequired, {
+              task_id: args.task_id,
+              processor: "stripe",
+              currency,
+            });
+            await ctx.runMutation(internal.tasks._setPaymentStatus, {
+              task_id: args.task_id,
+              payment_status: "requires_payment",
+              status: "requires_payment",
+            });
+            await ctx.runMutation(internal.lifecycle.log, {
+              task_id: args.task_id,
+              event_type: "stripe_payment_required",
+              payload: {
+                seller_id: next.agent_id,
+                amount: price_paid,
+                currency,
+                mode: "checkout_manual_capture",
+                reason: "execution_failover",
+              },
+            });
+            return;
+          }
+          await ctx.scheduler.runAfter(0, internal.auctions.execute, {
+            task_id: args.task_id,
+            attempted_agent_ids: attempted,
+          });
+          return;
+        }
+      }
+
+      await ctx.runMutation(internal.tasks._setStatus, {
+        task_id: args.task_id,
+        status: "failed",
       });
     }
   },
@@ -654,6 +1117,7 @@ export const judge = internalAction({
           maxTokens: 512,
           timeoutMs: 20_000,
           retries: 1,
+          purpose: "judge",
         }),
         new Promise<JudgeVerdict>((_, reject) =>
           setTimeout(() => reject(new Error("judge timeout (20s)")), 20_000),
@@ -726,9 +1190,9 @@ export const settle = internalAction({
     });
 
     // Capture actual runtime from lifecycle events for the dimensions record.
-    const lifecycle = await ctx.runQuery(internal.lifecycle._forTask, {
+    const lifecycle = (await ctx.runQuery(internal.lifecycle._forTask, {
       task_id: args.task_id,
-    });
+    })) as Array<Doc<"lifecycle_events">>;
     const startedAt = lifecycle.find(
       (e) => e.event_type === "execution_started",
     )?.timestamp;
@@ -752,6 +1216,7 @@ export const settle = internalAction({
     });
 
     if (verdict.verdict === "accept") {
+      await captureStripePaymentForTask(ctx, args.task_id);
       await ctx.runMutation(internal.escrow._settle, {
         task_id: args.task_id,
         status: "released",
@@ -786,6 +1251,7 @@ export const settle = internalAction({
         },
       });
     } else {
+      await cancelStripePaymentForTask(ctx, args.task_id, "judge_rejected");
       await ctx.runMutation(internal.escrow._settle, {
         task_id: args.task_id,
         status: "refunded",

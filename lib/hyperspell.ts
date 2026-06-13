@@ -141,10 +141,24 @@ export async function uploadFile({
   collection,
   metadata,
 }: UploadFileParams) {
+  let bytes: Buffer;
+  try {
+    bytes = fs.readFileSync(filePath);
+  } catch (err) {
+    throw new Error(
+      `Could not read Hyperspell upload file "${filePath}" for user "${userId}": ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+  const blobBytes = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
   const form = new FormData();
   form.append(
     "file",
-    new Blob([fs.readFileSync(filePath)]),
+    new Blob([blobBytes]),
     path.basename(filePath),
   );
   if (collection) form.append("collection", collection);

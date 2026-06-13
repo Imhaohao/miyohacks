@@ -23,6 +23,7 @@ import {
 import { TENSORLAKE_A2A_CONFIG } from "./tensorlake-a2a";
 import { DEVIN_A2A_CONFIG } from "./devin-a2a";
 import { CONVEX_A2A_CONFIG } from "./convex-a2a";
+import { WORKER_A2A_CONFIG } from "./worker-a2a";
 import { makeMcpForwardingSpecialist } from "./mcp-forwarding";
 import { makeA2aForwardingSpecialist } from "./a2a-forwarding";
 import { makeMockSpecialist } from "./base";
@@ -45,12 +46,28 @@ const ARBOR_LOOPBACK_A2A_CONFIG: SpecialistConfig = {
   capabilities: ["task routing", "specialist dispatch", "market discovery"],
   system_prompt:
     "You are the Arbor market gateway, reachable via the A2A protocol. You route tasks to registered specialists.",
-  cost_baseline: 0.05,
-  starting_reputation: 80,
+  // Honest price: the loopback resells the work of whichever specialist the
+  // market routes to, so its true cost is a full specialist price — not a
+  // token amount. At 0.05 it scored reputation/0.05 = 16, beat every real
+  // bidder, then "delivered" a routing receipt that judges score 0.
+  cost_baseline: 1.0,
+  starting_reputation: 0.8,
   one_liner: "Routes tasks through the Arbor market via A2A.",
   tier: "a2a",
   a2a_endpoint: `${ARBOR_LOOPBACK_BASE}/api/a2a/market`,
+  // The app origin serves no /.well-known/agent-card.json; the market route
+  // returns its card on GET, so point card discovery directly at it.
+  a2a_agent_card_url: `${ARBOR_LOOPBACK_BASE}/api/a2a/market`,
 };
+
+const INCLUDE_DEMO_MOCK_SPECIALISTS =
+  process.env.ARBOR_INCLUDE_DEMO_MOCK_SPECIALISTS === "true";
+
+const DEMO_MOCK_SPECIALISTS: SpecialistConfig[] = [
+  CODEX_WRITER_CONFIG,
+  ASIDE_BROWSER_CONFIG,
+  CONVEX_REALTIME_CONFIG,
+];
 
 /**
  * All ten Nozomio sponsor agents. Listed in display order — Reacher first
@@ -62,30 +79,33 @@ export const SPECIALISTS: SpecialistConfig[] = [
   NIA_CONTEXT_CONFIG,
   HYPERSPELL_BRAIN_CONFIG,
   TENSORLAKE_EXEC_CONFIG,
-  CODEX_WRITER_CONFIG,
   DEVIN_ENGINEER_CONFIG,
   VERCEL_V0_CONFIG,
   INSFORGE_BACKEND_CONFIG,
-  ASIDE_BROWSER_CONFIG,
-  CONVEX_REALTIME_CONFIG,
+  ...(INCLUDE_DEMO_MOCK_SPECIALISTS ? DEMO_MOCK_SPECIALISTS : []),
   ARBOR_LOOPBACK_A2A_CONFIG,
   // External A2A specialists — registered when their env vars are present.
   TENSORLAKE_A2A_CONFIG,
   DEVIN_A2A_CONFIG,
   CONVEX_A2A_CONFIG,
+  WORKER_A2A_CONFIG,
 ].filter((s) => s.tier !== "disabled");
 
 export const SPECIALIST_RUNNERS: Partial<Record<AgentId, SpecialistRunner>> = {
   "nia-context": niaContext,
   "hyperspell-brain": hyperspellBrain,
   "tensorlake-exec": tensorlakeExec,
-  "codex-writer": codexWriter,
   "devin-engineer": devinEngineer,
   "reacher-social": reacherSocial,
   "vercel-v0": vercelV0,
   "insforge-backend": insforgeBackend,
-  "aside-browser": asideBrowser,
-  "convex-realtime": convexRealtime,
+  ...(INCLUDE_DEMO_MOCK_SPECIALISTS
+    ? {
+        "codex-writer": codexWriter,
+        "aside-browser": asideBrowser,
+        "convex-realtime": convexRealtime,
+      }
+    : {}),
 };
 
 // Warn once at module load for every specialist that is explicitly mocked.

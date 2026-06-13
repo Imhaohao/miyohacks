@@ -1,0 +1,13 @@
+[
+  {
+    "source": "mcp-registry",
+    "fetched_at": "2026-06-11T00:00:00.000Z",
+    "raw_count": 15000,
+    "http_invokable_count": 6641,
+    "consumer_candidate_count": 1653,
+    "kept_count": 809,
+    "overflow_count": 844,
+    "failed_count": 1,
+    "notes": "Live registry entries are treated as partial verification unless a source-specific probe upgrades the row."
+  }
+]

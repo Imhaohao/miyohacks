@@ -253,6 +253,7 @@ async function runConversionDropDemoInner(
           maxTokens: 800,
           timeoutMs: 30_000,
           retries: 0,
+          purpose: "demo",
         });
         if (synthesized.trim().length > 80) {
           diagnosis = synthesized.trim();
@@ -696,6 +697,7 @@ async function tryLlmPatch(currentContent: string, diagnosis: string): Promise<s
     maxTokens: 4000,
     timeoutMs: 60_000,
     retries: 0,
+    purpose: "demo",
   });
   return typeof out.new_content === "string" ? out.new_content : null;
 }

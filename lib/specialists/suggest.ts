@@ -25,7 +25,7 @@ export interface SpecialistSuggestion {
   fit_score: number;
   fit_reasoning: string;
   discovered: boolean;
-  discovery_source?: "catalog" | "registry" | "synthesized";
+  discovery_source?: "catalog" | "registry" | "synthesized" | "a2a";
   /** Real MCP endpoint backing this specialist, if any. */
   mcp_endpoint?: string;
   homepage_url?: string;
@@ -35,7 +35,26 @@ export interface SpecialistSuggestion {
    * `discover_specialist` with the same prompt enrolls it.
    */
   enrollable: boolean;
+  /** Capability fit before reputation blending (0..1). Equals fit_score when no reputation. */
+  base_fit_score?: number;
+  /** Reputation-adjusted score actually used for ordering (0..1+). */
+  adjusted_score?: number;
+  /** Mean judged `overall` reputation (0..1) from real completed tasks, if any. */
+  reputation_overall?: number;
+  /** Number of real judged tasks backing the reputation (confidence). */
+  reputation_tasks?: number;
 }
+
+/**
+ * Per-agent reputation derived from REAL judged task outcomes
+ * (convex `reputation_dimensions`). Passed into routing so specialists that
+ * actually performed well rank higher — closing the effectiveness loop the
+ * auction/judge already produces but routing historically ignored.
+ */
+export type ReputationMap = Record<
+  string,
+  { overall: number; tasks: number }
+>;
 
 export interface SuggestResult {
   query: string;
@@ -47,6 +66,23 @@ export interface SuggestResult {
 
 const LOW_CONFIDENCE_THRESHOLD = 0.55;
 
+/**
+ * Reputation blend tuning. Reward-only by design: proven specialists get boosted
+ * up to +ALPHA, unproven ones (0 tasks) are untouched, so cold-start and the
+ * live demo behave exactly as before. Reputation acts as a tiebreaker among
+ * comparable capability fits — it never lets a weak-fit agent leapfrog a clearly
+ * better-fit one (0.4 * 1.35 < 0.9).
+ */
+const REP_ALPHA = 0.35; // max multiplicative boost at full reputation + confidence
+const REP_CONF_K = 3; // judged-task count at which confidence reaches 0.5
+
+/** Reward-only reputation multiplier bonus in [0, REP_ALPHA]. */
+function reputationBonus(stat: { overall: number; tasks: number } | undefined): number {
+  if (!stat || stat.tasks <= 0) return 0;
+  const confidence = stat.tasks / (stat.tasks + REP_CONF_K); // 0..1, grows with evidence
+  return REP_ALPHA * confidence * clamp01(stat.overall);
+}
+
 interface RankedItem {
   agent_id: string;
   fit_score: number;
@@ -57,11 +93,11 @@ interface RankResponse {
   ranked: RankedItem[];
 }
 
-const RANK_SYSTEM_PROMPT = `You are the routing layer of a general-purpose marketplace where specialist agents bid on any kind of work — payments, design, code, research, marketing, data, ops, anything. The user describes a goal in plain language; you score how well each available specialist agent fits the goal.
+export const RANK_SYSTEM_PROMPT = `You are the routing layer of a general-purpose marketplace where specialist agents bid on any kind of work — payments, design, code, research, marketing, data, ops, anything. The user describes a goal in plain language; you score how well each available specialist agent fits the goal.
 
 Hard rules:
 1. Read the user's goal LITERALLY. If they say "set up Stripe" the goal is payments — not marketing, not creator outreach. Don't infer adjacent intents.
-2. Score by capability match only. Ignore sponsor brand recognition, ignore reputation, ignore how many agents of a given category are in the list.
+2. Score by capability match only. Ignore sponsor brand recognition and how many agents of a given category are in the list. Do NOT factor in reputation or track record — the system blends real judged reputation in separately, after your scoring.
 3. Cross-domain bias is a bug. A creator-marketing specialist scoring above 0.3 for a payments task is wrong. A code/engineering agent scoring above 0.3 for a design task is wrong. Be willing to give very low scores (0.0–0.2) to most of the list.
 4. Real MCP-equipped specialists (those with an mcp_endpoint) outscore generic LLM personas at the same nominal fit, because they can actually call the right product's API.
 
@@ -97,7 +133,7 @@ interface CandidateSpec {
   mcp_endpoint?: string;
   homepage_url?: string;
   discovered: boolean;
-  discovery_source?: "catalog" | "registry" | "synthesized";
+  discovery_source?: "catalog" | "registry" | "synthesized" | "a2a";
   enrollable: boolean;
   tags?: string[];
   note?: string;
@@ -175,6 +211,7 @@ async function rankWithLLM(
       maxTokens: 1200,
       timeoutMs: 18_000,
       retries: 0,
+      purpose: "suggester",
     });
     if (!Array.isArray(data.ranked)) {
       console.warn(
@@ -272,6 +309,9 @@ export async function suggestSpecialists(
   taskType: string | undefined,
   specs: SpecialistConfig[],
   topN = 3,
+  /** Real judged reputation per agent_id. Empty/omitted → identical to the
+   *  pre-reputation behavior (protects cold-start and the live demo). */
+  reputation: ReputationMap = {},
 ): Promise<SuggestResult> {
   const trimmed = query.trim();
   if (!trimmed) {
@@ -299,6 +339,12 @@ export async function suggestSpecialists(
   for (const r of ranked) {
     const c = byId.get(r.agent_id);
     if (!c) continue;
+    // Capability fit is the LLM/keyword score; reputation (from real judged
+    // outcomes) is blended in here as a reward-only multiplier so the ranker
+    // stays a pure capability matcher and the effectiveness loop closes in code.
+    const stat = reputation[c.agent_id];
+    const baseFit = r.fit_score;
+    const adjusted = baseFit * (1 + reputationBonus(stat));
     suggestions.push({
       agent_id: c.agent_id,
       display_name: c.display_name,
@@ -313,16 +359,32 @@ export async function suggestSpecialists(
       mcp_endpoint: c.mcp_endpoint,
       homepage_url: c.homepage_url,
       enrollable: c.enrollable,
+      base_fit_score: baseFit,
+      adjusted_score: adjusted,
+      reputation_overall: stat?.overall,
+      reputation_tasks: stat?.tasks,
     });
   }
-  suggestions.sort((a, b) => b.fit_score - a.fit_score);
+  // Rank by the reputation-adjusted score; capability fit breaks ties.
+  suggestions.sort(
+    (a, b) =>
+      (b.adjusted_score ?? b.fit_score) - (a.adjusted_score ?? a.fit_score) ||
+      b.fit_score - a.fit_score,
+  );
   suggestions.length = Math.min(suggestions.length, topN);
 
-  const best_fit_score = suggestions[0]?.fit_score ?? 0;
+  // Confidence is about capability fit (not reputation): is there any strong
+  // capability match at all? Use the best capability fit among the shortlist.
+  const best_fit_score = suggestions.reduce(
+    (max, s) => Math.max(max, s.fit_score),
+    0,
+  );
   const low_confidence = best_fit_score < LOW_CONFIDENCE_THRESHOLD;
   // Only push the user toward Discover (LLM-synth) when even the catalog/
   // registry roster has nothing strong — i.e. no real MCP fits.
-  const bestRealFit = suggestions.find((s) => !!s.mcp_endpoint)?.fit_score ?? 0;
+  const bestRealFit = suggestions
+    .filter((s) => !!s.mcp_endpoint)
+    .reduce((max, s) => Math.max(max, s.fit_score), 0);
   const recommend_discovery =
     low_confidence && bestRealFit < LOW_CONFIDENCE_THRESHOLD;
   return {

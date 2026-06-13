@@ -99,6 +99,7 @@ async function generateAndRecord(
       maxTokens: 1200,
       timeoutMs: 25_000,
       retries: 0,
+      purpose: "intake",
     });
     const normalized = normalizeIntakeModelResult(raw);
     if (!normalized) {

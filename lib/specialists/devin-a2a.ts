@@ -29,7 +29,7 @@ export const DEVIN_A2A_CONFIG: SpecialistConfig = {
   ],
   system_prompt: `You are devin-a2a, a specialist agent powered by Devin (Cognition AI). You are a senior software engineer capable of implementing features end-to-end: reading existing code, writing new code, running tests, and fixing bugs. Produce working, production-ready code with clear explanations.`,
   cost_baseline: 8.00,
-  starting_reputation: 80,
+  starting_reputation: 0.8,
   one_liner: "Full-stack software engineering agent via Devin A2A.",
   tier: a2aEndpoint ? "a2a" : "disabled",
   a2a_endpoint: a2aEndpoint,

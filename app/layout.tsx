@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Nunito } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-// Nunito — one rounded, friendly variable family for both body and display.
-// Exposed as `--font-nunito`; globals.css maps `--font-encode-sans` (body)
-// and `--font-display` (headlines) onto it, so every existing `font-sans` /
-// `font-display` consumer resolves to Nunito with no config change.
-const nunito = Nunito({
+// Plus Jakarta Sans — clean, modern variable family for a professional AI
+// marketplace. Exposed as `--font-plus-jakarta`; globals.css maps body and
+// display tokens onto it so every `font-sans` / `font-display` consumer
+// resolves here with no further config changes.
+const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
-  variable: "--font-nunito",
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-plus-jakarta",
   display: "swap",
 });
 
@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={nunito.variable} suppressHydrationWarning>
+    <html lang="en" className={plusJakartaSans.variable} suppressHydrationWarning>
       <body
         className="min-h-screen bg-white text-ink antialiased"
         suppressHydrationWarning

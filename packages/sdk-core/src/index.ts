@@ -106,6 +106,28 @@ export interface AwaitTaskOptions {
 
 const TERMINAL_STATUSES = new Set(["complete", "disputed", "failed"]);
 
+async function parseJsonResponse<T>(res: Response, method: string, path: string): Promise<T> {
+  const text = await res.text();
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!text.trim()) {
+    throw new Error(`${method} ${path} returned an empty response body`);
+  }
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      `${method} ${path} returned ${contentType || "unknown content-type"}: ${text.slice(0, 200)}`,
+    );
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch (err) {
+    throw new Error(
+      `${method} ${path} returned invalid JSON: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+}
+
 export class AuctionClient {
   private readonly baseUrl: string;
   private readonly agentId: string;
@@ -190,14 +212,18 @@ export class AuctionClient {
     if (!res.ok) {
       let detail = "";
       try {
-        const j = (await res.json()) as { error?: { message?: string } };
+        const j = await parseJsonResponse<{ error?: { message?: string } }>(
+          res,
+          method,
+          path,
+        );
         detail = j.error?.message ?? "";
-      } catch {
-        detail = await res.text();
+      } catch (err) {
+        detail = err instanceof Error ? err.message : String(err);
       }
       throw new Error(`HTTP ${res.status} ${res.statusText}: ${detail}`);
     }
-    return (await res.json()) as T;
+    return await parseJsonResponse<T>(res, method, path);
   }
 }
 

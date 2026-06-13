@@ -101,13 +101,16 @@ export type AgentId = KnownAgentId | (string & {});
 export type TaskStatus =
   | "open"
   | "planning"
+  | "plan_review"
   | "bidding"
   | "awarded"
+  | "requires_payment"
   | "executing"
   | "judging"
   | "synthesizing"
   | "complete"
   | "disputed"
+  | "cancelled"
   | "failed";
 
 export type EscrowStatus = "locked" | "released" | "refunded";
@@ -134,8 +137,15 @@ export type LifecycleEventType =
 
 export interface BidPayload {
   bid_price: number;
+  /** A concrete 2-4 step plan for this specific task — not a generic pitch. */
   capability_claim: string;
   estimated_seconds: number;
+  /**
+   * Where the plan came from: "remote" = the agent's own A2A reply text,
+   * "llm" = persona/synthesized plan (labeled in the claim when the agent
+   * itself didn't author it), "baseline" = static template fallback.
+   */
+  plan_source?: "remote" | "llm" | "baseline";
 }
 
 export interface DeclineDecision {
@@ -220,6 +230,11 @@ export interface SpecialistConfig {
    */
   a2a_api_key_env?: string;
   /**
+   * "none" = skip card auth entirely (the server was verified not to enforce
+   * the scheme its card declares). Absent or "card" = resolve from the card.
+   */
+  a2a_auth_mode?: "none" | "card";
+  /**
    * If set, this specialist is wired to a real remote MCP server. Bid + execute
    * are forwarded to that endpoint via an LLM-driven tool-calling loop, instead
    * of being mocked. Mark `is_verified: true` only when the URL has been
@@ -254,9 +269,10 @@ export interface SpecialistConfig {
    * Where the discovered specialist came from:
    *   - "catalog"      → curated list of known production HTTP MCP servers
    *   - "registry"     → live search against an MCP registry
+   *   - "a2a"          → runtime A2A directory probe (ARBOR_A2A_DIRECTORY)
    *   - "synthesized"  → LLM-designed in-persona agent (no real MCP backend)
    */
-  discovery_source?: "catalog" | "registry" | "synthesized";
+  discovery_source?: "catalog" | "registry" | "a2a" | "synthesized";
   /** Free-form note explaining what query triggered discovery. */
   discovered_for?: string;
 }

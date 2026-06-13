@@ -9,7 +9,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: R
   }
 
   static getDerivedStateFromError(error: unknown) {
-    const errorText = '' + (error as any).toString();
+    const errorText = error instanceof Error ? error.message : String(error);
     if (errorText.includes('@workos-inc/authkit-react') && errorText.includes('clientId')) {
       return {
         error: (
@@ -43,7 +43,9 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: R
     return { error: <p>{errorText}</p> };
   }
 
-  componentDidCatch() {}
+  componentDidCatch(error: unknown) {
+    console.error('Caught render error:', error);
+  }
 
   render() {
     if (this.state.error !== null) {

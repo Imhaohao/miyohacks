@@ -57,12 +57,14 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
   const [data, setData] = useState<SuggestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshWarning, setRefreshWarning] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false);
   const [discovered, setDiscovered] = useState<DiscoverResponse | null>(null);
   const reqIdRef = useRef(0);
 
   useEffect(() => {
     setDiscovered(null);
+    setRefreshWarning(null);
     if (prompt.trim().length < MIN_PROMPT_LEN) {
       setData(null);
       setError(null);
@@ -98,6 +100,7 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
   async function onDiscover() {
     setDiscovering(true);
     setError(null);
+    setRefreshWarning(null);
     try {
       const res = await fetch("/api/v1/discover", {
         method: "POST",
@@ -117,6 +120,11 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
       const refreshJson = await refresh.json();
       if (refresh.ok && reReq === reqIdRef.current) {
         setData(refreshJson as SuggestResponse);
+      } else if (reReq === reqIdRef.current) {
+        setRefreshWarning(
+          refreshJson?.error?.message ??
+            "Specialist was added, but refreshing recommendations failed.",
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -147,6 +155,12 @@ export function AgentSuggestions({ prompt, taskType }: Props) {
       {error && (
         <p className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
           {error}
+        </p>
+      )}
+
+      {refreshWarning && (
+        <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {refreshWarning}
         </p>
       )}
 

@@ -66,7 +66,6 @@ export function AuctionResolution({ events, probes }: Props) {
   }
 
   if (!resolved) {
-    const responded = bidCount + declineCount;
     const status =
       bidCount === 0 && declineCount === 0
         ? "Waiting for the first specialist to respond..."

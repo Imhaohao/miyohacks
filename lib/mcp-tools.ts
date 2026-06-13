@@ -19,6 +19,7 @@ import {
 import {
   suggestSpecialists,
   type SuggestResult,
+  type ReputationMap,
 } from "@/lib/specialists/suggest";
 import { discoverSpecialist } from "@/lib/specialists/discover";
 import type { SpecialistConfig } from "@/lib/types";
@@ -44,6 +45,7 @@ export interface PostTaskArgs {
   business_context?: string;
   repo_context?: string;
   source_hints?: string[];
+  workflow_mode?: string;
 }
 
 export interface GetTaskArgs {
@@ -81,9 +83,9 @@ export interface DiscoverSpecialistArgs {
   verify?: boolean;
   /**
    * Restrict / reorder discovery sources. Default order:
-   * catalog → registry → synthesized.
+   * catalog → registry → a2a → synthesized.
    */
-  preferred_sources?: Array<"catalog" | "registry" | "synthesized">;
+  preferred_sources?: Array<"catalog" | "registry" | "a2a" | "synthesized">;
 }
 
 export interface UpsertProductContextArgs {
@@ -94,6 +96,53 @@ export interface UpsertProductContextArgs {
   business_context: string;
   repo_context?: string;
   source_hints?: string[];
+}
+
+export interface RegisterAgentArgs {
+  agent_id: string;
+  display_name: string;
+  sponsor: string;
+  owner_id?: string;
+  capabilities: string[];
+  one_liner: string;
+  system_prompt: string;
+  cost_baseline: number;
+  starting_reputation?: number;
+  mcp_endpoint?: string;
+  mcp_api_key_env?: string;
+  a2a_endpoint?: string;
+  a2a_agent_card_url?: string;
+  a2a_api_key_env?: string;
+  homepage_url?: string;
+  fetch_tools?: boolean;
+}
+
+export interface SearchAgentsArgs {
+  query: string;
+  top_k?: number;
+  min_reputation?: number;
+  max_cost?: number;
+  include_unevaluated?: boolean;
+}
+
+export interface ScratchpadReadArgs {
+  dag_id: string;
+}
+
+export interface ScratchpadWriteArgs {
+  dag_id: string;
+  agent_id: string;
+  kind: "observation" | "result" | "decision" | "question";
+  content: string;
+  confidence: number;
+  node_id?: string;
+  task_id?: string;
+}
+
+export interface ScratchpadRecallArgs {
+  dag_id: string;
+  query: string;
+  limit?: number;
 }
 
 // ─── tool definitions ─────────────────────────────────────────────────────
@@ -194,6 +243,11 @@ export const TOOLS: ToolDefinition[] = [
           items: { type: "string" },
           description:
             "Optional repo paths, docs, URLs, or source IDs that Nia should prioritize.",
+        },
+        workflow_mode: {
+          type: "string",
+          description:
+            "Optional. Set to 'hive' to run the multi-agent DAG hive planner (parallel nodes + shared scratchpad + DAG evaluation). Omit for the standard sequential planner.",
         },
       },
     },
@@ -306,6 +360,177 @@ export const TOOLS: ToolDefinition[] = [
       },
     },
   },
+  {
+    name: "register_agent",
+    description:
+      "Register an external agent into the Arbor hive registry. Publish your capability schema (and optional MCP/A2A endpoints); a fixed eval gate runs before the agent enters the hive routing pool. Idempotent per agent_id.",
+    inputSchema: {
+      type: "object",
+      required: [
+        "agent_id",
+        "display_name",
+        "sponsor",
+        "capabilities",
+        "one_liner",
+        "system_prompt",
+        "cost_baseline",
+      ],
+      properties: {
+        agent_id: {
+          type: "string",
+          description: "Stable unique id for this agent; re-registering updates it.",
+        },
+        display_name: {
+          type: "string",
+          description: "Human-readable name shown in the hive.",
+        },
+        sponsor: {
+          type: "string",
+          description: "Org or owner publishing this agent.",
+        },
+        owner_id: {
+          type: "string",
+          description: "Optional caller/owner identifier for this registration.",
+        },
+        capabilities: {
+          type: "array",
+          items: { type: "string" },
+          description: "Capability tags the agent can fulfill.",
+        },
+        one_liner: {
+          type: "string",
+          description: "Short description of what this agent does.",
+        },
+        system_prompt: {
+          type: "string",
+          description: "System prompt / instructions that define the agent's behavior.",
+        },
+        cost_baseline: {
+          type: "number",
+          description: "Typical USD cost per task; used for cost-based filtering.",
+        },
+        starting_reputation: {
+          type: "number",
+          description: "Optional initial reputation score before any judged tasks.",
+        },
+        mcp_endpoint: {
+          type: "string",
+          description: "Optional MCP server URL the agent is reachable at.",
+        },
+        mcp_api_key_env: {
+          type: "string",
+          description: "env var NAME, never a secret value.",
+        },
+        a2a_endpoint: {
+          type: "string",
+          description: "Optional A2A endpoint URL the agent is reachable at.",
+        },
+        a2a_agent_card_url: {
+          type: "string",
+          description: "Optional A2A agent card URL.",
+        },
+        a2a_api_key_env: {
+          type: "string",
+          description: "env var NAME, never a secret value.",
+        },
+        homepage_url: {
+          type: "string",
+          description: "Optional public homepage or docs URL.",
+        },
+        fetch_tools: {
+          type: "boolean",
+          description: "If true, attempt to fetch the agent's tools/list at registration.",
+        },
+      },
+    },
+  },
+  {
+    name: "search_agents",
+    description:
+      "Semantic search over hive-registered agents by capability. Returns top-K candidates by embedding similarity, filtered by reputation and cost. Only eval-passed agents are returned unless include_unevaluated is true.",
+    inputSchema: {
+      type: "object",
+      required: ["query"],
+      properties: {
+        query: {
+          type: "string",
+          description: "Free-form capability or goal to match agents against.",
+        },
+        top_k: {
+          type: "integer",
+          description: "How many candidates to return. Default 5, clamped to 1..20.",
+        },
+        min_reputation: {
+          type: "number",
+          description: "Optional minimum reputation score filter.",
+        },
+        max_cost: {
+          type: "number",
+          description: "Optional maximum cost_baseline filter.",
+        },
+        include_unevaluated: {
+          type: "boolean",
+          description: "If true, include agents that have not passed the eval gate.",
+        },
+      },
+    },
+  },
+  {
+    name: "scratchpad_read",
+    description:
+      "Read all shared-scratchpad entries for a hive DAG. Use the dag_id from your node task, or resolve it from your task_id via the task surface.",
+    inputSchema: {
+      type: "object",
+      required: ["dag_id"],
+      properties: {
+        dag_id: {
+          type: "string",
+          description: "Hive DAG id returned by dagForTask or a hive task lookup.",
+        },
+      },
+    },
+  },
+  {
+    name: "scratchpad_write",
+    description:
+      "Append an entry to a hive DAG's shared scratchpad. Stamp it with your agent_id, a kind, and a confidence 0..1. Other agents read this, so be concise and honest about confidence.",
+    inputSchema: {
+      type: "object",
+      required: ["dag_id", "agent_id", "kind", "content", "confidence"],
+      properties: {
+        dag_id: { type: "string" },
+        agent_id: { type: "string" },
+        kind: {
+          type: "string",
+          enum: ["observation", "result", "decision", "question"],
+        },
+        content: { type: "string" },
+        confidence: {
+          type: "number",
+          description: "Confidence from 0 to 1.",
+        },
+        node_id: { type: "string" },
+        task_id: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "scratchpad_recall",
+    description:
+      "Semantic search the shared scratchpad of a hive DAG for entries relevant to a query.",
+    inputSchema: {
+      type: "object",
+      required: ["dag_id", "query"],
+      properties: {
+        dag_id: { type: "string" },
+        query: { type: "string" },
+        limit: {
+          type: "integer",
+          description: "Number of results, clamped to 1..20.",
+        },
+      },
+    },
+  },
 ];
 
 // ─── tool handlers ────────────────────────────────────────────────────────
@@ -324,6 +549,7 @@ export async function handlePostTask(args: PostTaskArgs) {
     business_context: args.business_context,
     repo_context: args.repo_context,
     source_hints: args.source_hints,
+    workflow_mode: args.workflow_mode,
   });
 
   return {
@@ -370,7 +596,9 @@ export async function handleListSpecialists(_args: ListSpecialistsArgs) {
     // so the strongest signal we have is "endpoint configured and any
     // required credential is set". Verified status is reported separately
     // via `mcp_connected` for stricter callers.
-    const hasEndpoint = !!s.mcp_endpoint;
+    const hasEndpoint = !!s.mcp_endpoint || !!s.a2a_endpoint;
+    // A2A auth is card-driven at call time; no pre-check beyond the existing
+    // mcp_api_key_env convention (a2a_api_key_env is resolved lazily by the runner).
     const credSatisfied =
       !s.mcp_api_key_env || !!process.env[s.mcp_api_key_env];
     const marketReady = hasEndpoint && credSatisfied;
@@ -421,10 +649,13 @@ async function loadAllSpecialists(): Promise<SpecialistConfig[]> {
     starting_reputation: number;
     one_liner: string;
     discovered_for: string;
-    discovery_source?: "catalog" | "registry" | "synthesized";
+    discovery_source?: "catalog" | "registry" | "a2a" | "synthesized";
     mcp_endpoint?: string;
     mcp_api_key_env?: string;
     homepage_url?: string;
+    a2a_endpoint?: string;
+    a2a_agent_card_url?: string;
+    a2a_api_key_env?: string;
   }>;
   const discoveredConfigs: SpecialistConfig[] = discovered.map((d) => ({
     agent_id: d.agent_id,
@@ -438,10 +669,13 @@ async function loadAllSpecialists(): Promise<SpecialistConfig[]> {
     mcp_endpoint: d.mcp_endpoint,
     mcp_api_key_env: d.mcp_api_key_env,
     homepage_url: d.homepage_url,
+    a2a_endpoint: d.a2a_endpoint,
+    a2a_agent_card_url: d.a2a_agent_card_url,
+    a2a_api_key_env: d.a2a_api_key_env,
     discovered: true,
     discovery_source: d.discovery_source,
     discovered_for: d.discovered_for,
-    tier: d.mcp_endpoint ? "mcp-forwarding" as const : "mock" as const,
+    tier: d.a2a_endpoint ? "a2a" as const : d.mcp_endpoint ? "mcp-forwarding" as const : "mock" as const,
   }));
   for (const cfg of discoveredConfigs) registerDiscoveredSpecialist(cfg);
   return [...SPECIALISTS, ...discoveredConfigs];
@@ -458,7 +692,39 @@ export async function handleSuggestSpecialists(
       ? Math.min(10, Math.floor(args.top_n))
       : 3;
   const all = await loadAllSpecialists();
-  return await suggestSpecialists(args.prompt, args.task_type, all, topN);
+  const reputation = await loadReputationMap();
+  return await suggestSpecialists(
+    args.prompt,
+    args.task_type,
+    all,
+    topN,
+    reputation,
+  );
+}
+
+/**
+ * Per-agent reputation from REAL judged task outcomes (convex
+ * `reputation_dimensions`, written by the auction judge in auctions.ts). Feeding
+ * this into routing closes the effectiveness loop: specialists that actually did
+ * good work rank higher next time. Degrades to {} (today's behavior) if Convex
+ * is unreachable, so routing never hard-fails on the reputation lookup.
+ */
+async function loadReputationMap(): Promise<ReputationMap> {
+  try {
+    const c = convex();
+    const rows = (await c.query(api.reputationDimensions.summaries, {})) as Array<{
+      agent_id: string;
+      tasks: number;
+      overall: number;
+    }>;
+    const map: ReputationMap = {};
+    for (const r of rows) {
+      map[r.agent_id] = { overall: r.overall, tasks: r.tasks };
+    }
+    return map;
+  } catch {
+    return {};
+  }
 }
 
 export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
@@ -493,6 +759,9 @@ export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
         mcp_endpoint: cfg.mcp_endpoint,
         mcp_api_key_env: cfg.mcp_api_key_env,
         homepage_url: cfg.homepage_url,
+        a2a_endpoint: cfg.a2a_endpoint,
+        a2a_agent_card_url: cfg.a2a_agent_card_url,
+        a2a_api_key_env: cfg.a2a_api_key_env,
         rationale: result.rationale,
       });
       registerDiscoveredSpecialist(cfg);
@@ -516,6 +785,9 @@ export async function handleDiscoverSpecialist(args: DiscoverSpecialistArgs) {
       mcp_endpoint: cfg.mcp_endpoint,
       mcp_api_key_env: cfg.mcp_api_key_env,
       homepage_url: cfg.homepage_url,
+      a2a_endpoint: cfg.a2a_endpoint,
+      a2a_agent_card_url: cfg.a2a_agent_card_url,
+      a2a_api_key_env: cfg.a2a_api_key_env,
       discovered: true,
       discovery_source: cfg.discovery_source,
       discovered_for: cfg.discovered_for,
@@ -575,6 +847,130 @@ export async function handleOverrideJudge(args: OverrideJudgeArgs) {
   });
 }
 
+export async function handleRegisterAgent(args: RegisterAgentArgs) {
+  const missing: string[] = [];
+  if (typeof args.agent_id !== "string" || !args.agent_id.trim())
+    missing.push("agent_id");
+  if (typeof args.display_name !== "string" || !args.display_name.trim())
+    missing.push("display_name");
+  if (typeof args.sponsor !== "string" || !args.sponsor.trim())
+    missing.push("sponsor");
+  if (!Array.isArray(args.capabilities) || args.capabilities.length === 0)
+    missing.push("capabilities");
+  if (typeof args.one_liner !== "string" || !args.one_liner.trim())
+    missing.push("one_liner");
+  if (typeof args.system_prompt !== "string" || !args.system_prompt.trim())
+    missing.push("system_prompt");
+  if (typeof args.cost_baseline !== "number")
+    missing.push("cost_baseline");
+  if (missing.length > 0) {
+    throw new Error(`missing or invalid required fields: ${missing.join(", ")}`);
+  }
+
+  // Whitelist only known fields — never spread unknown keys into the action.
+  const result = await convex().action(api.hiveRegistry.registerAgent, {
+    agent_id: args.agent_id,
+    display_name: args.display_name,
+    sponsor: args.sponsor,
+    owner_id: args.owner_id,
+    capabilities: args.capabilities,
+    one_liner: args.one_liner,
+    system_prompt: args.system_prompt,
+    cost_baseline: args.cost_baseline,
+    starting_reputation: args.starting_reputation,
+    mcp_endpoint: args.mcp_endpoint,
+    mcp_api_key_env: args.mcp_api_key_env,
+    a2a_endpoint: args.a2a_endpoint,
+    a2a_agent_card_url: args.a2a_agent_card_url,
+    a2a_api_key_env: args.a2a_api_key_env,
+    homepage_url: args.homepage_url,
+    fetch_tools: args.fetch_tools,
+  });
+
+  return {
+    ...result,
+    note: "Eval gate runs asynchronously; poll search_agents or GET /api/v1/agents/search until eval_status is passed.",
+  };
+}
+
+export async function handleSearchAgents(args: SearchAgentsArgs) {
+  if (typeof args.query !== "string" || !args.query.trim()) {
+    throw new Error("query is required");
+  }
+  const top_k =
+    typeof args.top_k === "number"
+      ? Math.min(20, Math.max(1, Math.floor(args.top_k)))
+      : undefined;
+  const candidates = await convex().action(api.hiveRegistry.searchAgents, {
+    query: args.query,
+    top_k,
+    min_reputation: args.min_reputation,
+    max_cost: args.max_cost,
+    include_unevaluated: args.include_unevaluated,
+  });
+  return { query: args.query, candidates };
+}
+
+function assertScratchpadKind(
+  kind: string,
+): asserts kind is ScratchpadWriteArgs["kind"] {
+  if (
+    kind !== "observation" &&
+    kind !== "result" &&
+    kind !== "decision" &&
+    kind !== "question"
+  ) {
+    throw new Error("kind must be observation, result, decision, or question");
+  }
+}
+
+export async function handleScratchpadRead(args: ScratchpadReadArgs) {
+  if (!args.dag_id) throw new Error("dag_id is required");
+  const entries = await convex().query(api.scratchpad.forDag, {
+    dag_id: args.dag_id as Id<"hive_dags">,
+  });
+  return { dag_id: args.dag_id, entries };
+}
+
+export async function handleScratchpadWrite(args: ScratchpadWriteArgs) {
+  if (!args.dag_id) throw new Error("dag_id is required");
+  if (!args.agent_id?.trim()) throw new Error("agent_id is required");
+  if (!args.content?.trim()) throw new Error("content is required");
+  assertScratchpadKind(args.kind);
+  if (typeof args.confidence !== "number" || !Number.isFinite(args.confidence)) {
+    throw new Error("confidence must be a finite number");
+  }
+  if (args.confidence < 0 || args.confidence > 1) {
+    throw new Error("confidence must be between 0 and 1");
+  }
+
+  const result = await convex().action(api.scratchpadActions.write, {
+    dag_id: args.dag_id as Id<"hive_dags">,
+    agent_id: args.agent_id,
+    kind: args.kind,
+    content: args.content,
+    confidence: args.confidence,
+    node_id: args.node_id,
+    task_id: args.task_id as Id<"tasks"> | undefined,
+  });
+  return { dag_id: args.dag_id, ...result };
+}
+
+export async function handleScratchpadRecall(args: ScratchpadRecallArgs) {
+  if (!args.dag_id) throw new Error("dag_id is required");
+  if (!args.query?.trim()) throw new Error("query is required");
+  const limit =
+    typeof args.limit === "number" && Number.isFinite(args.limit)
+      ? Math.max(1, Math.min(20, Math.floor(args.limit)))
+      : undefined;
+  const results = await convex().action(api.scratchpadActions.semanticRecall, {
+    dag_id: args.dag_id as Id<"hive_dags">,
+    query: args.query,
+    limit,
+  });
+  return { dag_id: args.dag_id, query: args.query, results };
+}
+
 // ─── unified dispatch ─────────────────────────────────────────────────────
 
 export async function dispatchTool(
@@ -604,6 +1000,18 @@ export async function dispatchTool(
       return await handleRaiseDispute(args as unknown as RaiseDisputeArgs);
     case "override_judge":
       return await handleOverrideJudge(args as unknown as OverrideJudgeArgs);
+    case "register_agent":
+      return await handleRegisterAgent(args as unknown as RegisterAgentArgs);
+    case "search_agents":
+      return await handleSearchAgents(args as unknown as SearchAgentsArgs);
+    case "scratchpad_read":
+      return await handleScratchpadRead(args as unknown as ScratchpadReadArgs);
+    case "scratchpad_write":
+      return await handleScratchpadWrite(args as unknown as ScratchpadWriteArgs);
+    case "scratchpad_recall":
+      return await handleScratchpadRecall(
+        args as unknown as ScratchpadRecallArgs,
+      );
     default:
       throw new Error(`unknown tool: ${name}`);
   }

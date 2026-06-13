@@ -7,13 +7,18 @@
  *   2. **Live MCP registry search** (lib/specialists/mcp-registry.ts). Hits the
  *      open registry.modelcontextprotocol.io for HTTP-invocable servers.
  *      Optionally verified by fetching `tools/list` against the candidate.
- *   3. **LLM synthesis** (last resort). Designs an in-persona agent when no
+ *   3. **A2A directory probe**. Reads base URLs from ARBOR_A2A_DIRECTORY
+ *      (comma-separated), fetches each agent card, and scores fit against the
+ *      query using deterministic keyword matching — no LLM. Preferred over
+ *      synthesized because the agent is a real external backend.
+ *   4. **LLM synthesis** (last resort). Designs an in-persona agent when no
  *      real specialist matches. Clearly marked `synthesized` in storage and
  *      UI so callers know it's a costumed LLM, not a real backend.
  *
  * A discovered specialist with `mcp_endpoint` set automatically routes through
  * `makeMcpForwardingSpecialist`, so bid + execute become real MCP tool calls
  * to the remote server — not a renamed in-process LLM.
+ * A discovered specialist with `a2a_endpoint` set routes through the A2A runner.
  */
 
 import { callOpenAIJSON } from "../openai";
@@ -25,6 +30,7 @@ import {
   resolveRegistryUrl,
   type RegistryCandidate,
 } from "./mcp-registry";
+import { fetchAgentCard, type AgentCard } from "./a2a-agent-card";
 
 interface DiscoverArgs {
   query: string;
@@ -40,12 +46,12 @@ interface DiscoverArgs {
   /**
    * Lets callers override the order or skip stages — handy in tests and demos.
    */
-  preferred_sources?: Array<"catalog" | "registry" | "synthesized">;
+  preferred_sources?: Array<"catalog" | "registry" | "a2a" | "synthesized">;
 }
 
 export interface DiscoveryResult {
   specialist: SpecialistConfig;
-  source: "catalog" | "registry" | "synthesized";
+  source: "catalog" | "registry" | "a2a" | "synthesized";
   /** Why this candidate was chosen — surfaced to the UI. */
   rationale: string;
   /**
@@ -55,9 +61,10 @@ export interface DiscoveryResult {
   verified_tools: string[];
 }
 
-const DEFAULT_ORDER: Array<"catalog" | "registry" | "synthesized"> = [
+const DEFAULT_ORDER: Array<"catalog" | "registry" | "a2a" | "synthesized"> = [
   "catalog",
   "registry",
+  "a2a",
   "synthesized",
 ];
 
@@ -87,6 +94,9 @@ export async function discoverSpecialist(
           : [];
         return { ...hit, verified_tools };
       }
+    } else if (stage === "a2a") {
+      const hit = await tryA2A(args.query, args.taskType, taken);
+      if (hit) return { ...hit, verified_tools: [] };
     } else if (stage === "synthesized") {
       const hit = await synthesize(args.query, args.taskType, args.existing, taken);
       return { ...hit, verified_tools: [] };
@@ -159,6 +169,7 @@ Include every entry exactly once. Do not invent agent_ids that aren't in the lis
       maxTokens: 700,
       timeoutMs: 12_000,
       retries: 0,
+      purpose: "suggester",
     });
     const ranked = (data.ranked ?? []).map((r) => ({
       agent_id: String(r.agent_id),
@@ -311,6 +322,7 @@ async function rankRegistry(
       maxTokens: 700,
       timeoutMs: 12_000,
       retries: 0,
+      purpose: "suggester",
     });
     return (data.ranked ?? [])
       .map((r) => ({
@@ -405,7 +417,173 @@ function inferCapabilities(c: RegistryCandidate): string[] {
   return matched.length ? matched.map((b) => b.tag) : ["mcp-tools"];
 }
 
-// ─── Stage 3: LLM synthesis (last resort) ────────────────────────────────
+// ─── Stage 3: A2A directory probe ────────────────────────────────────────
+
+const A2A_STOPWORDS = new Set([
+  "general", "task", "the", "a", "for", "with", "to", "of",
+  "and", "that", "this",
+]);
+
+const A2A_MIN_FIT = 0.3;
+const A2A_MIN_HITS = 2;
+
+async function tryA2A(
+  query: string,
+  taskType: string | undefined,
+  taken: Set<string>,
+): Promise<Omit<DiscoveryResult, "verified_tools"> | null> {
+  const raw = process.env.ARBOR_A2A_DIRECTORY ?? "";
+  const baseUrls = raw
+    .split(",")
+    .map((u) => u.trim())
+    .filter((u) => u.length > 0);
+  if (baseUrls.length === 0) return null;
+
+  // Tokenize query + taskType — same deterministic approach as probe()
+  const queryText = `${query} ${taskType ?? ""}`.toLowerCase();
+  const tokens = queryText
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length > 2 && !A2A_STOPWORDS.has(t));
+
+  interface Candidate {
+    base: string;
+    card: AgentCard;
+    fit: number;
+    hits: number;
+  }
+  const candidates: Candidate[] = [];
+
+  for (const base of baseUrls) {
+    let card: AgentCard;
+    try {
+      card = await fetchAgentCard(base);
+    } catch {
+      continue;
+    }
+
+    interface AgentSkill {
+      id?: string;
+      name?: string;
+      tags?: string[];
+      description?: string;
+    }
+    const skills = (card.skills ?? []) as AgentSkill[];
+    const haystackParts: string[] = [
+      String(card.name ?? ""),
+      String(card.description ?? ""),
+    ];
+    for (const s of skills) {
+      haystackParts.push(
+        s.id ?? "",
+        s.name ?? "",
+        ...(s.tags ?? []),
+        (s.description ?? "").slice(0, 200),
+      );
+    }
+    const haystack = haystackParts.join(" ").toLowerCase();
+
+    let hits = 0;
+    for (const t of tokens) if (haystack.includes(t)) hits += 1;
+    const fit = tokens.length === 0
+      ? 0.3
+      : Math.min(1, hits / Math.max(2, tokens.length));
+
+    if (hits > 0) {
+      candidates.push({ base, card, fit, hits });
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => b.fit - a.fit || b.hits - a.hits);
+  const best = candidates[0];
+  if (best.fit < A2A_MIN_FIT && best.hits < A2A_MIN_HITS) return null;
+
+  interface AgentSkill { id?: string; name?: string; }
+  const skills = (best.card.skills ?? []) as AgentSkill[];
+  const matchedSkills = skills
+    .filter((s) => {
+      const hay = `${s.id ?? ""} ${s.name ?? ""}`.toLowerCase();
+      return tokens.some((t) => hay.includes(t));
+    })
+    .map((s) => s.name ?? s.id ?? "")
+    .filter(Boolean)
+    .slice(0, 3);
+
+  const cfg = a2aCardToConfig(best.card, best.base, query, taken);
+  const skillNote = matchedSkills.length > 0
+    ? `matched skills: ${matchedSkills.join(", ")}`
+    : `${best.hits} keyword hit(s)`;
+  return {
+    specialist: cfg,
+    source: "a2a",
+    rationale: `A2A directory agent at ${best.base} — ${skillNote} (fit ${best.fit.toFixed(2)}).`,
+  };
+}
+
+function a2aCardToConfig(
+  card: AgentCard,
+  baseUrl: string,
+  query: string,
+  taken: Set<string>,
+): SpecialistConfig {
+  const nameStr = typeof card.name === "string" && card.name.trim()
+    ? card.name.trim()
+    : "a2a-agent";
+
+  const candidateId = slugify(nameStr) + "-a2a";
+  const agent_id = uniqueAgentId(candidateId, taken);
+
+  interface AgentSkill { id?: string; name?: string; }
+  const skills = (card.skills ?? []) as AgentSkill[];
+  const capabilities = skills
+    .map((s) => s.id ?? s.name ?? "")
+    .filter((c) => c.length > 0)
+    .slice(0, 6);
+  if (capabilities.length === 0) capabilities.push("a2a-tasks");
+
+  const providerRaw = card.provider;
+  const sponsor =
+    providerRaw &&
+    typeof providerRaw === "object" &&
+    !Array.isArray(providerRaw) &&
+    typeof (providerRaw as Record<string, unknown>).organization === "string"
+      ? ((providerRaw as Record<string, unknown>).organization as string).trim()
+      : nameStr || "A2A directory";
+
+  const cardUrl =
+    typeof (card as Record<string, unknown>).url === "string" &&
+    ((card as Record<string, unknown>).url as string).trim()
+      ? ((card as Record<string, unknown>).url as string).trim()
+      : baseUrl;
+
+  const descStr = typeof card.description === "string" ? card.description : "";
+  const one_liner = truncate(descStr || nameStr, 160);
+
+  const system_prompt =
+    `You are ${nameStr}, a real external A2A agent discovered at runtime from the A2A directory. ` +
+    `You bid and execute tasks over the A2A protocol by forwarding requests to the remote agent at ${cardUrl}. ` +
+    `All deliverables come from the remote agent — never invent results locally.`;
+
+  return {
+    agent_id,
+    display_name: nameStr,
+    sponsor,
+    capabilities,
+    cost_baseline: 0.5,
+    starting_reputation: 0.55,
+    one_liner,
+    system_prompt,
+    tier: "a2a",
+    a2a_endpoint: cardUrl,
+    is_verified: false,
+    discovered: true,
+    discovery_source: "a2a",
+    discovered_for: query.trim().slice(0, 240),
+  };
+}
+
+// ─── Stage 4: LLM synthesis (last resort) ────────────────────────────────
 
 async function synthesize(
   query: string,
@@ -450,6 +628,7 @@ Do not duplicate any existing agent_id.`;
       maxTokens: 700,
       timeoutMs: 18_000,
       retries: 0,
+      purpose: "discovery",
     });
   } catch {
     /* fall through */

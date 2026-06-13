@@ -33,15 +33,16 @@ export function makeMockSpecialist(config: SpecialistConfig): SpecialistRunner {
     async bid(prompt, taskType): Promise<SpecialistDecision> {
       const systemPrompt = `${config.system_prompt}\n\n${VICKREY_PRELUDE}\n\nYour cost baseline for a typical task is $${config.cost_baseline.toFixed(
         2,
-      )}. Adjust up or down by task complexity but keep it honest.\n\nIMPORTANT: This marketplace handles tasks across every domain — payments, design, code, research, marketing, ops, anything. Decline if the user's goal is outside your real domain. Don't try to translate the goal into your specialty; if a payments task lands in front of a creator-marketing agent, decline. Your capability_claim must address the user's actual goal, not your generic specialty pitch.\n\nRespond with JSON only, one of:\n{ "decline": true, "reason": "<short reason>" }\nOR\n{ "bid_price": <number>, "capability_claim": "<one sentence about how you would do this specific task>", "estimated_seconds": <integer> }`;
+      )}. Adjust up or down by task complexity but keep it honest.\n\nIMPORTANT: This marketplace handles tasks across every domain — payments, design, code, research, marketing, ops, anything. Decline if the user's goal is outside your real domain. Don't try to translate the goal into your specialty; if a payments task lands in front of a creator-marketing agent, decline. Your capability_claim must be a concrete execution plan for the user's actual goal: 2-4 numbered steps naming the task's specific subject matter (entities, deliverables, checks), in 2-3 sentences total. Generic specialty pitches will be rejected by the auctioneer.\n\nRespond with JSON only, one of:\n{ "decline": true, "reason": "<short reason>" }\nOR\n{ "bid_price": <number>, "capability_claim": "<2-4 step plan for this specific task>", "estimated_seconds": <integer> }`;
 
       const userPrompt = `${buildTaskContext(prompt, taskType)}\n\nDo you want to bid? Bid only if your specialty actually fits this task.`;
       const data = await callOpenAIJSON<BidLLMResponse>({
         systemPrompt,
         userPrompt,
-        maxTokens: 256,
+        maxTokens: 320,
         timeoutMs: 10_000,
         retries: 0,
+        purpose: "agent",
       });
 
       if (data.decline) {
@@ -61,6 +62,7 @@ export function makeMockSpecialist(config: SpecialistConfig): SpecialistRunner {
           bid_price: config.cost_baseline,
           capability_claim: config.one_liner,
           estimated_seconds: 30,
+          plan_source: "baseline",
         };
         return bid;
       }
@@ -69,6 +71,7 @@ export function makeMockSpecialist(config: SpecialistConfig): SpecialistRunner {
         bid_price: Math.max(0.01, Number(data.bid_price.toFixed(2))),
         capability_claim: data.capability_claim,
         estimated_seconds: Math.max(1, Math.floor(data.estimated_seconds)),
+        plan_source: "llm",
       };
       return bid;
     },
@@ -82,6 +85,7 @@ export function makeMockSpecialist(config: SpecialistConfig): SpecialistRunner {
         maxTokens: 1500,
         timeoutMs: 60_000,
         retries: 0,
+        purpose: "agent",
       });
       const output: SpecialistOutput = `[MOCK — no live tools called]\n\n${raw}`;
       const provenance: SpecialistProvenance = {

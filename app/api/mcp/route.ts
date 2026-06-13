@@ -3,8 +3,8 @@
  *
  * Implements the streamable-HTTP transport's request/response shape directly
  * as JSON-RPC 2.0 so we don't need to adapt Next.js's `Request` to a Node
- * `IncomingMessage`. Stateless mode is sufficient for our four tools because
- * none of them require per-session server-side state.
+ * `IncomingMessage`. Stateless mode is sufficient because none of the tools
+ * require per-session server-side state.
  *
  * Compatible with `@modelcontextprotocol/sdk`'s `StreamableHTTPClientTransport`
  * for tool discovery and invocation.

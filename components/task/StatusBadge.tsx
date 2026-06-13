@@ -6,6 +6,7 @@ const META: Record<string, { label: string; tone: PillTone; pulse?: boolean }> =
   planning: { label: "Planning", tone: "info", pulse: true },
   bidding: { label: "Bidding", tone: "warning", pulse: true },
   awarded: { label: "Awarded", tone: "info" },
+  requires_payment: { label: "Payment", tone: "warning", pulse: true },
   executing: { label: "Executing", tone: "brand", pulse: true },
   judging: { label: "Judging", tone: "info", pulse: true },
   synthesizing: { label: "Synthesizing", tone: "brand", pulse: true },

@@ -27,6 +27,7 @@ export default defineSchema({
       v.literal("plan_review"),
       v.literal("bidding"),
       v.literal("awarded"),
+      v.literal("requires_payment"),
       v.literal("executing"),
       v.literal("judging"),
       v.literal("synthesizing"),
@@ -65,6 +66,10 @@ export default defineSchema({
         }),
       ),
     ),
+    invited_agent_ids: v.optional(v.array(v.string())),
+    hive_dag_id: v.optional(v.id("hive_dags")),
+    hive_node_id: v.optional(v.string()),
+    success_criteria: v.optional(v.string()),
   }).index("by_parent", ["parent_task_id"]),
 
   product_context_profiles: defineTable({
@@ -182,6 +187,7 @@ export default defineSchema({
     expected_quality: v.optional(v.number()),
     historical_quality: v.optional(v.number()),
     latency_penalty: v.optional(v.number()),
+    plan_source: v.optional(v.string()),              // "remote" | "llm" | "baseline"
     reputation_score: v.optional(v.number()),
     reputation_source: v.optional(v.string()),
     reliability_score: v.optional(v.number()),
@@ -222,6 +228,20 @@ export default defineSchema({
     revoked_at: v.optional(v.number()),
   }).index("by_agent_id", ["agent_id"]),
 
+  // Outbound API keys for remote A2A specialists (the inverse of agent_keys,
+  // which holds inbound HMAC secrets). One active row per agent_id; setting a
+  // new key overwrites. `source` records how the key was obtained:
+  // "user_paste" (console UI), "auto_acquired" (trial-key/signup script), or
+  // "operator". header_name overrides the card's scheme header when set.
+  a2a_outbound_keys: defineTable({
+    agent_id: v.string(),
+    api_key: v.string(),
+    header_name: v.optional(v.string()),
+    source: v.string(),
+    created_at: v.number(),
+    updated_at: v.number(),
+  }).index("by_agent_id", ["agent_id"]),
+
   // Nonces seen on signed inbound callbacks. Each row is one accepted
   // request; replay attempts hit the by_nonce index and 403.
   a2a_nonces: defineTable({
@@ -239,12 +259,40 @@ export default defineSchema({
     locked_amount: v.number(),
     agent_net_amount: v.optional(v.number()),
     platform_fee: v.optional(v.number()),
+    payment_processor: v.optional(v.string()),
+    payment_status: v.optional(v.string()),
+    stripe_checkout_session_id: v.optional(v.string()),
+    stripe_payment_intent_id: v.optional(v.string()),
+    stripe_charge_id: v.optional(v.string()),
+    stripe_connected_account_id: v.optional(v.string()),
+    stripe_application_fee_amount: v.optional(v.number()),
+    stripe_currency: v.optional(v.string()),
+    payment_required_at: v.optional(v.number()),
+    payment_authorized_at: v.optional(v.number()),
+    payment_captured_at: v.optional(v.number()),
+    payment_canceled_at: v.optional(v.number()),
+    payment_last_error: v.optional(v.string()),
     status: v.union(
       v.literal("locked"),
       v.literal("released"),
       v.literal("refunded"),
     ),
   }).index("by_task", ["task_id"]),
+
+  stripe_connected_accounts: defineTable({
+    agent_id: v.string(),
+    stripe_account_id: v.string(),
+    email: v.optional(v.string()),
+    onboarding_status: v.string(),
+    charges_enabled: v.boolean(),
+    payouts_enabled: v.boolean(),
+    details_submitted: v.boolean(),
+    requirements_currently_due: v.array(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_agent_id", ["agent_id"])
+    .index("by_stripe_account_id", ["stripe_account_id"]),
 
   reputation_events: defineTable({
     agent_id: v.string(),
@@ -348,12 +396,31 @@ export default defineSchema({
         v.literal("catalog"),
         v.literal("registry"),
         v.literal("synthesized"),
+        v.literal("a2a"),
       ),
     ),
     mcp_endpoint: v.optional(v.string()),
     mcp_api_key_env: v.optional(v.string()),
     homepage_url: v.optional(v.string()),
     rationale: v.optional(v.string()),
+    a2a_endpoint: v.optional(v.string()),
+    a2a_agent_card_url: v.optional(v.string()),
+    a2a_api_key_env: v.optional(v.string()),
+    // "none" = skip card auth entirely (server verified not to enforce the
+    // scheme its card declares). Absent/"card" = resolve auth from the card.
+    a2a_auth_mode: v.optional(v.union(v.literal("none"), v.literal("card"))),
+    owner_id: v.optional(v.string()),
+    mcp_tool_schemas: v.optional(v.array(v.any())),
+    avg_latency_ms: v.optional(v.number()),
+    reliability_score: v.optional(v.number()),
+    eval_status: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("passed"),
+        v.literal("failed"),
+      ),
+    ),
+    eval_report: v.optional(v.any()),
   }).index("by_agent_id", ["agent_id"]),
 
   /**
@@ -385,4 +452,136 @@ export default defineSchema({
     created_at: v.number(),
     updated_at: v.number(),
   }).index("by_run_id", ["run_id"]),
+
+  // ─── Hive mind: Layer 1 registry embeddings ──────────────────────────────
+  hive_agent_embeddings: defineTable({
+    agent_id: v.string(),
+    capability_text: v.string(),
+    embedding: v.array(v.float64()),
+    embedding_model: v.string(),
+    eval_passed: v.boolean(),
+    cost_baseline: v.number(),
+    reputation_score: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_agent_id", ["agent_id"])
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: 1536,
+      filterFields: ["eval_passed"],
+    }),
+
+  // ─── Hive mind: Layer 2 task DAGs ────────────────────────────────────────
+  hive_dags: defineTable({
+    root_task_id: v.id("tasks"),
+    goal: v.string(),
+    status: v.union(
+      v.literal("planning"),
+      v.literal("running"),
+      v.literal("evaluating"),
+      v.literal("complete"),
+      v.literal("failed"),
+      v.literal("escalated"),
+    ),
+    planner_model: v.string(),
+    max_budget: v.number(),
+    created_at: v.number(),
+    updated_at: v.number(),
+  }).index("by_root_task", ["root_task_id"]),
+
+  hive_nodes: defineTable({
+    dag_id: v.id("hive_dags"),
+    node_id: v.string(),
+    description: v.string(),
+    depends_on: v.array(v.string()),
+    success_criteria: v.optional(v.string()),
+    task_class: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("ready"),
+      v.literal("auctioned"),
+      v.literal("executing"),
+      v.literal("complete"),
+      v.literal("failed"),
+    ),
+    task_id: v.optional(v.id("tasks")),
+    assigned_agent_id: v.optional(v.string()),
+    output_text: v.optional(v.string()),
+    eval_score: v.optional(v.number()),
+    updated_at: v.number(),
+  })
+    .index("by_dag", ["dag_id"])
+    .index("by_dag_and_node_id", ["dag_id", "node_id"])
+    .index("by_task_id", ["task_id"]),
+
+  // ─── Hive mind: Layer 4 shared context store (stigmergy scratchpad) ─────
+  scratchpad_entries: defineTable({
+    dag_id: v.id("hive_dags"),
+    node_id: v.optional(v.string()),
+    task_id: v.optional(v.id("tasks")),
+    agent_id: v.string(),
+    kind: v.union(
+      v.literal("observation"),
+      v.literal("result"),
+      v.literal("decision"),
+      v.literal("question"),
+    ),
+    content: v.string(),
+    confidence: v.number(),
+    embedding: v.optional(v.array(v.float64())),
+    embedding_model: v.optional(v.string()),
+    created_at: v.number(),
+  })
+    .index("by_dag", ["dag_id"])
+    .index("by_dag_and_node", ["dag_id", "node_id"])
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: 1536,
+      filterFields: ["dag_id"],
+    }),
+
+  // ─── Hive mind: Layer 5 evaluations + escalations ────────────────────────
+  hive_evaluations: defineTable({
+    dag_id: v.id("hive_dags"),
+    node_id: v.optional(v.string()),
+    agent_id: v.string(),
+    score: v.number(),
+    verdict: v.union(v.literal("accept"), v.literal("reject")),
+    reasoning: v.string(),
+    conflicts_with: v.optional(v.array(v.string())),
+    judge_model: v.string(),
+    created_at: v.number(),
+  }).index("by_dag", ["dag_id"]),
+
+  escalations: defineTable({
+    dag_id: v.optional(v.id("hive_dags")),
+    task_id: v.id("tasks"),
+    kind: v.union(v.literal("low_confidence"), v.literal("conflict_tie")),
+    reason: v.string(),
+    payload: v.optional(v.any()),
+    status: v.union(v.literal("open"), v.literal("resolved")),
+    resolution: v.optional(v.string()),
+    created_at: v.number(),
+    resolved_at: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_task", ["task_id"]),
+
+  // ─── Hive mind: Layer 6 settlement ───────────────────────────────────────
+  payout_records: defineTable({
+    owner_id: v.string(),
+    agent_id: v.string(),
+    period: v.string(),
+    tasks_won: v.number(),
+    tasks_lost: v.number(),
+    tasks_accepted: v.number(),
+    gross_volume: v.number(),
+    platform_fee: v.number(),
+    estimated_payout: v.number(),
+    reputation_end: v.number(),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_owner_and_period", ["owner_id", "period"])
+    .index("by_agent_and_period", ["agent_id", "period"]),
 });

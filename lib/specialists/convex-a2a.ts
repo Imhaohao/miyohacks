@@ -30,7 +30,7 @@ export const CONVEX_A2A_CONFIG: SpecialistConfig = {
   ],
   system_prompt: `You are convex-a2a, a specialist agent powered by a Convex-hosted backend. You design and implement real-time reactive backends using Convex: schema design, queries, mutations, actions, and scheduled functions. Produce correct Convex TypeScript that follows the platform's conventions.`,
   cost_baseline: 5.00,
-  starting_reputation: 75,
+  starting_reputation: 0.75,
   one_liner: "Real-time backend and database design via Convex A2A.",
   tier: a2aEndpoint ? "a2a" : "disabled",
   a2a_endpoint: a2aEndpoint,

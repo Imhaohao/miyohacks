@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "created_at": "2026-06-01T00:00:00.000Z",
+  "updated_at": "2026-06-01T00:00:00.000Z",
+  "endpoint": "https://<resource>.openai.azure.com",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "training_type": "GlobalStandard",
+  "apply": true,
+  "validation_report_path": "data/fine-tuning/validation-report.json",
+  "eval_report_path": "data/fine-tuning/eval-report.json",
+  "roles": {
+    "suggester": {
+      "train_path": "data/fine-tuning/arbor-suggester.train.jsonl",
+      "validation_path": "data/fine-tuning/arbor-suggester.validation.jsonl",
+      "test_path": "data/fine-tuning/arbor-suggester.test.jsonl",
+      "train_examples": 24,
+      "validation_examples": 6,
+      "test_examples": 6,
+      "train_file_id": "<azure-file-id>",
+      "validation_file_id": "<azure-file-id>",
+      "job_id": "<azure-fine-tune-job-id>",
+      "job_status": "succeeded",
+      "fine_tuned_model": "<fine-tuned-suggester-model-id>",
+      "deployment": "arbor-suggester",
+      "deployed_model": "<fine-tuned-suggester-model-id>",
+      "deployed_at": "2026-06-01T01:00:00.000Z"
+    },
+    "judge": {
+      "train_path": "data/fine-tuning/arbor-judge.train.jsonl",
+      "validation_path": "data/fine-tuning/arbor-judge.validation.jsonl",
+      "test_path": "data/fine-tuning/arbor-judge.test.jsonl",
+      "train_examples": 18,
+      "validation_examples": 4,
+      "test_examples": 4,
+      "train_file_id": "<azure-file-id>",
+      "validation_file_id": "<azure-file-id>",
+      "job_id": "<azure-fine-tune-job-id>",
+      "job_status": "succeeded",
+      "fine_tuned_model": "<fine-tuned-judge-model-id>",
+      "deployment": "arbor-judge",
+      "deployed_model": "<fine-tuned-judge-model-id>",
+      "deployed_at": "2026-06-01T01:00:00.000Z"
+    }
+  }
+}

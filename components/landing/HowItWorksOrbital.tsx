@@ -80,14 +80,14 @@ export function HowItWorksOrbital() {
   return (
     <section className="relative bg-black">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 pt-16 text-center">
-        <p className="text-sm font-semibold uppercase tracking-widest text-brand-400">
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1 text-[11px] font-semibold uppercase tracking-widest text-brand-400 backdrop-blur-sm">
           How Arbor works
-        </p>
-        <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          Five steps from idea to shipped work.
+        </span>
+        <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          From idea to shipped work.
         </h2>
-        <p className="mt-2 text-sm text-white/50">
-          Tap any node to expand the step.
+        <p className="mt-2.5 text-sm text-white/40">
+          Select any node to explore the step.
         </p>
       </div>
       <RadialOrbitalTimeline timelineData={arborSteps} />

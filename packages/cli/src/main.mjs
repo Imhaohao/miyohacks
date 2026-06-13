@@ -33,6 +33,28 @@ function makeClient({ baseUrl, agentId, apiKey, fetch: customFetch }) {
   const root = baseUrl.replace(/\/$/, "");
   const doFetch = customFetch ?? globalThis.fetch;
 
+  async function parseJsonResponse(res, method, path) {
+    const text = await res.text();
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!text.trim()) {
+      throw new Error(`${method} ${path} returned an empty response body`);
+    }
+    if (!contentType.includes("application/json")) {
+      throw new Error(
+        `${method} ${path} returned ${contentType || "unknown content-type"}: ${text.slice(0, 200)}`,
+      );
+    }
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      throw new Error(
+        `${method} ${path} returned invalid JSON: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
   async function request(method, path, body) {
     const headers = {};
     if (body) headers["content-type"] = "application/json";
@@ -45,14 +67,14 @@ function makeClient({ baseUrl, agentId, apiKey, fetch: customFetch }) {
     if (!res.ok) {
       let detail = "";
       try {
-        const j = await res.json();
+        const j = await parseJsonResponse(res, method, path);
         detail = j?.error?.message ?? "";
-      } catch {
-        detail = await res.text();
+      } catch (err) {
+        detail = err instanceof Error ? err.message : String(err);
       }
       throw new Error(`HTTP ${res.status} ${res.statusText}: ${detail}`);
     }
-    return await res.json();
+    return await parseJsonResponse(res, method, path);
   }
 
   return {

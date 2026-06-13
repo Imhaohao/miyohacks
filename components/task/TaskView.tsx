@@ -8,6 +8,7 @@ import { TaskHeader } from "./TaskHeader";
 import { ContextEnrichmentPanel } from "./ContextEnrichmentPanel";
 import { BidWindow } from "./BidWindow";
 import { AuctionResolution } from "./AuctionResolution";
+import { TaskPaymentPanel } from "./TaskPaymentPanel";
 import { ValueImpactPanel } from "./ValueImpactPanel";
 import { ExecutionPanel } from "./ExecutionPanel";
 import { JudgeVerdictPanel } from "./JudgeVerdictPanel";
@@ -122,6 +123,7 @@ function RegularTaskView({
         <>
           <BidWindow task={task} events={lifecycle} />
           <AuctionResolution events={lifecycle} probes={probes} />
+          <TaskPaymentPanel task={task} escrow={escrow ?? null} />
           <ValueImpactPanel task={task} events={lifecycle} />
           <ExecutionPanel task={task} events={lifecycle} toolCalls={toolCalls} probes={probes} />
           <JudgeVerdictPanel task={task} events={lifecycle} />

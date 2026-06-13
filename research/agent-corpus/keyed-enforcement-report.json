@@ -1,0 +1,141 @@
+{
+  "generated": "2026-06-12T18:53:12.360Z",
+  "total_keyed": 22,
+  "not_enforced_can_skip_key": 14,
+  "truly_enforced_needs_key": 5,
+  "unknown": 3,
+  "results": [
+    {
+      "agent_id": "agent-health-monitor-ahm",
+      "enforced": false,
+      "evidence": "keyless result ok: \"ok\"",
+      "endpoint": "https://agenthealthmonitor.xyz/a2a"
+    },
+    {
+      "agent_id": "match-it-up-networkbot",
+      "enforced": false,
+      "evidence": "jsonrpc error NOT_FOUND: Not Found",
+      "endpoint": "https://matchitup.in/api/protocol"
+    },
+    {
+      "agent_id": "algovoi-payment-agent",
+      "enforced": false,
+      "evidence": "keyless result ok: \"ok\"",
+      "endpoint": "https://api.algovoi.co.uk"
+    },
+    {
+      "agent_id": "ambr",
+      "enforced": false,
+      "evidence": "keyless result ok: \"ok\"",
+      "endpoint": "https://getamber.dev/api/a2a"
+    },
+    {
+      "agent_id": "humanbrowser",
+      "enforced": true,
+      "evidence": "HTTP 401",
+      "endpoint": "https://agent.humanbrowser.cloud/a2a"
+    },
+    {
+      "agent_id": "ragsphere",
+      "enforced": true,
+      "evidence": "HTTP 401",
+      "endpoint": "https://ragsphere.vercel.app/api/a2a/tasks"
+    },
+    {
+      "agent_id": "microquery",
+      "enforced": false,
+      "evidence": "keyless result ok: \"Microquery is a pay-per-query SQL service. To run queries: POST SQL to https://microquery.\"",
+      "endpoint": "https://microquery.dev/v1/a2a"
+    },
+    {
+      "agent_id": "clix-agent",
+      "enforced": true,
+      "evidence": "HTTP 401",
+      "endpoint": "https://api.clix.so/a2a"
+    },
+    {
+      "agent_id": "voidly-censorship-intelligence-agent",
+      "enforced": false,
+      "evidence": "jsonrpc error NOT_FOUND: Endpoint not found",
+      "endpoint": "https://api.voidly.ai/v1/agent"
+    },
+    {
+      "agent_id": "chainaware-ai-api",
+      "enforced": false,
+      "evidence": "keyless result ok: \"Got it — running fraud_check. Please provide a wallet address (0x...) and network (ETH, BN\"",
+      "endpoint": "https://beta.backend.chainaware.ai/api/a2a"
+    },
+    {
+      "agent_id": "policycheck",
+      "enforced": false,
+      "evidence": "keyless result ok: \"Analysis Status: text_provided | Confidence: high Fetch Method: text_input Summary: Unable\"",
+      "endpoint": "https://policycheck.tools/api/a2a"
+    },
+    {
+      "agent_id": "execution-market",
+      "enforced": true,
+      "evidence": "HTTP 401",
+      "endpoint": "https://api.execution.market/a2a/v1"
+    },
+    {
+      "agent_id": "thinkneo-control-plane-agent",
+      "enforced": false,
+      "evidence": "keyless result ok: \"Hello! I'm the ThinkNEO AI agent — your interface to the ThinkNEO Enterprise AI Control Pl\"",
+      "endpoint": "https://agent.thinkneo.ai/a2a"
+    },
+    {
+      "agent_id": "the-colony",
+      "enforced": false,
+      "evidence": "keyless result ok: \"ok\"",
+      "endpoint": "https://thecolony.cc/api/v1"
+    },
+    {
+      "agent_id": "kevros-governance-api",
+      "enforced": false,
+      "evidence": "keyless result ok: \"ok\"",
+      "endpoint": "https://governance.taskhawktech.com"
+    },
+    {
+      "agent_id": "manthan-advisor",
+      "enforced": false,
+      "evidence": "jsonrpc error -32602: message has no {skill,args} data part",
+      "endpoint": "https://manthan-advisor-dzv6bwbpba-uc.a.run.app/a2a"
+    },
+    {
+      "agent_id": "partstable-intelligence",
+      "enforced": "unknown",
+      "evidence": "non-JSON 502",
+      "endpoint": "https://partsiq-api.onrender.com/a2a"
+    },
+    {
+      "agent_id": "makeup-land",
+      "enforced": false,
+      "evidence": "jsonrpc error undefined: ",
+      "endpoint": "https://makeup.land/api/v1"
+    },
+    {
+      "agent_id": "vicoop-bridge-server-admin",
+      "enforced": true,
+      "evidence": "HTTP 401",
+      "endpoint": "https://vicoop-bridge-server.fly.dev"
+    },
+    {
+      "agent_id": "workprotocol",
+      "enforced": "unknown",
+      "evidence": "non-JSON 200",
+      "endpoint": "https://workprotocol.ai"
+    },
+    {
+      "agent_id": "ydb-qdrant",
+      "enforced": "unknown",
+      "evidence": "non-JSON 200",
+      "endpoint": "https://ydb-qdrant.tech/"
+    },
+    {
+      "agent_id": "neurodecode-asd-caregiver-agent",
+      "enforced": false,
+      "evidence": "keyless result ok: \"I can help you with a variety of support needs for autistic children. I can: * **Find loca\"",
+      "endpoint": "https://neurodecode-a2a-jzfv6ygw3q-as.a.run.app"
+    }
+  ]
+}

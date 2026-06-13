@@ -19,8 +19,11 @@ import type { Id } from "./_generated/dataModel";
 import { enrichRepoContextFromNia } from "../lib/nia-loader";
 import { enrichBusinessContextFromHyperspell } from "../lib/hyperspell";
 import type { BusinessContext } from "../lib/orchestration-context";
+import { BID_WINDOW_SECONDS } from "./tasks";
 
-const BID_WINDOW_MS = 15_000;
+// Single source of truth for the bid window — a private 15s constant
+// here silently overrode tasks.BID_WINDOW_SECONDS for every enriched task.
+const BID_WINDOW_MS = BID_WINDOW_SECONDS * 1000;
 
 export const enrichAndStartAuction = internalAction({
   args: { task_id: v.id("tasks") },

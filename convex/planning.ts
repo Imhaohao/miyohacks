@@ -3,6 +3,7 @@
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
 import { SPECIALISTS } from "../lib/specialists/registry";
 import { MCP_CATALOG } from "../lib/specialists/catalog";
 import { callOpenAI, callOpenAIJSON } from "../lib/openai";
@@ -104,6 +105,7 @@ export const decompose = internalAction({
         maxTokens: 800,
         timeoutMs: 18_000,
         retries: 0,
+        purpose: "planner",
       });
     } catch (err) {
       console.warn(
@@ -235,6 +237,12 @@ export const advanceOrSynthesize = internalAction({
     const child = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
     });
+    if (child.hive_node_id) {
+      await ctx.scheduler.runAfter(0, internal.hiveOrchestrator.onNodeSettled, {
+        task_id: args.task_id,
+      });
+      return;
+    }
     if (!child.parent_task_id) return;
 
     const parent = await ctx.runQuery(internal.tasks._get, {
@@ -272,9 +280,9 @@ export const synthesize = internalAction({
     const parent = await ctx.runQuery(internal.tasks._get, {
       task_id: args.task_id,
     });
-    const children = await ctx.runQuery(api.tasks.childrenOf, {
+    const children = (await ctx.runQuery(api.tasks.childrenOf, {
       parent_task_id: args.task_id,
-    });
+    })) as Array<Doc<"tasks">>;
     const plan = parent.task_plan ?? [];
 
     await ctx.runMutation(internal.tasks._setStatus, {
@@ -312,6 +320,7 @@ export const synthesize = internalAction({
         maxTokens: 2000,
         timeoutMs: 60_000,
         retries: 0,
+        purpose: "planner",
       });
     } catch (err) {
       synthesized = `Synthesis failed: ${err instanceof Error ? err.message : String(err)}\n\n${userPrompt}`;

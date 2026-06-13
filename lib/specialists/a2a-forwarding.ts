@@ -19,6 +19,7 @@
  */
 
 import { buildTaskContext } from "../campaign-context";
+import { callOpenAI } from "../openai";
 import { getAuthForEndpoint, fetchAgentCard } from "./a2a-agent-card";
 import type {
   SpecialistConfig,
@@ -34,7 +35,7 @@ import { toPublicTier } from "./tiers";
 
 // ─── A2A protocol types ───────────────────────────────────────────────────
 
-interface A2AMessagePart {
+export interface A2AMessagePart {
   kind?: "text" | "data";
   type?: string;
   text?: string;
@@ -42,7 +43,7 @@ interface A2AMessagePart {
 }
 
 interface A2ATaskStatus {
-  state: "submitted" | "working" | "completed" | "failed";
+  state: "submitted" | "working" | "completed" | "failed" | "canceled";
   message?: {
     role: string;
     parts: A2AMessagePart[];
@@ -55,7 +56,7 @@ interface A2AArtifact {
   parts: A2AMessagePart[];
 }
 
-interface A2ATask {
+export interface A2ATask {
   id: string;
   kind: "task";
   status: A2ATaskStatus;
@@ -133,7 +134,7 @@ async function postJsonRpc(
 }
 
 /** Poll `tasks/get` until terminal, returning the final A2ATask. */
-async function pollUntilTerminal(
+export async function pollUntilTerminal(
   endpoint: string,
   taskId: string,
   authHeaders: Record<string, string> = {},
@@ -157,7 +158,7 @@ async function pollUntilTerminal(
 }
 
 /** Extract readable text from the first artifact, falling back to status message. */
-function extractText(task: A2ATask): string {
+export function extractText(task: A2ATask): string {
   for (const artifact of task.artifacts ?? []) {
     for (const part of artifact.parts ?? []) {
       if ((part.kind === "text" || part.type === "text") && part.text) {
@@ -185,6 +186,50 @@ export function makeA2aForwardingSpecialist(
     );
   }
   const endpoint = config.a2a_endpoint;
+
+  /**
+   * Bid plans must be task-specific. Preferred source is the remote agent's
+   * own reply to the cost_estimate message; when the remote gives no usable
+   * text, Arbor drafts a plan from the agent card and says so in the claim —
+   * a live endpoint with a labeled draft plan, never a fabricated quote.
+   */
+  async function draftPlanFromCard(
+    prompt: string,
+    taskType: string,
+  ): Promise<{ claim: string; source: "llm" | "baseline" }> {
+    // Never author plans for discovered third-party agents — and never pay
+    // for an LLM call per dead corpus endpoint. Drafting is reserved for
+    // Arbor's own static roster; third parties must speak for themselves.
+    if (config.discovered) {
+      return {
+        claim: `${config.display_name} via A2A at ${endpoint}`,
+        source: "baseline",
+      };
+    }
+    try {
+      const text = await callOpenAI({
+        systemPrompt: `You draft a brief execution plan on behalf of "${config.display_name}" (${config.one_liner ?? ""}), whose declared capabilities are: ${config.capabilities.join(", ")}. Write 2-4 numbered steps for how an agent with exactly those capabilities would complete the user's task — name the task's actual subject matter. 2-3 sentences total. Plain text, no preamble. If the task is clearly outside those capabilities, still describe the closest in-scope contribution.`,
+        userPrompt: buildTaskContext(prompt, taskType),
+        maxTokens: 220,
+        timeoutMs: 6_000,
+        retries: 0,
+        purpose: "agent",
+      });
+      const plan = text.trim();
+      if (plan.length >= 40) {
+        return {
+          claim: `${plan.slice(0, 600)}\n\n[Plan drafted by Arbor from ${config.display_name}'s agent card — endpoint verified live; plan not authored by the remote agent.]`,
+          source: "llm",
+        };
+      }
+    } catch {
+      // fall through to the static baseline claim
+    }
+    return {
+      claim: `${config.display_name} via A2A at ${endpoint}`,
+      source: "baseline",
+    };
+  }
 
   return {
     config,
@@ -216,17 +261,24 @@ export function makeA2aForwardingSpecialist(
             ? { [auth.headerName]: auth.token }
             : {};
 
-      // Send a cost-estimate intent. If the remote doesn't understand it or
-      // fails, we fall back to cfg.cost_baseline so bidding stays cheap.
+      // Send a cost-estimate intent that also asks the remote to outline its
+      // plan. If the remote doesn't understand it or fails, we fall back to
+      // cfg.cost_baseline (price) and a labeled Arbor-drafted plan (claim).
       const context = buildTaskContext(prompt, taskType);
+      const bidMessageText = `${context}\n\nThis is a bid request, not the task itself. Reply with a brief numbered plan (2-4 steps) describing exactly how you would complete this task. If you can, also set metadata.cost_estimate (number, USD) and metadata.estimated_seconds (integer) in your response.`;
       try {
         const rpc = await withTimeout(
           postJsonRpc(
             endpoint,
             "message/send",
             {
+              // role/messageId/kind are required by spec-strict A2A servers
+              // (the official Python SDK rejects messages without them).
               message: {
-                parts: [{ kind: "text", text: context }],
+                role: "user",
+                parts: [{ kind: "text", text: bidMessageText }],
+                messageId: nextRpcId(),
+                kind: "message",
               },
               metadata: {
                 intent: "cost_estimate",
@@ -243,18 +295,42 @@ export function makeA2aForwardingSpecialist(
         const meta = rpc.result.metadata ?? {};
         const remoteCost =
           typeof meta.cost_estimate === "number" ? meta.cost_estimate : null;
+        // Prefer the remote agent's own reply text as the plan. extractText
+        // falls back to JSON.stringify(status) — a "{"-prefixed string is not
+        // a plan, so treat it as missing and draft a labeled one instead.
+        const remotePlan = extractText(rpc.result).trim();
+        const hasRemotePlan =
+          remotePlan.length >= 40 && !remotePlan.startsWith("{");
+        const drafted = hasRemotePlan
+          ? null
+          : await draftPlanFromCard(prompt, taskType);
         const bid: BidPayload = {
           bid_price: remoteCost ?? config.cost_baseline,
-          capability_claim: `${config.display_name} via A2A at ${endpoint}`,
+          capability_claim: hasRemotePlan
+            ? remotePlan.slice(0, 700)
+            : drafted!.claim,
           estimated_seconds: typeof meta.estimated_seconds === "number"
             ? (meta.estimated_seconds as number)
             : 30,
+          plan_source: hasRemotePlan ? "remote" : drafted!.source,
         };
         return bid;
       } catch (err) {
-        // Endpoint unreachable at bid time → decline cleanly so the auctioneer
-        // can route elsewhere. Do NOT fall through to mock.
         const reason = err instanceof Error ? err.message : String(err);
+        // A JSON-RPC application error means the agent is alive but doesn't
+        // support the optional cost_estimate intent — bid at cost_baseline
+        // (the header contract: "If the remote cannot honor it, fall back").
+        if (reason.startsWith("A2A JSON-RPC error")) {
+          const drafted = await draftPlanFromCard(prompt, taskType);
+          return {
+            bid_price: config.cost_baseline,
+            capability_claim: drafted.claim,
+            estimated_seconds: 30,
+            plan_source: drafted.source,
+          };
+        }
+        // Network/HTTP/timeout → decline cleanly so the auctioneer can route
+        // elsewhere. Do NOT fall through to mock.
         return {
           decline: true,
           reason: `A2A endpoint unreachable during bid: ${reason.slice(0, 200)}`,
@@ -262,7 +338,7 @@ export function makeA2aForwardingSpecialist(
       }
     },
 
-    async execute(prompt, taskType): Promise<SpecialistExecuteResult> {
+    async execute(prompt, taskType, context): Promise<SpecialistExecuteResult> {
       // Defensive: resolve auth again (module cache makes this essentially free
       // on the second call). If bid somehow declined and execute is still reached,
       // return a clear fallback rather than blasting an auth-less request.
@@ -306,25 +382,54 @@ export function makeA2aForwardingSpecialist(
             ? { [auth.headerName]: auth.token }
             : {};
 
-      const context = buildTaskContext(prompt, taskType);
+      const taskContext = buildTaskContext(prompt, taskType);
+      // Record both JSON-RPC legs through the auctioneer's tool recorder so
+      // A2A executions produce real receipts (external session id, observed
+      // events, artifact hash) — same audit trail as MCP-forwarding runners.
+      const recorder = context?.toolRecorder;
 
       let taskId: string;
       try {
-        const sendRpc = await postJsonRpc(
-          endpoint,
-          "message/send",
-          {
-            message: {
-              parts: [{ kind: "text", text: context }],
+        const send = () =>
+          postJsonRpc(
+            endpoint,
+            "message/send",
+            {
+              message: {
+                role: "user",
+                parts: [{ kind: "text", text: taskContext }],
+                messageId: nextRpcId(),
+                kind: "message",
+              },
+              metadata: {
+                intent: "post_task",
+                agent_id: config.agent_id,
+              },
             },
-            metadata: {
-              intent: "post_task",
-              agent_id: config.agent_id,
-            },
-          },
-          SEND_TIMEOUT_MS,
-          authHeaders,
-        );
+            SEND_TIMEOUT_MS,
+            authHeaders,
+          );
+        const sendRpc = recorder
+          ? await recorder.record(
+              {
+                agent_id: config.agent_id,
+                phase: "execute",
+                transport: "a2a",
+                provider: config.sponsor,
+                endpoint,
+                method: "message/send",
+                tool_name: "message/send",
+                arguments: { intent: "post_task", task_type: taskType },
+              },
+              send,
+              (rpc) => ({
+                ok: true,
+                result_preview: `task ${rpc.result.id} state=${rpc.result.status.state}`,
+                external_session_id: rpc.result.id,
+                external_task_id: rpc.result.id,
+              }),
+            )
+          : await send();
         taskId = sendRpc.result.id;
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
@@ -341,14 +446,41 @@ export function makeA2aForwardingSpecialist(
         return { output, provenance };
       }
 
-      // Poll until terminal state.
+      // Poll until terminal state. Recorded as a single tasks/get leg whose
+      // outcome reflects the remote task's terminal state.
       let finalTask: A2ATask;
       try {
-        finalTask = await withTimeout(
-          pollUntilTerminal(endpoint, taskId, authHeaders),
-          POLL_MAX_ATTEMPTS * POLL_INTERVAL_MS + POLL_TIMEOUT_MS + 2_000,
-          "a2a-poll",
-        );
+        const poll = () =>
+          withTimeout(
+            pollUntilTerminal(endpoint, taskId, authHeaders),
+            POLL_MAX_ATTEMPTS * POLL_INTERVAL_MS + POLL_TIMEOUT_MS + 2_000,
+            "a2a-poll",
+          );
+        finalTask = recorder
+          ? await recorder.record(
+              {
+                agent_id: config.agent_id,
+                phase: "execute",
+                transport: "a2a",
+                provider: config.sponsor,
+                endpoint,
+                method: "tasks/get",
+                tool_name: "tasks/get",
+                call_id: taskId,
+              },
+              poll,
+              (t) => ({
+                ok: t.status.state === "completed",
+                result_preview: extractText(t).slice(0, 300),
+                error_message:
+                  t.status.state === "failed"
+                    ? extractText(t).slice(0, 300)
+                    : undefined,
+                external_session_id: taskId,
+                external_task_id: taskId,
+              }),
+            )
+          : await poll();
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         const provenance: SpecialistProvenance = {
@@ -389,6 +521,7 @@ export function makeA2aForwardingSpecialist(
         live_tools_called: true,
         transport: "a2a",
         proof_level: "agent_session",
+        external_session_id: taskId,
         external_task_id: taskId,
         endpoint,
       };
@@ -472,8 +605,11 @@ export function makeA2aForwardingSpecialist(
               ? { [authResult.headerName]: authResult.token }
               : {};
 
+        // 12s: probe runs concurrently with the bid leg, so a generous cap
+        // costs no wall-clock. LLM-backed agents (LangGraph currency sample)
+        // run their full graph even on a probe ping and routinely exceed 8s.
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8000);
+        const timer = setTimeout(() => controller.abort(), 12_000);
 
         let res: Response;
         try {

@@ -9,7 +9,11 @@ import { internal } from "./_generated/api";
 import { buildOrchestrationContext } from "../lib/orchestration-context";
 import { isConversionDropPrompt } from "../lib/conversion-drop-demo";
 
-export const BID_WINDOW_SECONDS = 15;
+// 30s: the auctioneer now runs the liveness probe and the bid request
+// concurrently per agent (see auctions.solicitBids), so the slowest leg
+// (~12s A2A bid + ~6s plan screen) fits with headroom even for tunneled
+// remote agents. Was 45s when the two JSON-RPC legs ran serially.
+export const BID_WINDOW_SECONDS = 30;
 
 const taskStatusValidator = v.union(
   v.literal("open"),
@@ -17,6 +21,7 @@ const taskStatusValidator = v.union(
   v.literal("plan_review"),
   v.literal("bidding"),
   v.literal("awarded"),
+  v.literal("requires_payment"),
   v.literal("executing"),
   v.literal("judging"),
   v.literal("synthesizing"),
@@ -51,6 +56,7 @@ export const post = mutation({
     business_context: v.optional(v.string()),
     repo_context: v.optional(v.string()),
     source_hints: v.optional(v.array(v.string())),
+    workflow_mode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -86,6 +92,10 @@ export const post = mutation({
     ]);
     const businessContext = cleanOptional(args.business_context) ?? profileBusiness;
     const repoContext = cleanOptional(args.repo_context) ?? profileRepo;
+    const hive =
+      args.workflow_mode === "hive" ||
+      (process.env.ARBOR_HIVE_DEFAULT === "true" &&
+        args.workflow_mode !== "legacy");
 
     const task_id = await ctx.db.insert("tasks", {
       posted_by: args.posted_by,
@@ -97,6 +107,7 @@ export const post = mutation({
       bid_window_seconds: BID_WINDOW_SECONDS,
       bid_window_closes_at: closesAt,
       product_context_profile_id: profile?._id,
+      workflow_mode: hive ? "hive" : undefined,
     });
 
     const orchestrationContext = buildOrchestrationContext({
@@ -152,6 +163,8 @@ export const post = mutation({
     // diagnose-then-PR investigation flow instead of the generic auction.
     if (isConversionDropPrompt(args.prompt)) {
       await ctx.scheduler.runAfter(0, internal.demos.runConversionDropDemo, { task_id });
+    } else if (hive) {
+      await ctx.scheduler.runAfter(0, internal.hivePlanner.planDag, { task_id });
     } else {
       // Planner: atomic → enrichment + auction on this task; compound → multi-
       // step children (each routed through enrichment; children without a stub
@@ -311,6 +324,20 @@ export const _setStatus = internalMutation({
   args: { task_id: v.id("tasks"), status: taskStatusValidator },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.task_id, { status: args.status });
+  },
+});
+
+export const _setPaymentStatus = internalMutation({
+  args: {
+    task_id: v.id("tasks"),
+    payment_status: v.string(),
+    status: v.optional(taskStatusValidator),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.task_id, {
+      payment_status: args.payment_status,
+      ...(args.status ? { status: args.status } : {}),
+    });
   },
 });
 

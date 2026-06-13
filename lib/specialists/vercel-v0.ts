@@ -80,6 +80,9 @@ function v0Key() {
 
 function isFrontendTask(prompt: string, taskType: string) {
   const text = `${prompt} ${taskType}`.toLowerCase();
+  // Single-word needles must match whole words — bare substring matching made
+  // short needles like "ui" hit inside "requires"/"build"/"quick", so v0 bid
+  // on tasks far outside its scope.
   return [
     "landing page",
     "pricing page",
@@ -93,7 +96,11 @@ function isFrontendTask(prompt: string, taskType: string) {
     "web app",
     "hero",
     "cta",
-  ].some((needle) => text.includes(needle));
+  ].some((needle) =>
+    needle.includes(" ")
+      ? text.includes(needle)
+      : new RegExp(`\\b${needle}\\b`).test(text),
+  );
 }
 
 function decline(reason: string): DeclineDecision {

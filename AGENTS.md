@@ -1,5 +1,3 @@
-# AGENTS.md
-
 Guidance for AI agents working in `/Users/yanzihao/Documents/miyohacks`.
 
 ## Model Routing (Executive Delegation)
@@ -134,6 +132,7 @@ This makes cost tracking and quality regressions visible across sessions.
 - Prefer small, targeted edits that preserve the product direction already in the repository.
 - Use `rg` / `rg --files` for search.
 - Use `apply_patch` for manual file edits.
+- When adding code that requires a new API key or provider secret, update `docs/api-keys.md` in the same change. Never include real secret values.
 - Do not revert or overwrite user changes unless the user explicitly asks.
 - When changing frontend behavior, run the local app and verify the actual browser experience.
 - After meaningful frontend work, use the in-app Browser plugin for local site checks rather than only relying on static inspection.

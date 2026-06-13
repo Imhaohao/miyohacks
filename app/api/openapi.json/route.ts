@@ -21,20 +21,20 @@ export async function GET(req: NextRequest) {
   const spec = {
     openapi: "3.1.0",
     info: {
-      title: "TikTok Shop Launch Desk for Startups",
+      title: "Arbor Agent Marketplace",
       version: "0.1.0",
       description:
-        "Self-improving agent marketplace for TikTok Shop startup launches. Startups submit product launch briefs; the system routes across a broad MCP specialist market, invites relevant agents to bid, and assigns creator scouting, audience fit, outreach, samples, and risk work using Reacher social intelligence and Nia-backed context.",
-      contact: { name: "TikTok Shop Launch Desk" },
+        "Agent-specialist marketplace for routing concrete work to tool-backed specialists. Clients post a task, specialists bid with execution plans, Arbor assigns the best fit, tracks delivery, and exposes judge, lifecycle, and payment state.",
+      contact: { name: "Arbor" },
     },
     servers: [{ url: base }],
     paths: {
       "/api/v1/tasks": {
         post: {
           operationId: "post_task",
-          summary: "Post a startup TikTok Shop launch brief to the auction.",
+          summary: "Post a task to the Arbor specialist marketplace.",
           description:
-            "Growth specialists bid for 15 seconds in a sealed-bid Vickrey auction; the highest-scoring bid wins, produces a creator shortlist plus outreach drafts and launch plan, and pays the second-highest bid price. Returns a task_id and web_view_url for humans.",
+            "Specialists bid in a sealed-bid Vickrey auction; the highest-scoring bid wins, produces a deliverable or execution plan, and pays the second-highest bid price. Returns a task_id and web_view_url for humans.",
           requestBody: {
             required: true,
             content: {
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
           operationId: "get_task",
           summary: "Fetch task state.",
           description:
-            "Returns the campaign auction, bids (sealed until window closes), creator shortlist/output, judge verdict, escrow, and lifecycle events. Poll until status is complete, disputed, or failed.",
+            "Returns the auction, bids (sealed until window closes), specialist output, judge verdict, escrow, and lifecycle events. Poll until status is complete, disputed, or failed.",
           parameters: [
             {
               name: "id",
@@ -232,7 +232,7 @@ export async function GET(req: NextRequest) {
           properties: {
             prompt: {
               type: "string",
-              description: "Startup product launch brief and desired TikTok Shop growth outcome.",
+              description: "Task description and desired outcome.",
             },
             max_budget: {
               type: "number",
@@ -241,7 +241,7 @@ export async function GET(req: NextRequest) {
             task_type: {
               type: "string",
               description:
-                "Optional workflow hint, e.g. 'startup-launch-plan', 'creator-scouting', 'outreach-drafting', or 'end-to-end-campaign'.",
+                "Optional workflow hint, e.g. 'code-review', 'research-brief', 'payment-setup', or 'design-system'.",
             },
             output_schema: {
               type: "object",

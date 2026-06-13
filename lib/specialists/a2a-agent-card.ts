@@ -1,10 +1,11 @@
 /**
  * A2A agent-card discovery and auth resolution.
  *
- * Fetches the standard A2A agent card from `/.well-known/agent.json` (or an
- * explicit override URL), inspects its `security` / `securitySchemes` fields,
- * and returns a typed `ResolvedAuth` so the outbound runner can attach the
- * right headers — or decline loud when credentials are missing.
+ * Fetches the standard A2A agent card — `/.well-known/agent-card.json` per
+ * A2A v0.3.0, falling back to the legacy v0.2.x `/.well-known/agent.json` —
+ * or an explicit override URL. Inspects its `security` / `securitySchemes`
+ * fields and returns a typed `ResolvedAuth` so the outbound runner can attach
+ * the right headers — or decline loud when credentials are missing.
  *
  * Two-level cache:
  *   - `cardCache` (Map<endpoint, {card, fetchedAt}>): resolved cards, TTL 10 min.
@@ -67,6 +68,14 @@ const cardCache = new Map<string, { card: AgentCard; fetchedAt: number }>();
 /** In-flight dedupe — keyed by the same card fetch URL. */
 const inFlight = new Map<string, Promise<AgentCard>>();
 
+/**
+ * Which well-known path won for a given origin. Once an origin resolves via
+ * agent-card.json (or the legacy fallback), later calls skip the probe order
+ * and go straight to the winner — a v0.2.x server isn't re-probed at the
+ * v0.3.0 path on every bid.
+ */
+const resolvedCardUrlByOrigin = new Map<string, string>();
+
 // ─── helpers ──────────────────────────────────────────────────────────────
 
 /** 6-line timeout wrapper (same shape as the one in a2a-forwarding.ts). */
@@ -79,26 +88,60 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   ]);
 }
 
-/** Derive the card URL from the A2A endpoint origin + well-known path. */
-function defaultCardUrl(a2aEndpoint: string): string {
-  return `${new URL(a2aEndpoint).origin}/.well-known/agent.json`;
+/**
+ * Candidate well-known card URLs for an endpoint origin, in probe order:
+ * the A2A v0.3.0 path first, then the legacy v0.2.x path.
+ */
+function candidateCardUrls(a2aEndpoint: string): string[] {
+  const origin = new URL(a2aEndpoint).origin;
+  return [
+    `${origin}/.well-known/agent-card.json`,
+    `${origin}/.well-known/agent.json`,
+  ];
 }
 
 // ─── public API ───────────────────────────────────────────────────────────
 
 /**
  * Fetch the agent card for `endpoint`.  Uses `explicitUrl` when provided,
- * otherwise falls back to `${origin(endpoint)}/.well-known/agent.json`.
+ * otherwise probes `${origin}/.well-known/agent-card.json` (A2A v0.3.0)
+ * and falls back to `${origin}/.well-known/agent.json` (v0.2.x).
  *
  * Results are cached per card URL for CARD_TTL_MS.  Concurrent fetches to
- * the same URL are coalesced via `inFlight`.
+ * the same URL are coalesced via `inFlight`.  The winning well-known path
+ * per origin is remembered so fallback probing happens at most once.
  */
 export async function fetchAgentCard(
   endpoint: string,
   explicitUrl?: string,
 ): Promise<AgentCard> {
-  const cardUrl = explicitUrl ?? defaultCardUrl(endpoint);
+  if (explicitUrl) {
+    return fetchCardAtUrl(explicitUrl);
+  }
 
+  const origin = new URL(endpoint).origin;
+  const known = resolvedCardUrlByOrigin.get(origin);
+  if (known) {
+    return fetchCardAtUrl(known);
+  }
+
+  let lastError: unknown;
+  for (const cardUrl of candidateCardUrls(endpoint)) {
+    try {
+      const card = await fetchCardAtUrl(cardUrl);
+      resolvedCardUrlByOrigin.set(origin, cardUrl);
+      return card;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`no agent card found for ${origin}`);
+}
+
+/** Single-URL fetch with TTL cache + in-flight dedup. */
+async function fetchCardAtUrl(cardUrl: string): Promise<AgentCard> {
   // Cache hit?
   const cached = cardCache.get(cardUrl);
   if (cached && Date.now() - cached.fetchedAt < CARD_TTL_MS) {
@@ -250,6 +293,11 @@ export async function getAuthForEndpoint(
   endpoint: string,
   cfg: SpecialistConfig,
 ): Promise<ResolvedAuth> {
+  // Operator override: the server was verified to NOT enforce the auth its
+  // card declares — skip card resolution entirely and call keyless.
+  if (cfg.a2a_auth_mode === "none") {
+    return { kind: "none" };
+  }
   try {
     const card = await fetchAgentCard(endpoint, cfg.a2a_agent_card_url);
     return resolveAuth(card, cfg);

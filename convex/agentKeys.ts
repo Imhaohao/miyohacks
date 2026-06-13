@@ -18,30 +18,39 @@ export const _insert = internalMutation({
   },
 });
 
-export const _revoke = internalMutation({
+export const _rotate = internalMutation({
   args: {
     agent_id: v.string(),
-    revoked_at: v.number(),
+    secret_b64: v.string(),
+    created_at: v.number(),
   },
   handler: async (ctx, args) => {
-    const row = await ctx.db
+    const existing = ctx.db
       .query("agent_keys")
-      .withIndex("by_agent_id", (q) => q.eq("agent_id", args.agent_id))
-      .first();
-    if (!row) return { ok: false };
-    await ctx.db.patch(row._id, { revoked_at: args.revoked_at });
-    return { ok: true };
+      .withIndex("by_agent_id", (q) => q.eq("agent_id", args.agent_id));
+    for await (const row of existing) {
+      if (row.revoked_at === undefined) {
+        await ctx.db.patch(row._id, { revoked_at: args.created_at });
+      }
+    }
+    return await ctx.db.insert("agent_keys", args);
   },
 });
 
 export const _getSecretForAgent = internalQuery({
   args: { agent_id: v.string() },
   handler: async (ctx, args) => {
-    const row = await ctx.db
+    const rows = ctx.db
       .query("agent_keys")
-      .withIndex("by_agent_id", (q) => q.eq("agent_id", args.agent_id))
-      .first();
-    if (!row || row.revoked_at !== undefined) return null;
-    return { secret_b64: row.secret_b64 };
+      .withIndex("by_agent_id", (q) => q.eq("agent_id", args.agent_id));
+    let latest: { secret_b64: string; created_at: number } | null = null;
+    for await (const row of rows) {
+      if (row.revoked_at !== undefined) continue;
+      if (!latest || row.created_at > latest.created_at) {
+        latest = { secret_b64: row.secret_b64, created_at: row.created_at };
+      }
+    }
+    if (!latest) return null;
+    return { secret_b64: latest.secret_b64 };
   },
 });

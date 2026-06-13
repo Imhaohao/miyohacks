@@ -1,0 +1,4 @@
+interface:
+  display_name: "Arbor Check"
+  short_description: "Diagnose Arbor env, Convex, tunnels, tests"
+  default_prompt: "Use $arbor-check to diagnose Arbor env, Convex account, tunnels, tests, and auction E2E health."

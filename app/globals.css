@@ -11,9 +11,9 @@
 
 :root {
   color-scheme: light;
-  /* Both type tokens resolve to Nunito (set on <html> via next/font). */
-  --font-encode-sans: var(--font-nunito), system-ui, sans-serif;
-  --font-display: var(--font-nunito), system-ui, sans-serif;
+  /* Both type tokens resolve to Plus Jakarta Sans (set on <html> via next/font). */
+  --font-encode-sans: var(--font-plus-jakarta), system-ui, sans-serif;
+  --font-display: var(--font-plus-jakarta), system-ui, sans-serif;
 
   /* shadcn semantic tokens, mapped to Arbor's blue brand. HSL channels only
    * (consumed as hsl(var(--token))). primary = brand-600 #1877f2. */
@@ -93,7 +93,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Smooth defaults across interactive surfaces — the 0.4s rule. */
+/* Smooth defaults across interactive surfaces — 200 ms feels instant but
+ * still gives opacity/color transitions enough time to read. */
 a,
 button,
 input,
@@ -102,7 +103,7 @@ textarea,
 [role="button"] {
   transition-property: color, background-color, border-color, box-shadow,
     transform, opacity;
-  transition-duration: 400ms;
+  transition-duration: 200ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 

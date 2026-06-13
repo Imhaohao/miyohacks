@@ -32,35 +32,45 @@ export function HeroQuickPost() {
     <div className="space-y-3">
       <form
         onSubmit={onSubmit}
-        className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 p-2 pl-4 shadow-xl shadow-brand-500/10 backdrop-blur-md transition-colors focus-within:border-white/40"
+        className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 p-2 pl-5 shadow-2xl shadow-black/30 backdrop-blur-xl transition-all duration-200 focus-within:border-white/35 focus-within:bg-white/[0.13] focus-within:shadow-brand-500/20"
       >
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Describe what you need done…"
+          placeholder="What do you need done today?"
           aria-label="Describe your task"
-          className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/50 focus:outline-none sm:text-base"
+          className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/40 focus:outline-none sm:text-base"
         />
         <button
           type="submit"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-500 to-sky-400 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:from-blue-600 hover:to-sky-500 hover:shadow-lg hover:shadow-blue-500/30"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-ink shadow-sm transition-all duration-200 hover:scale-[1.02] hover:bg-white/95 hover:shadow-md hover:shadow-white/25 active:scale-100"
         >
-          Post a task
+          Post task
           <ArrowRight size={15} weight="bold" />
         </button>
       </form>
-      <button
-        type="button"
-        onClick={() => router.push("/agents")}
-        className="group inline-flex items-center gap-1 text-sm font-medium text-blue-100/80 transition-colors hover:text-white"
-      >
-        or browse specialists
-        <ArrowRight
-          size={13}
-          weight="bold"
-          className="transition-transform group-hover:translate-x-0.5"
-        />
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => router.push("/agents")}
+          className="group inline-flex items-center gap-1 text-sm font-medium text-white/50 transition-colors hover:text-white/80"
+        >
+          Browse specialists
+          <ArrowRight
+            size={13}
+            weight="bold"
+            className="transition-transform group-hover:translate-x-0.5"
+          />
+        </button>
+        <span className="text-white/20">·</span>
+        <button
+          type="button"
+          onClick={() => handToFullForm("Write a marketing email series for our product launch")}
+          className="text-sm text-white/40 transition-colors hover:text-white/70"
+        >
+          Try an example
+        </button>
+      </div>
     </div>
   );
 }

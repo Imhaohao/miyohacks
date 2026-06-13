@@ -1,6 +1,9 @@
 import { AuthConfig } from 'convex/server';
 
 const clientId = process.env.WORKOS_CLIENT_ID;
+if (!clientId) {
+  throw new Error('WORKOS_CLIENT_ID is required for Convex AuthKit JWT config');
+}
 
 export default {
   providers: [

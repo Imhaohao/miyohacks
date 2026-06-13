@@ -52,6 +52,23 @@ export interface McpRequestOptions {
 
 let nextId = 1;
 
+function parseJsonEnvelope<T>(
+  text: string,
+  url: string,
+  method: string,
+  source: string,
+): JsonRpcResponse<T> {
+  try {
+    return JSON.parse(text) as JsonRpcResponse<T>;
+  } catch (err) {
+    throw new Error(
+      `MCP ${method} → ${url} returned invalid ${source} JSON: ${
+        err instanceof Error ? err.message : String(err)
+      }; body=${text.slice(0, 200)}`,
+    );
+  }
+}
+
 /**
  * Single JSON-RPC round-trip. Returns the result plus any `Mcp-Session-Id`
  * the server issued (or echoed back). Pass `sessionId` to thread an existing
@@ -102,10 +119,11 @@ async function rpcSession<T>(
       const text = await res.text();
       // Take the first `data:` line.
       const line = text.split("\n").find((l) => l.startsWith("data:"));
-      if (!line) throw new Error("MCP SSE response had no data line");
-      envelope = JSON.parse(line.slice(5).trim()) as JsonRpcResponse<T>;
+      if (!line) throw new Error(`MCP ${method} → ${url} SSE response had no data line`);
+      envelope = parseJsonEnvelope<T>(line.slice(5).trim(), url, method, "SSE data");
     } else {
-      envelope = (await res.json()) as JsonRpcResponse<T>;
+      const text = await res.text();
+      envelope = parseJsonEnvelope<T>(text, url, method, "HTTP");
     }
     if (envelope.error) {
       throw new Error(

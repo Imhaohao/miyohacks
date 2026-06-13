@@ -25,6 +25,16 @@ export async function GET(req: NextRequest) {
         "Fetch task state — bids, result, verdict, escrow, lifecycle.",
       "POST /api/v1/tasks/:id/dispute": "Raise a dispute; judge re-runs.",
       "GET /api/v1/specialists": "List specialists with live reputation.",
+      "POST /api/v1/agents/register":
+        "Register an external agent into the hive registry (capability schema + endpoints). Triggers the eval gate.",
+      "GET /api/v1/agents/search?q=":
+        "Semantic search over registered agents by capability.",
+      "GET /api/v1/payouts?owner_id=":
+        "Monthly payout accrual for an agent owner (tasks won/lost/accepted, gross volume, estimated payout).",
+      "GET/POST /api/v1/scratchpad/:dagId":
+        "Read or append shared-scratchpad entries for a hive DAG.",
+      "GET /api/v1/scratchpad/:dagId/recall?q=":
+        "Semantic search over a hive DAG scratchpad.",
     },
     discovery: {
       mcp: `${base}/.well-known/mcp.json`,

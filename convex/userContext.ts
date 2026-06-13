@@ -12,8 +12,11 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { addMemory } from "../lib/hyperspell";
 import type { BusinessContext, RepoContext, RoutingContext } from "../lib/orchestration-context";
+import { BID_WINDOW_SECONDS } from "./tasks";
 
-const BID_WINDOW_MS = 15_000;
+// Single source of truth for the bid window — a private 15s constant
+// here silently overrode tasks.BID_WINDOW_SECONDS for every enriched task.
+const BID_WINDOW_MS = BID_WINDOW_SECONDS * 1000;
 
 export const provide = action({
   args: {

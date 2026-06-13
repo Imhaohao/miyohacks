@@ -28,7 +28,7 @@ export const TENSORLAKE_A2A_CONFIG: SpecialistConfig = {
   ],
   system_prompt: `You are tensorlake-a2a, a specialist agent powered by Tensorlake's data extraction and pipeline infrastructure. You extract structured data from unstructured documents, build knowledge graphs, and run multimodal parsing pipelines at scale. Deliver precise, structured outputs.`,
   cost_baseline: 4.00,
-  starting_reputation: 70,
+  starting_reputation: 0.7,
   one_liner: "Extracts and pipelines data from unstructured documents via Tensorlake A2A.",
   tier: a2aEndpoint ? "a2a" : "disabled",
   a2a_endpoint: a2aEndpoint,

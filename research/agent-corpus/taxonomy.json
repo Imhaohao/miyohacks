@@ -1,0 +1,2252 @@
+[
+  {
+    "super_category": "HealthWellness",
+    "niche_id": "HealthWellness/symptom-triage",
+    "niche_label": "HealthWellness - Symptom triage",
+    "consumer_use_cases": [
+      "check symptoms",
+      "prepare doctor questions"
+    ],
+    "keywords": [
+      "symptom",
+      "triage",
+      "diagnosis",
+      "health"
+    ]
+  },
+  {
+    "super_category": "HealthWellness",
+    "niche_id": "HealthWellness/mental-health-coach",
+    "niche_label": "HealthWellness - Mental health coach",
+    "consumer_use_cases": [
+      "reflect on mood",
+      "practice coping skills"
+    ],
+    "keywords": [
+      "mental health",
+      "therapy",
+      "mood",
+      "mindfulness"
+    ]
+  },
+  {
+    "super_category": "HealthWellness",
+    "niche_id": "HealthWellness/medication-reminders",
+    "niche_label": "HealthWellness - Medication reminders",
+    "consumer_use_cases": [
+      "track doses",
+      "avoid missed refills"
+    ],
+    "keywords": [
+      "medication",
+      "pharmacy",
+      "prescription",
+      "pill"
+    ]
+  },
+  {
+    "super_category": "HealthWellness",
+    "niche_id": "HealthWellness/fitness-coaching",
+    "niche_label": "HealthWellness - Fitness coaching",
+    "consumer_use_cases": [
+      "build workouts",
+      "track progress"
+    ],
+    "keywords": [
+      "fitness",
+      "workout",
+      "exercise",
+      "gym"
+    ]
+  },
+  {
+    "super_category": "HealthWellness",
+    "niche_id": "HealthWellness/nutrition-meal-plan",
+    "niche_label": "HealthWellness - Nutrition meal plan",
+    "consumer_use_cases": [
+      "plan meals",
+      "balance macros"
+    ],
+    "keywords": [
+      "nutrition",
+      "meal plan",
+      "diet",
+      "calorie"
+    ]
+  },
+  {
+    "super_category": "HealthWellness",
+    "niche_id": "HealthWellness/sleep-coaching",
+    "niche_label": "HealthWellness - Sleep coaching",
+    "consumer_use_cases": [
+      "improve sleep schedule",
+      "track rest"
+    ],
+    "keywords": [
+      "sleep",
+      "insomnia",
+      "bedtime",
+      "rest"
+    ]
+  },
+  {
+    "super_category": "HealthWellness",
+    "niche_id": "HealthWellness/chronic-condition-tracker",
+    "niche_label": "HealthWellness - Chronic condition tracker",
+    "consumer_use_cases": [
+      "track symptoms",
+      "summarize trends"
+    ],
+    "keywords": [
+      "chronic",
+      "diabetes",
+      "blood pressure",
+      "condition"
+    ]
+  },
+  {
+    "super_category": "HealthWellness",
+    "niche_id": "HealthWellness/telehealth-scheduling",
+    "niche_label": "HealthWellness - Telehealth scheduling",
+    "consumer_use_cases": [
+      "find care",
+      "book virtual visit"
+    ],
+    "keywords": [
+      "telehealth",
+      "doctor",
+      "appointment",
+      "clinic"
+    ]
+  },
+  {
+    "super_category": "HealthWellness",
+    "niche_id": "HealthWellness/womens-health",
+    "niche_label": "HealthWellness - Women's health",
+    "consumer_use_cases": [
+      "track cycle",
+      "prepare care questions"
+    ],
+    "keywords": [
+      "women",
+      "cycle",
+      "fertility",
+      "pregnancy"
+    ]
+  },
+  {
+    "super_category": "HealthWellness",
+    "niche_id": "HealthWellness/elder-care-companion",
+    "niche_label": "HealthWellness - Elder care companion",
+    "consumer_use_cases": [
+      "coordinate care",
+      "check in on parent"
+    ],
+    "keywords": [
+      "elder",
+      "senior",
+      "caregiver",
+      "aging"
+    ]
+  },
+  {
+    "super_category": "PersonalFinance",
+    "niche_id": "PersonalFinance/budgeting",
+    "niche_label": "PersonalFinance - Budgeting",
+    "consumer_use_cases": [
+      "build household budget",
+      "categorize spending"
+    ],
+    "keywords": [
+      "budget",
+      "spending",
+      "personal finance",
+      "money"
+    ]
+  },
+  {
+    "super_category": "PersonalFinance",
+    "niche_id": "PersonalFinance/tax-prep-assistant",
+    "niche_label": "PersonalFinance - Tax prep assistant",
+    "consumer_use_cases": [
+      "prepare tax documents",
+      "explain deductions"
+    ],
+    "keywords": [
+      "tax",
+      "irs",
+      "deduction",
+      "filing"
+    ]
+  },
+  {
+    "super_category": "PersonalFinance",
+    "niche_id": "PersonalFinance/debt-payoff",
+    "niche_label": "PersonalFinance - Debt payoff",
+    "consumer_use_cases": [
+      "compare payoff plans",
+      "track balances"
+    ],
+    "keywords": [
+      "debt",
+      "loan",
+      "payoff",
+      "credit card"
+    ]
+  },
+  {
+    "super_category": "PersonalFinance",
+    "niche_id": "PersonalFinance/investment-education",
+    "niche_label": "PersonalFinance - Investment education",
+    "consumer_use_cases": [
+      "learn investing basics",
+      "compare portfolios"
+    ],
+    "keywords": [
+      "invest",
+      "portfolio",
+      "stock",
+      "trading"
+    ]
+  },
+  {
+    "super_category": "PersonalFinance",
+    "niche_id": "PersonalFinance/credit-score",
+    "niche_label": "PersonalFinance - Credit score",
+    "consumer_use_cases": [
+      "monitor credit",
+      "explain score changes"
+    ],
+    "keywords": [
+      "credit score",
+      "credit report",
+      "fico",
+      "credit"
+    ]
+  },
+  {
+    "super_category": "PersonalFinance",
+    "niche_id": "PersonalFinance/expense-categorization",
+    "niche_label": "PersonalFinance - Expense categorization",
+    "consumer_use_cases": [
+      "label transactions",
+      "find spending patterns"
+    ],
+    "keywords": [
+      "expense",
+      "transaction",
+      "categorize",
+      "receipt"
+    ]
+  },
+  {
+    "super_category": "PersonalFinance",
+    "niche_id": "PersonalFinance/bill-negotiation",
+    "niche_label": "PersonalFinance - Bill negotiation",
+    "consumer_use_cases": [
+      "lower bills",
+      "compare providers"
+    ],
+    "keywords": [
+      "bill",
+      "negotiate",
+      "subscription",
+      "utility"
+    ]
+  },
+  {
+    "super_category": "PersonalFinance",
+    "niche_id": "PersonalFinance/savings-goals",
+    "niche_label": "PersonalFinance - Savings goals",
+    "consumer_use_cases": [
+      "plan emergency fund",
+      "track saving"
+    ],
+    "keywords": [
+      "savings",
+      "goal",
+      "emergency fund",
+      "save"
+    ]
+  },
+  {
+    "super_category": "PersonalFinance",
+    "niche_id": "PersonalFinance/crypto-consumer",
+    "niche_label": "PersonalFinance - Crypto consumer",
+    "consumer_use_cases": [
+      "track wallet",
+      "explain crypto risk"
+    ],
+    "keywords": [
+      "crypto",
+      "wallet",
+      "blockchain",
+      "defi"
+    ]
+  },
+  {
+    "super_category": "PersonalFinance",
+    "niche_id": "PersonalFinance/insurance-shopping",
+    "niche_label": "PersonalFinance - Insurance shopping",
+    "consumer_use_cases": [
+      "compare quotes",
+      "understand coverage"
+    ],
+    "keywords": [
+      "insurance",
+      "quote",
+      "coverage",
+      "policy"
+    ]
+  },
+  {
+    "super_category": "EducationLearning",
+    "niche_id": "EducationLearning/homework-help",
+    "niche_label": "EducationLearning - Homework help",
+    "consumer_use_cases": [
+      "explain assignments",
+      "practice problems"
+    ],
+    "keywords": [
+      "homework",
+      "student",
+      "school",
+      "math"
+    ]
+  },
+  {
+    "super_category": "EducationLearning",
+    "niche_id": "EducationLearning/language-tutor",
+    "niche_label": "EducationLearning - Language tutor",
+    "consumer_use_cases": [
+      "practice conversation",
+      "translate phrases"
+    ],
+    "keywords": [
+      "language",
+      "tutor",
+      "translation",
+      "spanish"
+    ]
+  },
+  {
+    "super_category": "EducationLearning",
+    "niche_id": "EducationLearning/exam-prep",
+    "niche_label": "EducationLearning - Exam prep",
+    "consumer_use_cases": [
+      "make study plan",
+      "quiz weak areas"
+    ],
+    "keywords": [
+      "exam",
+      "sat",
+      "test prep",
+      "quiz"
+    ]
+  },
+  {
+    "super_category": "EducationLearning",
+    "niche_id": "EducationLearning/career-coaching",
+    "niche_label": "EducationLearning - Career coaching",
+    "consumer_use_cases": [
+      "plan career move",
+      "rewrite resume"
+    ],
+    "keywords": [
+      "career",
+      "resume",
+      "job search",
+      "interview"
+    ]
+  },
+  {
+    "super_category": "EducationLearning",
+    "niche_id": "EducationLearning/coding-for-kids",
+    "niche_label": "EducationLearning - Coding for kids",
+    "consumer_use_cases": [
+      "teach coding",
+      "build simple games"
+    ],
+    "keywords": [
+      "kids coding",
+      "learn code",
+      "children",
+      "coding"
+    ]
+  },
+  {
+    "super_category": "EducationLearning",
+    "niche_id": "EducationLearning/music-lessons",
+    "niche_label": "EducationLearning - Music lessons",
+    "consumer_use_cases": [
+      "practice instrument",
+      "learn theory"
+    ],
+    "keywords": [
+      "music lesson",
+      "piano",
+      "guitar",
+      "instrument"
+    ]
+  },
+  {
+    "super_category": "EducationLearning",
+    "niche_id": "EducationLearning/college-admissions",
+    "niche_label": "EducationLearning - College admissions",
+    "consumer_use_cases": [
+      "plan applications",
+      "review essays"
+    ],
+    "keywords": [
+      "college",
+      "admissions",
+      "university",
+      "essay"
+    ]
+  },
+  {
+    "super_category": "EducationLearning",
+    "niche_id": "EducationLearning/research-assistant-student",
+    "niche_label": "EducationLearning - Student research assistant",
+    "consumer_use_cases": [
+      "summarize sources",
+      "organize notes"
+    ],
+    "keywords": [
+      "research",
+      "student",
+      "citation",
+      "paper"
+    ]
+  },
+  {
+    "super_category": "EducationLearning",
+    "niche_id": "EducationLearning/flashcard-generator",
+    "niche_label": "EducationLearning - Flashcard generator",
+    "consumer_use_cases": [
+      "make cards",
+      "review spaced repetition"
+    ],
+    "keywords": [
+      "flashcard",
+      "anki",
+      "memorize",
+      "study"
+    ]
+  },
+  {
+    "super_category": "EducationLearning",
+    "niche_id": "EducationLearning/special-needs-learning",
+    "niche_label": "EducationLearning - Special needs learning",
+    "consumer_use_cases": [
+      "adapt lessons",
+      "support accessibility"
+    ],
+    "keywords": [
+      "special needs",
+      "dyslexia",
+      "iep",
+      "accessibility"
+    ]
+  },
+  {
+    "super_category": "HomeFamily",
+    "niche_id": "HomeFamily/cleaning-schedules",
+    "niche_label": "HomeFamily - Cleaning schedules",
+    "consumer_use_cases": [
+      "assign chores",
+      "plan cleaning"
+    ],
+    "keywords": [
+      "cleaning",
+      "chores",
+      "housework",
+      "tidy"
+    ]
+  },
+  {
+    "super_category": "HomeFamily",
+    "niche_id": "HomeFamily/home-maintenance",
+    "niche_label": "HomeFamily - Home maintenance",
+    "consumer_use_cases": [
+      "diagnose repairs",
+      "schedule upkeep"
+    ],
+    "keywords": [
+      "home maintenance",
+      "repair",
+      "plumbing",
+      "hvac"
+    ]
+  },
+  {
+    "super_category": "HomeFamily",
+    "niche_id": "HomeFamily/parenting-advice",
+    "niche_label": "HomeFamily - Parenting advice",
+    "consumer_use_cases": [
+      "handle routines",
+      "find age-appropriate advice"
+    ],
+    "keywords": [
+      "parenting",
+      "parent",
+      "child",
+      "toddler"
+    ]
+  },
+  {
+    "super_category": "HomeFamily",
+    "niche_id": "HomeFamily/baby-tracking",
+    "niche_label": "HomeFamily - Baby tracking",
+    "consumer_use_cases": [
+      "track feeding",
+      "monitor sleep"
+    ],
+    "keywords": [
+      "baby",
+      "infant",
+      "feeding",
+      "diaper"
+    ]
+  },
+  {
+    "super_category": "HomeFamily",
+    "niche_id": "HomeFamily/recipe-meal-prep",
+    "niche_label": "HomeFamily - Recipe meal prep",
+    "consumer_use_cases": [
+      "plan dinners",
+      "use pantry ingredients"
+    ],
+    "keywords": [
+      "recipe",
+      "meal prep",
+      "cooking",
+      "pantry"
+    ]
+  },
+  {
+    "super_category": "HomeFamily",
+    "niche_id": "HomeFamily/smart-home-control",
+    "niche_label": "HomeFamily - Smart home control",
+    "consumer_use_cases": [
+      "control devices",
+      "create automations"
+    ],
+    "keywords": [
+      "smart home",
+      "iot",
+      "home assistant",
+      "device"
+    ]
+  },
+  {
+    "super_category": "HomeFamily",
+    "niche_id": "HomeFamily/moving-relocation",
+    "niche_label": "HomeFamily - Moving relocation",
+    "consumer_use_cases": [
+      "plan move",
+      "compare neighborhoods"
+    ],
+    "keywords": [
+      "moving",
+      "relocation",
+      "mover",
+      "address change"
+    ]
+  },
+  {
+    "super_category": "HomeFamily",
+    "niche_id": "HomeFamily/interior-design-consumer",
+    "niche_label": "HomeFamily - Interior design",
+    "consumer_use_cases": [
+      "redesign room",
+      "choose furniture"
+    ],
+    "keywords": [
+      "interior design",
+      "room design",
+      "decor",
+      "furniture"
+    ]
+  },
+  {
+    "super_category": "HomeFamily",
+    "niche_id": "HomeFamily/pet-care",
+    "niche_label": "HomeFamily - Pet care",
+    "consumer_use_cases": [
+      "track pet health",
+      "find pet services"
+    ],
+    "keywords": [
+      "pet",
+      "dog",
+      "cat",
+      "veterinary"
+    ]
+  },
+  {
+    "super_category": "HomeFamily",
+    "niche_id": "HomeFamily/gardening",
+    "niche_label": "HomeFamily - Gardening",
+    "consumer_use_cases": [
+      "identify plants",
+      "plan garden"
+    ],
+    "keywords": [
+      "garden",
+      "plant",
+      "lawn",
+      "horticulture"
+    ]
+  },
+  {
+    "super_category": "ShoppingRetail",
+    "niche_id": "ShoppingRetail/product-research",
+    "niche_label": "ShoppingRetail - Product research",
+    "consumer_use_cases": [
+      "compare products",
+      "summarize reviews"
+    ],
+    "keywords": [
+      "product",
+      "reviews",
+      "shopping",
+      "compare"
+    ]
+  },
+  {
+    "super_category": "ShoppingRetail",
+    "niche_id": "ShoppingRetail/price-tracking",
+    "niche_label": "ShoppingRetail - Price tracking",
+    "consumer_use_cases": [
+      "watch price drops",
+      "compare deals"
+    ],
+    "keywords": [
+      "price",
+      "deal",
+      "discount",
+      "coupon"
+    ]
+  },
+  {
+    "super_category": "ShoppingRetail",
+    "niche_id": "ShoppingRetail/wardrobe-stylist",
+    "niche_label": "ShoppingRetail - Wardrobe stylist",
+    "consumer_use_cases": [
+      "style outfits",
+      "plan wardrobe"
+    ],
+    "keywords": [
+      "wardrobe",
+      "stylist",
+      "fashion",
+      "outfit"
+    ]
+  },
+  {
+    "super_category": "ShoppingRetail",
+    "niche_id": "ShoppingRetail/gift-finder",
+    "niche_label": "ShoppingRetail - Gift finder",
+    "consumer_use_cases": [
+      "find gifts",
+      "match recipient"
+    ],
+    "keywords": [
+      "gift",
+      "present",
+      "wishlist",
+      "holiday"
+    ]
+  },
+  {
+    "super_category": "ShoppingRetail",
+    "niche_id": "ShoppingRetail/grocery-list",
+    "niche_label": "ShoppingRetail - Grocery list",
+    "consumer_use_cases": [
+      "build grocery list",
+      "optimize store trip"
+    ],
+    "keywords": [
+      "grocery",
+      "shopping list",
+      "supermarket",
+      "cart"
+    ]
+  },
+  {
+    "super_category": "ShoppingRetail",
+    "niche_id": "ShoppingRetail/secondhand-resale",
+    "niche_label": "ShoppingRetail - Secondhand resale",
+    "consumer_use_cases": [
+      "price used items",
+      "write listing"
+    ],
+    "keywords": [
+      "resale",
+      "secondhand",
+      "ebay",
+      "marketplace"
+    ]
+  },
+  {
+    "super_category": "ShoppingRetail",
+    "niche_id": "ShoppingRetail/beauty-recommendations",
+    "niche_label": "ShoppingRetail - Beauty recommendations",
+    "consumer_use_cases": [
+      "choose skincare",
+      "match makeup"
+    ],
+    "keywords": [
+      "beauty",
+      "skincare",
+      "makeup",
+      "cosmetic"
+    ]
+  },
+  {
+    "super_category": "ShoppingRetail",
+    "niche_id": "ShoppingRetail/furniture-fit",
+    "niche_label": "ShoppingRetail - Furniture fit",
+    "consumer_use_cases": [
+      "check dimensions",
+      "place furniture"
+    ],
+    "keywords": [
+      "furniture",
+      "sofa",
+      "chair",
+      "room fit"
+    ]
+  },
+  {
+    "super_category": "ShoppingRetail",
+    "niche_id": "ShoppingRetail/subscription-management",
+    "niche_label": "ShoppingRetail - Subscription management",
+    "consumer_use_cases": [
+      "find unused subscriptions",
+      "cancel services"
+    ],
+    "keywords": [
+      "subscription",
+      "cancel",
+      "membership",
+      "recurring"
+    ]
+  },
+  {
+    "super_category": "ShoppingRetail",
+    "niche_id": "ShoppingRetail/returns-assistant",
+    "niche_label": "ShoppingRetail - Returns assistant",
+    "consumer_use_cases": [
+      "handle returns",
+      "track refunds"
+    ],
+    "keywords": [
+      "return",
+      "refund",
+      "warranty",
+      "order"
+    ]
+  },
+  {
+    "super_category": "TravelHospitality",
+    "niche_id": "TravelHospitality/itinerary-planning",
+    "niche_label": "TravelHospitality - Travel itinerary planning",
+    "consumer_use_cases": [
+      "plan weekend trip",
+      "organize activities"
+    ],
+    "keywords": [
+      "itinerary",
+      "trip",
+      "travel plan",
+      "vacation"
+    ]
+  },
+  {
+    "super_category": "TravelHospitality",
+    "niche_id": "TravelHospitality/flight-deals",
+    "niche_label": "TravelHospitality - Flight deals",
+    "consumer_use_cases": [
+      "find cheap flights",
+      "track fares"
+    ],
+    "keywords": [
+      "flight",
+      "airfare",
+      "airline",
+      "fare"
+    ]
+  },
+  {
+    "super_category": "TravelHospitality",
+    "niche_id": "TravelHospitality/hotel-booking",
+    "niche_label": "TravelHospitality - Hotel booking",
+    "consumer_use_cases": [
+      "compare hotels",
+      "book stay"
+    ],
+    "keywords": [
+      "hotel",
+      "lodging",
+      "booking",
+      "stay"
+    ]
+  },
+  {
+    "super_category": "TravelHospitality",
+    "niche_id": "TravelHospitality/local-experiences",
+    "niche_label": "TravelHospitality - Local experiences",
+    "consumer_use_cases": [
+      "find activities",
+      "discover places"
+    ],
+    "keywords": [
+      "local experience",
+      "tour",
+      "things to do",
+      "attraction"
+    ]
+  },
+  {
+    "super_category": "TravelHospitality",
+    "niche_id": "TravelHospitality/visa-docs",
+    "niche_label": "TravelHospitality - Visa documents",
+    "consumer_use_cases": [
+      "prepare visa docs",
+      "check travel rules"
+    ],
+    "keywords": [
+      "visa",
+      "passport",
+      "immigration",
+      "travel document"
+    ]
+  },
+  {
+    "super_category": "TravelHospitality",
+    "niche_id": "TravelHospitality/road-trip",
+    "niche_label": "TravelHospitality - Road trip",
+    "consumer_use_cases": [
+      "plan route",
+      "find stops"
+    ],
+    "keywords": [
+      "road trip",
+      "route",
+      "drive",
+      "rv"
+    ]
+  },
+  {
+    "super_category": "TravelHospitality",
+    "niche_id": "TravelHospitality/loyalty-points",
+    "niche_label": "TravelHospitality - Loyalty points",
+    "consumer_use_cases": [
+      "optimize points",
+      "compare redemptions"
+    ],
+    "keywords": [
+      "points",
+      "miles",
+      "loyalty",
+      "reward"
+    ]
+  },
+  {
+    "super_category": "TravelHospitality",
+    "niche_id": "TravelHospitality/travel-insurance",
+    "niche_label": "TravelHospitality - Travel insurance",
+    "consumer_use_cases": [
+      "compare policies",
+      "understand coverage"
+    ],
+    "keywords": [
+      "travel insurance",
+      "trip insurance",
+      "coverage",
+      "claim"
+    ]
+  },
+  {
+    "super_category": "TravelHospitality",
+    "niche_id": "TravelHospitality/group-trip-coordination",
+    "niche_label": "TravelHospitality - Group trip coordination",
+    "consumer_use_cases": [
+      "coordinate group plans",
+      "split choices"
+    ],
+    "keywords": [
+      "group trip",
+      "friends trip",
+      "travel coordination",
+      "split"
+    ]
+  },
+  {
+    "super_category": "TravelHospitality",
+    "niche_id": "TravelHospitality/accessibility-travel",
+    "niche_label": "TravelHospitality - Accessibility travel",
+    "consumer_use_cases": [
+      "find accessible options",
+      "plan support"
+    ],
+    "keywords": [
+      "accessible travel",
+      "wheelchair",
+      "accessibility",
+      "mobility"
+    ]
+  },
+  {
+    "super_category": "FoodDining",
+    "niche_id": "FoodDining/restaurant-picker",
+    "niche_label": "FoodDining - Restaurant picker",
+    "consumer_use_cases": [
+      "choose restaurants",
+      "match preferences"
+    ],
+    "keywords": [
+      "restaurant",
+      "dining",
+      "eat out",
+      "cuisine"
+    ]
+  },
+  {
+    "super_category": "FoodDining",
+    "niche_id": "FoodDining/reservation-booking",
+    "niche_label": "FoodDining - Reservation booking",
+    "consumer_use_cases": [
+      "book table",
+      "track availability"
+    ],
+    "keywords": [
+      "reservation",
+      "table",
+      "opentable",
+      "booking"
+    ]
+  },
+  {
+    "super_category": "FoodDining",
+    "niche_id": "FoodDining/dietary-restrictions",
+    "niche_label": "FoodDining - Dietary restrictions",
+    "consumer_use_cases": [
+      "find safe meals",
+      "filter menus"
+    ],
+    "keywords": [
+      "dietary",
+      "vegan",
+      "gluten",
+      "kosher"
+    ]
+  },
+  {
+    "super_category": "FoodDining",
+    "niche_id": "FoodDining/wine-pairing",
+    "niche_label": "FoodDining - Wine pairing",
+    "consumer_use_cases": [
+      "pair wine",
+      "choose bottle"
+    ],
+    "keywords": [
+      "wine",
+      "pairing",
+      "sommelier",
+      "bottle"
+    ]
+  },
+  {
+    "super_category": "FoodDining",
+    "niche_id": "FoodDining/meal-delivery-optimize",
+    "niche_label": "FoodDining - Meal delivery optimize",
+    "consumer_use_cases": [
+      "choose delivery",
+      "compare fees"
+    ],
+    "keywords": [
+      "meal delivery",
+      "doordash",
+      "ubereats",
+      "delivery"
+    ]
+  },
+  {
+    "super_category": "FoodDining",
+    "niche_id": "FoodDining/cooking-assistant",
+    "niche_label": "FoodDining - Cooking assistant",
+    "consumer_use_cases": [
+      "cook step-by-step",
+      "substitute ingredients"
+    ],
+    "keywords": [
+      "cook",
+      "recipe",
+      "kitchen",
+      "ingredient"
+    ]
+  },
+  {
+    "super_category": "FoodDining",
+    "niche_id": "FoodDining/food-allergy-scan",
+    "niche_label": "FoodDining - Food allergy scan",
+    "consumer_use_cases": [
+      "scan ingredients",
+      "avoid allergens"
+    ],
+    "keywords": [
+      "allergy",
+      "allergen",
+      "ingredient scan",
+      "label"
+    ]
+  },
+  {
+    "super_category": "FoodDining",
+    "niche_id": "FoodDining/farmers-market",
+    "niche_label": "FoodDining - Farmers market",
+    "consumer_use_cases": [
+      "find markets",
+      "plan seasonal shopping"
+    ],
+    "keywords": [
+      "farmers market",
+      "seasonal",
+      "produce",
+      "local food"
+    ]
+  },
+  {
+    "super_category": "FoodDining",
+    "niche_id": "FoodDining/calorie-tracking",
+    "niche_label": "FoodDining - Calorie tracking",
+    "consumer_use_cases": [
+      "log meals",
+      "track nutrition"
+    ],
+    "keywords": [
+      "calorie",
+      "macro",
+      "nutrition",
+      "food log"
+    ]
+  },
+  {
+    "super_category": "FoodDining",
+    "niche_id": "FoodDining/cocktail-recipes",
+    "niche_label": "FoodDining - Cocktail recipes",
+    "consumer_use_cases": [
+      "mix drinks",
+      "use bar ingredients"
+    ],
+    "keywords": [
+      "cocktail",
+      "drink",
+      "bar",
+      "mixology"
+    ]
+  },
+  {
+    "super_category": "EntertainmentMedia",
+    "niche_id": "EntertainmentMedia/movie-picker",
+    "niche_label": "EntertainmentMedia - Movie picker",
+    "consumer_use_cases": [
+      "choose a movie",
+      "match group taste"
+    ],
+    "keywords": [
+      "movie",
+      "film",
+      "cinema",
+      "watch"
+    ]
+  },
+  {
+    "super_category": "EntertainmentMedia",
+    "niche_id": "EntertainmentMedia/book-recommendations",
+    "niche_label": "EntertainmentMedia - Book recommendations",
+    "consumer_use_cases": [
+      "find books",
+      "track reading"
+    ],
+    "keywords": [
+      "book",
+      "reading",
+      "novel",
+      "library"
+    ]
+  },
+  {
+    "super_category": "EntertainmentMedia",
+    "niche_id": "EntertainmentMedia/podcast-discovery",
+    "niche_label": "EntertainmentMedia - Podcast discovery",
+    "consumer_use_cases": [
+      "find podcasts",
+      "summarize episodes"
+    ],
+    "keywords": [
+      "podcast",
+      "episode",
+      "audio show",
+      "listen"
+    ]
+  },
+  {
+    "super_category": "EntertainmentMedia",
+    "niche_id": "EntertainmentMedia/gaming-companion",
+    "niche_label": "EntertainmentMedia - Gaming companion",
+    "consumer_use_cases": [
+      "get game help",
+      "track quests"
+    ],
+    "keywords": [
+      "game",
+      "gaming",
+      "xbox",
+      "playstation"
+    ]
+  },
+  {
+    "super_category": "EntertainmentMedia",
+    "niche_id": "EntertainmentMedia/fan-community",
+    "niche_label": "EntertainmentMedia - Fan community",
+    "consumer_use_cases": [
+      "follow fandom",
+      "summarize updates"
+    ],
+    "keywords": [
+      "fan",
+      "fandom",
+      "community",
+      "creator"
+    ]
+  },
+  {
+    "super_category": "EntertainmentMedia",
+    "niche_id": "EntertainmentMedia/event-tickets",
+    "niche_label": "EntertainmentMedia - Event tickets",
+    "consumer_use_cases": [
+      "find tickets",
+      "compare seats"
+    ],
+    "keywords": [
+      "ticket",
+      "concert",
+      "event",
+      "show"
+    ]
+  },
+  {
+    "super_category": "EntertainmentMedia",
+    "niche_id": "EntertainmentMedia/streaming-optimize",
+    "niche_label": "EntertainmentMedia - Streaming optimize",
+    "consumer_use_cases": [
+      "find where to watch",
+      "manage services"
+    ],
+    "keywords": [
+      "streaming",
+      "netflix",
+      "hulu",
+      "watchlist"
+    ]
+  },
+  {
+    "super_category": "EntertainmentMedia",
+    "niche_id": "EntertainmentMedia/creative-writing-hobby",
+    "niche_label": "EntertainmentMedia - Creative writing hobby",
+    "consumer_use_cases": [
+      "write stories",
+      "develop characters"
+    ],
+    "keywords": [
+      "creative writing",
+      "story",
+      "fiction",
+      "writing"
+    ]
+  },
+  {
+    "super_category": "EntertainmentMedia",
+    "niche_id": "EntertainmentMedia/photo-editing-consumer",
+    "niche_label": "EntertainmentMedia - Photo editing consumer",
+    "consumer_use_cases": [
+      "edit photos",
+      "organize images"
+    ],
+    "keywords": [
+      "photo",
+      "image",
+      "editing",
+      "album"
+    ]
+  },
+  {
+    "super_category": "EntertainmentMedia",
+    "niche_id": "EntertainmentMedia/music-discovery",
+    "niche_label": "EntertainmentMedia - Music discovery",
+    "consumer_use_cases": [
+      "find music",
+      "build playlists"
+    ],
+    "keywords": [
+      "music",
+      "playlist",
+      "song",
+      "artist"
+    ]
+  },
+  {
+    "super_category": "LegalConsumer",
+    "niche_id": "LegalConsumer/tenant-rights",
+    "niche_label": "LegalConsumer - Tenant rights",
+    "consumer_use_cases": [
+      "understand lease",
+      "prepare landlord letter"
+    ],
+    "keywords": [
+      "tenant",
+      "rent",
+      "lease",
+      "landlord"
+    ]
+  },
+  {
+    "super_category": "LegalConsumer",
+    "niche_id": "LegalConsumer/small-claims",
+    "niche_label": "LegalConsumer - Small claims",
+    "consumer_use_cases": [
+      "prepare claim",
+      "organize evidence"
+    ],
+    "keywords": [
+      "small claims",
+      "court",
+      "claim",
+      "dispute"
+    ]
+  },
+  {
+    "super_category": "LegalConsumer",
+    "niche_id": "LegalConsumer/contract-simplify",
+    "niche_label": "LegalConsumer - Contract simplify",
+    "consumer_use_cases": [
+      "explain contract",
+      "spot risky clauses"
+    ],
+    "keywords": [
+      "contract",
+      "terms",
+      "agreement",
+      "legal"
+    ]
+  },
+  {
+    "super_category": "LegalConsumer",
+    "niche_id": "LegalConsumer/immigration-consumer",
+    "niche_label": "LegalConsumer - Immigration consumer",
+    "consumer_use_cases": [
+      "prepare forms",
+      "understand process"
+    ],
+    "keywords": [
+      "immigration",
+      "visa",
+      "uscis",
+      "green card"
+    ]
+  },
+  {
+    "super_category": "LegalConsumer",
+    "niche_id": "LegalConsumer/estate-planning-lite",
+    "niche_label": "LegalConsumer - Estate planning lite",
+    "consumer_use_cases": [
+      "draft checklist",
+      "explain will basics"
+    ],
+    "keywords": [
+      "estate",
+      "will",
+      "trust",
+      "beneficiary"
+    ]
+  },
+  {
+    "super_category": "LegalConsumer",
+    "niche_id": "LegalConsumer/consumer-disputes",
+    "niche_label": "LegalConsumer - Consumer disputes",
+    "consumer_use_cases": [
+      "draft complaint",
+      "track dispute"
+    ],
+    "keywords": [
+      "consumer dispute",
+      "chargeback",
+      "complaint",
+      "refund"
+    ]
+  },
+  {
+    "super_category": "LegalConsumer",
+    "niche_id": "LegalConsumer/ip-for-creators",
+    "niche_label": "LegalConsumer - IP for creators",
+    "consumer_use_cases": [
+      "understand copyright",
+      "protect creative work"
+    ],
+    "keywords": [
+      "copyright",
+      "trademark",
+      "creator",
+      "ip"
+    ]
+  },
+  {
+    "super_category": "LegalConsumer",
+    "niche_id": "LegalConsumer/privacy-rights",
+    "niche_label": "LegalConsumer - Privacy rights",
+    "consumer_use_cases": [
+      "request data deletion",
+      "understand privacy"
+    ],
+    "keywords": [
+      "privacy",
+      "data rights",
+      "gdpr",
+      "ccpa"
+    ]
+  },
+  {
+    "super_category": "LegalConsumer",
+    "niche_id": "LegalConsumer/notary-docs",
+    "niche_label": "LegalConsumer - Notary documents",
+    "consumer_use_cases": [
+      "prepare notarization",
+      "check document needs"
+    ],
+    "keywords": [
+      "notary",
+      "notarize",
+      "document",
+      "signature"
+    ]
+  },
+  {
+    "super_category": "LegalConsumer",
+    "niche_id": "LegalConsumer/traffic-tickets",
+    "niche_label": "LegalConsumer - Traffic tickets",
+    "consumer_use_cases": [
+      "understand citation",
+      "prepare response"
+    ],
+    "keywords": [
+      "traffic ticket",
+      "citation",
+      "dmv",
+      "parking ticket"
+    ]
+  },
+  {
+    "super_category": "RealEstate",
+    "niche_id": "RealEstate/rent-vs-buy",
+    "niche_label": "RealEstate - Rent vs buy",
+    "consumer_use_cases": [
+      "compare rent and buy",
+      "estimate affordability"
+    ],
+    "keywords": [
+      "rent vs buy",
+      "mortgage",
+      "rent",
+      "affordability"
+    ]
+  },
+  {
+    "super_category": "RealEstate",
+    "niche_id": "RealEstate/apartment-search",
+    "niche_label": "RealEstate - Apartment search",
+    "consumer_use_cases": [
+      "find apartments",
+      "compare listings"
+    ],
+    "keywords": [
+      "apartment",
+      "rental",
+      "lease",
+      "listing"
+    ]
+  },
+  {
+    "super_category": "RealEstate",
+    "niche_id": "RealEstate/mortgage-estimate",
+    "niche_label": "RealEstate - Mortgage estimate",
+    "consumer_use_cases": [
+      "estimate mortgage",
+      "compare rates"
+    ],
+    "keywords": [
+      "mortgage",
+      "home loan",
+      "rate",
+      "down payment"
+    ]
+  },
+  {
+    "super_category": "RealEstate",
+    "niche_id": "RealEstate/home-inspection-qa",
+    "niche_label": "RealEstate - Home inspection QA",
+    "consumer_use_cases": [
+      "review inspection",
+      "ask repair questions"
+    ],
+    "keywords": [
+      "home inspection",
+      "inspection",
+      "repair",
+      "property"
+    ]
+  },
+  {
+    "super_category": "RealEstate",
+    "niche_id": "RealEstate/neighborhood-research",
+    "niche_label": "RealEstate - Neighborhood research",
+    "consumer_use_cases": [
+      "compare neighborhoods",
+      "check commute"
+    ],
+    "keywords": [
+      "neighborhood",
+      "schools",
+      "crime",
+      "commute"
+    ]
+  },
+  {
+    "super_category": "RealEstate",
+    "niche_id": "RealEstate/listing-description",
+    "niche_label": "RealEstate - Listing description",
+    "consumer_use_cases": [
+      "write listing",
+      "improve photos copy"
+    ],
+    "keywords": [
+      "real estate listing",
+      "listing",
+      "zillow",
+      "realtor"
+    ]
+  },
+  {
+    "super_category": "RealEstate",
+    "niche_id": "RealEstate/open-house-scheduler",
+    "niche_label": "RealEstate - Open house scheduler",
+    "consumer_use_cases": [
+      "schedule visits",
+      "track showings"
+    ],
+    "keywords": [
+      "open house",
+      "showing",
+      "tour home",
+      "scheduler"
+    ]
+  },
+  {
+    "super_category": "RealEstate",
+    "niche_id": "RealEstate/hoa-questions",
+    "niche_label": "RealEstate - HOA questions",
+    "consumer_use_cases": [
+      "understand HOA rules",
+      "summarize fees"
+    ],
+    "keywords": [
+      "hoa",
+      "homeowners association",
+      "condo",
+      "bylaws"
+    ]
+  },
+  {
+    "super_category": "RealEstate",
+    "niche_id": "RealEstate/renovation-estimate",
+    "niche_label": "RealEstate - Renovation estimate",
+    "consumer_use_cases": [
+      "scope renovation",
+      "estimate costs"
+    ],
+    "keywords": [
+      "renovation",
+      "remodel",
+      "contractor",
+      "estimate"
+    ]
+  },
+  {
+    "super_category": "RealEstate",
+    "niche_id": "RealEstate/airbnb-host",
+    "niche_label": "RealEstate - Airbnb host",
+    "consumer_use_cases": [
+      "optimize listing",
+      "reply to guests"
+    ],
+    "keywords": [
+      "airbnb",
+      "short term rental",
+      "guest",
+      "host"
+    ]
+  },
+  {
+    "super_category": "Automotive",
+    "niche_id": "Automotive/buy-car-research",
+    "niche_label": "Automotive - Buy car research",
+    "consumer_use_cases": [
+      "compare cars",
+      "understand prices"
+    ],
+    "keywords": [
+      "car",
+      "vehicle",
+      "auto",
+      "buy car"
+    ]
+  },
+  {
+    "super_category": "Automotive",
+    "niche_id": "Automotive/maintenance-schedule",
+    "niche_label": "Automotive - Maintenance schedule",
+    "consumer_use_cases": [
+      "track service",
+      "diagnose maintenance"
+    ],
+    "keywords": [
+      "maintenance",
+      "oil change",
+      "service",
+      "mechanic"
+    ]
+  },
+  {
+    "super_category": "Automotive",
+    "niche_id": "Automotive/ev-charging-route",
+    "niche_label": "Automotive - EV charging route",
+    "consumer_use_cases": [
+      "plan charging stops",
+      "compare chargers"
+    ],
+    "keywords": [
+      "ev",
+      "charging",
+      "electric vehicle",
+      "charger"
+    ]
+  },
+  {
+    "super_category": "Automotive",
+    "niche_id": "Automotive/insurance-quote",
+    "niche_label": "Automotive - Insurance quote",
+    "consumer_use_cases": [
+      "compare auto insurance",
+      "understand policy"
+    ],
+    "keywords": [
+      "auto insurance",
+      "car insurance",
+      "quote",
+      "premium"
+    ]
+  },
+  {
+    "super_category": "Automotive",
+    "niche_id": "Automotive/parking-finder",
+    "niche_label": "Automotive - Parking finder",
+    "consumer_use_cases": [
+      "find parking",
+      "compare garages"
+    ],
+    "keywords": [
+      "parking",
+      "garage",
+      "meter",
+      "spot"
+    ]
+  },
+  {
+    "super_category": "Automotive",
+    "niche_id": "Automotive/used-car-inspection",
+    "niche_label": "Automotive - Used car inspection",
+    "consumer_use_cases": [
+      "inspect used car",
+      "check history"
+    ],
+    "keywords": [
+      "used car",
+      "vin",
+      "inspection",
+      "carfax"
+    ]
+  },
+  {
+    "super_category": "Automotive",
+    "niche_id": "Automotive/ride-cost-compare",
+    "niche_label": "Automotive - Ride cost compare",
+    "consumer_use_cases": [
+      "compare rides",
+      "estimate commute cost"
+    ],
+    "keywords": [
+      "rideshare",
+      "uber",
+      "lyft",
+      "ride"
+    ]
+  },
+  {
+    "super_category": "Automotive",
+    "niche_id": "Automotive/dmv-paperwork",
+    "niche_label": "Automotive - DMV paperwork",
+    "consumer_use_cases": [
+      "prepare DMV forms",
+      "renew registration"
+    ],
+    "keywords": [
+      "dmv",
+      "registration",
+      "license",
+      "title"
+    ]
+  },
+  {
+    "super_category": "Automotive",
+    "niche_id": "Automotive/road-safety",
+    "niche_label": "Automotive - Road safety",
+    "consumer_use_cases": [
+      "prepare safe route",
+      "learn driving rules"
+    ],
+    "keywords": [
+      "road safety",
+      "driving",
+      "traffic",
+      "route safety"
+    ]
+  },
+  {
+    "super_category": "Automotive",
+    "niche_id": "Automotive/fleet-family",
+    "niche_label": "Automotive - Family fleet",
+    "consumer_use_cases": [
+      "manage family cars",
+      "track documents"
+    ],
+    "keywords": [
+      "family car",
+      "fleet",
+      "vehicle documents",
+      "registration"
+    ]
+  },
+  {
+    "super_category": "SportsOutdoors",
+    "niche_id": "SportsOutdoors/workout-plans",
+    "niche_label": "SportsOutdoors - Workout plans",
+    "consumer_use_cases": [
+      "build workouts",
+      "adjust training"
+    ],
+    "keywords": [
+      "workout",
+      "strength",
+      "exercise",
+      "training"
+    ]
+  },
+  {
+    "super_category": "SportsOutdoors",
+    "niche_id": "SportsOutdoors/running-coach",
+    "niche_label": "SportsOutdoors - Running coach",
+    "consumer_use_cases": [
+      "plan runs",
+      "pace workouts"
+    ],
+    "keywords": [
+      "running",
+      "runner",
+      "pace",
+      "5k"
+    ]
+  },
+  {
+    "super_category": "SportsOutdoors",
+    "niche_id": "SportsOutdoors/hiking-trails",
+    "niche_label": "SportsOutdoors - Hiking trails",
+    "consumer_use_cases": [
+      "find trails",
+      "check difficulty"
+    ],
+    "keywords": [
+      "hiking",
+      "trail",
+      "outdoor",
+      "backpacking"
+    ]
+  },
+  {
+    "super_category": "SportsOutdoors",
+    "niche_id": "SportsOutdoors/sports-betting-info",
+    "niche_label": "SportsOutdoors - Sports betting info",
+    "consumer_use_cases": [
+      "compare odds",
+      "understand risk"
+    ],
+    "keywords": [
+      "sports betting",
+      "odds",
+      "wager",
+      "bet"
+    ]
+  },
+  {
+    "super_category": "SportsOutdoors",
+    "niche_id": "SportsOutdoors/fantasy-sports",
+    "niche_label": "SportsOutdoors - Fantasy sports",
+    "consumer_use_cases": [
+      "set lineup",
+      "analyze players"
+    ],
+    "keywords": [
+      "fantasy sports",
+      "fantasy football",
+      "lineup",
+      "draft"
+    ]
+  },
+  {
+    "super_category": "SportsOutdoors",
+    "niche_id": "SportsOutdoors/ski-conditions",
+    "niche_label": "SportsOutdoors - Ski conditions",
+    "consumer_use_cases": [
+      "check snow",
+      "plan ski day"
+    ],
+    "keywords": [
+      "ski",
+      "snowboard",
+      "snow",
+      "resort"
+    ]
+  },
+  {
+    "super_category": "SportsOutdoors",
+    "niche_id": "SportsOutdoors/fishing-spots",
+    "niche_label": "SportsOutdoors - Fishing spots",
+    "consumer_use_cases": [
+      "find fishing areas",
+      "check conditions"
+    ],
+    "keywords": [
+      "fishing",
+      "fish",
+      "angler",
+      "lake"
+    ]
+  },
+  {
+    "super_category": "SportsOutdoors",
+    "niche_id": "SportsOutdoors/team-schedule-family",
+    "niche_label": "SportsOutdoors - Team schedule family",
+    "consumer_use_cases": [
+      "track games",
+      "coordinate rides"
+    ],
+    "keywords": [
+      "team schedule",
+      "soccer",
+      "little league",
+      "sports schedule"
+    ]
+  },
+  {
+    "super_category": "SportsOutdoors",
+    "niche_id": "SportsOutdoors/outdoor-gear",
+    "niche_label": "SportsOutdoors - Outdoor gear",
+    "consumer_use_cases": [
+      "choose gear",
+      "compare equipment"
+    ],
+    "keywords": [
+      "outdoor gear",
+      "camping",
+      "gear",
+      "tent"
+    ]
+  },
+  {
+    "super_category": "SportsOutdoors",
+    "niche_id": "SportsOutdoors/marathon-training",
+    "niche_label": "SportsOutdoors - Marathon training",
+    "consumer_use_cases": [
+      "train for race",
+      "manage mileage"
+    ],
+    "keywords": [
+      "marathon",
+      "race",
+      "training plan",
+      "long run"
+    ]
+  },
+  {
+    "super_category": "SocialCommunity",
+    "niche_id": "SocialCommunity/dating-profile-coach",
+    "niche_label": "SocialCommunity - Dating profile coach",
+    "consumer_use_cases": [
+      "rewrite profile",
+      "choose photos"
+    ],
+    "keywords": [
+      "dating",
+      "profile",
+      "match",
+      "relationship"
+    ]
+  },
+  {
+    "super_category": "SocialCommunity",
+    "niche_id": "SocialCommunity/event-planning-social",
+    "niche_label": "SocialCommunity - Event planning social",
+    "consumer_use_cases": [
+      "plan party",
+      "coordinate guests"
+    ],
+    "keywords": [
+      "party",
+      "event planning",
+      "invite",
+      "rsvp"
+    ]
+  },
+  {
+    "super_category": "SocialCommunity",
+    "niche_id": "SocialCommunity/volunteer-matching",
+    "niche_label": "SocialCommunity - Volunteer matching",
+    "consumer_use_cases": [
+      "find volunteer work",
+      "match causes"
+    ],
+    "keywords": [
+      "volunteer",
+      "charity",
+      "nonprofit",
+      "cause"
+    ]
+  },
+  {
+    "super_category": "SocialCommunity",
+    "niche_id": "SocialCommunity/neighborhood-help",
+    "niche_label": "SocialCommunity - Neighborhood help",
+    "consumer_use_cases": [
+      "find local help",
+      "ask neighbors"
+    ],
+    "keywords": [
+      "neighborhood",
+      "neighbor",
+      "local help",
+      "community"
+    ]
+  },
+  {
+    "super_category": "SocialCommunity",
+    "niche_id": "SocialCommunity/club-organizer",
+    "niche_label": "SocialCommunity - Club organizer",
+    "consumer_use_cases": [
+      "organize club",
+      "schedule meetups"
+    ],
+    "keywords": [
+      "club",
+      "meetup",
+      "organizer",
+      "group"
+    ]
+  },
+  {
+    "super_category": "SocialCommunity",
+    "niche_id": "SocialCommunity/pen-pal-language",
+    "niche_label": "SocialCommunity - Pen pal language",
+    "consumer_use_cases": [
+      "find language partner",
+      "practice messages"
+    ],
+    "keywords": [
+      "pen pal",
+      "language partner",
+      "exchange",
+      "practice"
+    ]
+  },
+  {
+    "super_category": "SocialCommunity",
+    "niche_id": "SocialCommunity/support-groups",
+    "niche_label": "SocialCommunity - Support groups",
+    "consumer_use_cases": [
+      "find support group",
+      "prepare questions"
+    ],
+    "keywords": [
+      "support group",
+      "peer support",
+      "recovery",
+      "community"
+    ]
+  },
+  {
+    "super_category": "SocialCommunity",
+    "niche_id": "SocialCommunity/hobby-clubs",
+    "niche_label": "SocialCommunity - Hobby clubs",
+    "consumer_use_cases": [
+      "find hobby group",
+      "coordinate activities"
+    ],
+    "keywords": [
+      "hobby",
+      "club",
+      "craft group",
+      "activity"
+    ]
+  },
+  {
+    "super_category": "SocialCommunity",
+    "niche_id": "SocialCommunity/civic-engagement",
+    "niche_label": "SocialCommunity - Civic engagement",
+    "consumer_use_cases": [
+      "track local issues",
+      "contact officials"
+    ],
+    "keywords": [
+      "civic",
+      "vote",
+      "city council",
+      "election"
+    ]
+  },
+  {
+    "super_category": "SocialCommunity",
+    "niche_id": "SocialCommunity/alumni-network",
+    "niche_label": "SocialCommunity - Alumni network",
+    "consumer_use_cases": [
+      "find alumni",
+      "plan reunion"
+    ],
+    "keywords": [
+      "alumni",
+      "reunion",
+      "school network",
+      "graduate"
+    ]
+  },
+  {
+    "super_category": "ProductivityPersonal",
+    "niche_id": "ProductivityPersonal/email-triage-consumer",
+    "niche_label": "ProductivityPersonal - Email triage consumer",
+    "consumer_use_cases": [
+      "sort personal email",
+      "draft replies"
+    ],
+    "keywords": [
+      "email",
+      "inbox",
+      "gmail",
+      "triage"
+    ]
+  },
+  {
+    "super_category": "ProductivityPersonal",
+    "niche_id": "ProductivityPersonal/calendar-optimize",
+    "niche_label": "ProductivityPersonal - Calendar optimize",
+    "consumer_use_cases": [
+      "schedule day",
+      "protect focus time"
+    ],
+    "keywords": [
+      "calendar",
+      "schedule",
+      "appointment",
+      "time"
+    ]
+  },
+  {
+    "super_category": "ProductivityPersonal",
+    "niche_id": "ProductivityPersonal/habit-tracking",
+    "niche_label": "ProductivityPersonal - Habit tracking",
+    "consumer_use_cases": [
+      "track habits",
+      "build streaks"
+    ],
+    "keywords": [
+      "habit",
+      "routine",
+      "streak",
+      "accountability"
+    ]
+  },
+  {
+    "super_category": "ProductivityPersonal",
+    "niche_id": "ProductivityPersonal/goal-accountability",
+    "niche_label": "ProductivityPersonal - Goal accountability",
+    "consumer_use_cases": [
+      "set goals",
+      "check progress"
+    ],
+    "keywords": [
+      "goal",
+      "accountability",
+      "progress",
+      "coach"
+    ]
+  },
+  {
+    "super_category": "ProductivityPersonal",
+    "niche_id": "ProductivityPersonal/journaling",
+    "niche_label": "ProductivityPersonal - Journaling",
+    "consumer_use_cases": [
+      "reflect daily",
+      "summarize journal"
+    ],
+    "keywords": [
+      "journal",
+      "diary",
+      "reflection",
+      "mood"
+    ]
+  },
+  {
+    "super_category": "ProductivityPersonal",
+    "niche_id": "ProductivityPersonal/meeting-notes-personal",
+    "niche_label": "ProductivityPersonal - Meeting notes personal",
+    "consumer_use_cases": [
+      "summarize calls",
+      "extract tasks"
+    ],
+    "keywords": [
+      "meeting notes",
+      "transcript",
+      "notes",
+      "call"
+    ]
+  },
+  {
+    "super_category": "ProductivityPersonal",
+    "niche_id": "ProductivityPersonal/file-organize-home",
+    "niche_label": "ProductivityPersonal - File organize home",
+    "consumer_use_cases": [
+      "organize documents",
+      "rename files"
+    ],
+    "keywords": [
+      "file organize",
+      "documents",
+      "photos",
+      "folders"
+    ]
+  },
+  {
+    "super_category": "ProductivityPersonal",
+    "niche_id": "ProductivityPersonal/password-lessons",
+    "niche_label": "ProductivityPersonal - Password lessons",
+    "consumer_use_cases": [
+      "learn password safety",
+      "organize accounts"
+    ],
+    "keywords": [
+      "password",
+      "security",
+      "account",
+      "login"
+    ]
+  },
+  {
+    "super_category": "ProductivityPersonal",
+    "niche_id": "ProductivityPersonal/focus-pomodoro",
+    "niche_label": "ProductivityPersonal - Focus pomodoro",
+    "consumer_use_cases": [
+      "run focus sessions",
+      "avoid distractions"
+    ],
+    "keywords": [
+      "focus",
+      "pomodoro",
+      "timer",
+      "distraction"
+    ]
+  },
+  {
+    "super_category": "ProductivityPersonal",
+    "niche_id": "ProductivityPersonal/life-admin",
+    "niche_label": "ProductivityPersonal - Life admin",
+    "consumer_use_cases": [
+      "track paperwork",
+      "manage errands"
+    ],
+    "keywords": [
+      "life admin",
+      "errand",
+      "paperwork",
+      "personal admin"
+    ]
+  },
+  {
+    "super_category": "CreativeHobbies",
+    "niche_id": "CreativeHobbies/art-prompt",
+    "niche_label": "CreativeHobbies - Art prompt",
+    "consumer_use_cases": [
+      "generate art prompts",
+      "iterate styles"
+    ],
+    "keywords": [
+      "art prompt",
+      "image generation",
+      "drawing",
+      "art"
+    ]
+  },
+  {
+    "super_category": "CreativeHobbies",
+    "niche_id": "CreativeHobbies/3d-print-design-lite",
+    "niche_label": "CreativeHobbies - 3D print design lite",
+    "consumer_use_cases": [
+      "make printable models",
+      "fix simple designs"
+    ],
+    "keywords": [
+      "3d print",
+      "stl",
+      "maker",
+      "model"
+    ]
+  },
+  {
+    "super_category": "CreativeHobbies",
+    "niche_id": "CreativeHobbies/woodworking-plans",
+    "niche_label": "CreativeHobbies - Woodworking plans",
+    "consumer_use_cases": [
+      "plan projects",
+      "cut list"
+    ],
+    "keywords": [
+      "woodworking",
+      "wood",
+      "project plan",
+      "carpentry"
+    ]
+  },
+  {
+    "super_category": "CreativeHobbies",
+    "niche_id": "CreativeHobbies/knitting-patterns",
+    "niche_label": "CreativeHobbies - Knitting patterns",
+    "consumer_use_cases": [
+      "adapt pattern",
+      "track rows"
+    ],
+    "keywords": [
+      "knitting",
+      "crochet",
+      "yarn",
+      "pattern"
+    ]
+  },
+  {
+    "super_category": "CreativeHobbies",
+    "niche_id": "CreativeHobbies/photography-coach",
+    "niche_label": "CreativeHobbies - Photography coach",
+    "consumer_use_cases": [
+      "improve photos",
+      "learn camera settings"
+    ],
+    "keywords": [
+      "photography",
+      "camera",
+      "photo",
+      "lens"
+    ]
+  },
+  {
+    "super_category": "CreativeHobbies",
+    "niche_id": "CreativeHobbies/songwriting",
+    "niche_label": "CreativeHobbies - Songwriting",
+    "consumer_use_cases": [
+      "write lyrics",
+      "shape melody ideas"
+    ],
+    "keywords": [
+      "songwriting",
+      "song",
+      "lyrics",
+      "music"
+    ]
+  },
+  {
+    "super_category": "CreativeHobbies",
+    "niche_id": "CreativeHobbies/meme-maker",
+    "niche_label": "CreativeHobbies - Meme maker",
+    "consumer_use_cases": [
+      "make memes",
+      "caption images"
+    ],
+    "keywords": [
+      "meme",
+      "caption",
+      "viral",
+      "image"
+    ]
+  },
+  {
+    "super_category": "CreativeHobbies",
+    "niche_id": "CreativeHobbies/scrapbook",
+    "niche_label": "CreativeHobbies - Scrapbook",
+    "consumer_use_cases": [
+      "design pages",
+      "organize memories"
+    ],
+    "keywords": [
+      "scrapbook",
+      "memory",
+      "album",
+      "craft"
+    ]
+  },
+  {
+    "super_category": "CreativeHobbies",
+    "niche_id": "CreativeHobbies/calligraphy",
+    "niche_label": "CreativeHobbies - Calligraphy",
+    "consumer_use_cases": [
+      "practice lettering",
+      "plan invitations"
+    ],
+    "keywords": [
+      "calligraphy",
+      "lettering",
+      "handwriting",
+      "ink"
+    ]
+  },
+  {
+    "super_category": "CreativeHobbies",
+    "niche_id": "CreativeHobbies/diy-crafts",
+    "niche_label": "CreativeHobbies - DIY crafts",
+    "consumer_use_cases": [
+      "plan crafts",
+      "adapt materials"
+    ],
+    "keywords": [
+      "diy",
+      "craft",
+      "make",
+      "handmade"
+    ]
+  }
+]

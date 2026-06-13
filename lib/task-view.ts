@@ -33,6 +33,7 @@ export interface TaskDoc {
   bid_window_closes_at: number;
   winning_bid_id?: string;
   price_paid?: number;
+  payment_status?: string;
   result?:
     | {
         text: string;
@@ -66,6 +67,19 @@ export interface EscrowDoc {
   buyer_id: string;
   seller_id: string;
   locked_amount: number;
+  payment_processor?: string;
+  payment_status?: string;
+  stripe_checkout_session_id?: string;
+  stripe_payment_intent_id?: string;
+  stripe_charge_id?: string;
+  stripe_connected_account_id?: string;
+  stripe_application_fee_amount?: number;
+  stripe_currency?: string;
+  payment_required_at?: number;
+  payment_authorized_at?: number;
+  payment_captured_at?: number;
+  payment_canceled_at?: number;
+  payment_last_error?: string;
   status: EscrowStatus;
 }
 

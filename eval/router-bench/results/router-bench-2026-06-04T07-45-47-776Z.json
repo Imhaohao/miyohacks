@@ -1,0 +1,905 @@
+{
+  "generatedAt": "2026-06-04T07-45-47-776Z",
+  "pool": [
+    "stripe-payments",
+    "notion-workspace",
+    "github-engineering",
+    "linear-issues",
+    "vercel-deploy",
+    "supabase-backend",
+    "sentry-observability",
+    "atlassian-suite",
+    "neon-postgres",
+    "figma-design"
+  ],
+  "scores": [
+    {
+      "strategy": "random",
+      "ran": true,
+      "n": 22,
+      "acc1": 0.045454545454545456,
+      "acc3": 0.3181818181818182,
+      "mrr": 0.2910894660894661,
+      "acc1_adversarial": 0,
+      "acc1_plain": 0.0625,
+      "perDomainAcc1": {
+        "payments": 0,
+        "docs": 0,
+        "code": 0,
+        "issues": 0,
+        "deploy": 0,
+        "backend": 0.5,
+        "database": 0,
+        "observability": 0,
+        "atlassian": 0,
+        "design": 0
+      },
+      "taskScores": [
+        {
+          "taskId": "pay-connect",
+          "domain": "payments",
+          "adversarial": true,
+          "picked": "sentry-observability",
+          "top1": false,
+          "top3": false,
+          "rr": 0.1
+        },
+        {
+          "taskId": "pay-subscriptions",
+          "domain": "payments",
+          "adversarial": false,
+          "picked": "linear-issues",
+          "top1": false,
+          "top3": false,
+          "rr": 0.16666666666666666
+        },
+        {
+          "taskId": "pay-checkout-failing",
+          "domain": "payments",
+          "adversarial": true,
+          "picked": "sentry-observability",
+          "top1": false,
+          "top3": false,
+          "rr": 0.1
+        },
+        {
+          "taskId": "pay-refund",
+          "domain": "payments",
+          "adversarial": false,
+          "picked": "notion-workspace",
+          "top1": false,
+          "top3": false,
+          "rr": 0.1
+        },
+        {
+          "taskId": "docs-wiki",
+          "domain": "docs",
+          "adversarial": false,
+          "picked": "supabase-backend",
+          "top1": false,
+          "top3": false,
+          "rr": 0.25
+        },
+        {
+          "taskId": "code-fix-pr",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "atlassian-suite",
+          "top1": false,
+          "top3": true,
+          "rr": 0.3333333333333333
+        },
+        {
+          "taskId": "code-ci-review",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "vercel-deploy",
+          "top1": false,
+          "top3": false,
+          "rr": 0.125
+        },
+        {
+          "taskId": "issues-triage",
+          "domain": "issues",
+          "adversarial": false,
+          "picked": "sentry-observability",
+          "top1": false,
+          "top3": false,
+          "rr": 0.25
+        },
+        {
+          "taskId": "issues-roadmap",
+          "domain": "issues",
+          "adversarial": false,
+          "picked": "vercel-deploy",
+          "top1": false,
+          "top3": false,
+          "rr": 0.25
+        },
+        {
+          "taskId": "deploy-landing",
+          "domain": "deploy",
+          "adversarial": false,
+          "picked": "neon-postgres",
+          "top1": false,
+          "top3": false,
+          "rr": 0.2
+        },
+        {
+          "taskId": "deploy-edge-logs",
+          "domain": "deploy",
+          "adversarial": false,
+          "picked": "stripe-payments",
+          "top1": false,
+          "top3": false,
+          "rr": 0.125
+        },
+        {
+          "taskId": "backend-auth-storage",
+          "domain": "backend",
+          "adversarial": false,
+          "picked": "supabase-backend",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "backend-login",
+          "domain": "backend",
+          "adversarial": true,
+          "picked": "vercel-deploy",
+          "top1": false,
+          "top3": true,
+          "rr": 0.5
+        },
+        {
+          "taskId": "db-branch-migrate",
+          "domain": "database",
+          "adversarial": false,
+          "picked": "sentry-observability",
+          "top1": false,
+          "top3": true,
+          "rr": 0.5
+        },
+        {
+          "taskId": "db-sql-query",
+          "domain": "database",
+          "adversarial": false,
+          "picked": "sentry-observability",
+          "top1": false,
+          "top3": false,
+          "rr": 0.2
+        },
+        {
+          "taskId": "obs-error-spike",
+          "domain": "observability",
+          "adversarial": false,
+          "picked": "supabase-backend",
+          "top1": false,
+          "top3": true,
+          "rr": 0.5
+        },
+        {
+          "taskId": "obs-alert-config",
+          "domain": "observability",
+          "adversarial": true,
+          "picked": "notion-workspace",
+          "top1": false,
+          "top3": true,
+          "rr": 0.5
+        },
+        {
+          "taskId": "atlassian-sprint",
+          "domain": "atlassian",
+          "adversarial": false,
+          "picked": "vercel-deploy",
+          "top1": false,
+          "top3": false,
+          "rr": 0.14285714285714285
+        },
+        {
+          "taskId": "design-tokens",
+          "domain": "design",
+          "adversarial": false,
+          "picked": "neon-postgres",
+          "top1": false,
+          "top3": false,
+          "rr": 0.1111111111111111
+        },
+        {
+          "taskId": "design-system",
+          "domain": "design",
+          "adversarial": true,
+          "picked": "sentry-observability",
+          "top1": false,
+          "top3": false,
+          "rr": 0.2
+        },
+        {
+          "taskId": "docs-postmortem",
+          "domain": "docs",
+          "adversarial": true,
+          "picked": "github-engineering",
+          "top1": false,
+          "top3": true,
+          "rr": 0.5
+        },
+        {
+          "taskId": "code-search-issue",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "stripe-payments",
+          "top1": false,
+          "top3": false,
+          "rr": 0.25
+        }
+      ]
+    },
+    {
+      "strategy": "lexical",
+      "ran": true,
+      "n": 22,
+      "acc1": 0.9545454545454546,
+      "acc3": 0.9545454545454546,
+      "mrr": 0.9636363636363636,
+      "acc1_adversarial": 0.8333333333333334,
+      "acc1_plain": 1,
+      "perDomainAcc1": {
+        "payments": 1,
+        "docs": 1,
+        "code": 1,
+        "issues": 1,
+        "deploy": 1,
+        "backend": 0.5,
+        "database": 1,
+        "observability": 1,
+        "atlassian": 1,
+        "design": 1
+      },
+      "taskScores": [
+        {
+          "taskId": "pay-connect",
+          "domain": "payments",
+          "adversarial": true,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "pay-subscriptions",
+          "domain": "payments",
+          "adversarial": false,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "pay-checkout-failing",
+          "domain": "payments",
+          "adversarial": true,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "pay-refund",
+          "domain": "payments",
+          "adversarial": false,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "docs-wiki",
+          "domain": "docs",
+          "adversarial": false,
+          "picked": "notion-workspace",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "code-fix-pr",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "github-engineering",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "code-ci-review",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "github-engineering",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "issues-triage",
+          "domain": "issues",
+          "adversarial": false,
+          "picked": "linear-issues",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "issues-roadmap",
+          "domain": "issues",
+          "adversarial": false,
+          "picked": "linear-issues",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "deploy-landing",
+          "domain": "deploy",
+          "adversarial": false,
+          "picked": "vercel-deploy",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "deploy-edge-logs",
+          "domain": "deploy",
+          "adversarial": false,
+          "picked": "vercel-deploy",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "backend-auth-storage",
+          "domain": "backend",
+          "adversarial": false,
+          "picked": "supabase-backend",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "backend-login",
+          "domain": "backend",
+          "adversarial": true,
+          "picked": "notion-workspace",
+          "top1": false,
+          "top3": false,
+          "rr": 0.2
+        },
+        {
+          "taskId": "db-branch-migrate",
+          "domain": "database",
+          "adversarial": false,
+          "picked": "neon-postgres",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "db-sql-query",
+          "domain": "database",
+          "adversarial": false,
+          "picked": "neon-postgres",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "obs-error-spike",
+          "domain": "observability",
+          "adversarial": false,
+          "picked": "sentry-observability",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "obs-alert-config",
+          "domain": "observability",
+          "adversarial": true,
+          "picked": "sentry-observability",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "atlassian-sprint",
+          "domain": "atlassian",
+          "adversarial": false,
+          "picked": "atlassian-suite",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "design-tokens",
+          "domain": "design",
+          "adversarial": false,
+          "picked": "figma-design",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "design-system",
+          "domain": "design",
+          "adversarial": true,
+          "picked": "figma-design",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "docs-postmortem",
+          "domain": "docs",
+          "adversarial": true,
+          "picked": "notion-workspace",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "code-search-issue",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "github-engineering",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        }
+      ]
+    },
+    {
+      "strategy": "embedding",
+      "ran": true,
+      "n": 22,
+      "acc1": 0.8181818181818182,
+      "acc3": 1,
+      "mrr": 0.893939393939394,
+      "acc1_adversarial": 0.5,
+      "acc1_plain": 0.9375,
+      "perDomainAcc1": {
+        "payments": 0.75,
+        "docs": 0.5,
+        "code": 1,
+        "issues": 1,
+        "deploy": 1,
+        "backend": 0.5,
+        "database": 1,
+        "observability": 0.5,
+        "atlassian": 1,
+        "design": 1
+      },
+      "taskScores": [
+        {
+          "taskId": "pay-connect",
+          "domain": "payments",
+          "adversarial": true,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "pay-subscriptions",
+          "domain": "payments",
+          "adversarial": false,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "pay-checkout-failing",
+          "domain": "payments",
+          "adversarial": true,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "pay-refund",
+          "domain": "payments",
+          "adversarial": false,
+          "picked": "github-engineering",
+          "top1": false,
+          "top3": true,
+          "rr": 0.5
+        },
+        {
+          "taskId": "docs-wiki",
+          "domain": "docs",
+          "adversarial": false,
+          "picked": "notion-workspace",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "code-fix-pr",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "github-engineering",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "code-ci-review",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "github-engineering",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "issues-triage",
+          "domain": "issues",
+          "adversarial": false,
+          "picked": "linear-issues",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "issues-roadmap",
+          "domain": "issues",
+          "adversarial": false,
+          "picked": "linear-issues",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "deploy-landing",
+          "domain": "deploy",
+          "adversarial": false,
+          "picked": "vercel-deploy",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "deploy-edge-logs",
+          "domain": "deploy",
+          "adversarial": false,
+          "picked": "vercel-deploy",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "backend-auth-storage",
+          "domain": "backend",
+          "adversarial": false,
+          "picked": "supabase-backend",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "backend-login",
+          "domain": "backend",
+          "adversarial": true,
+          "picked": "vercel-deploy",
+          "top1": false,
+          "top3": true,
+          "rr": 0.3333333333333333
+        },
+        {
+          "taskId": "db-branch-migrate",
+          "domain": "database",
+          "adversarial": false,
+          "picked": "neon-postgres",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "db-sql-query",
+          "domain": "database",
+          "adversarial": false,
+          "picked": "neon-postgres",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "obs-error-spike",
+          "domain": "observability",
+          "adversarial": false,
+          "picked": "sentry-observability",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "obs-alert-config",
+          "domain": "observability",
+          "adversarial": true,
+          "picked": "notion-workspace",
+          "top1": false,
+          "top3": true,
+          "rr": 0.3333333333333333
+        },
+        {
+          "taskId": "atlassian-sprint",
+          "domain": "atlassian",
+          "adversarial": false,
+          "picked": "atlassian-suite",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "design-tokens",
+          "domain": "design",
+          "adversarial": false,
+          "picked": "figma-design",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "design-system",
+          "domain": "design",
+          "adversarial": true,
+          "picked": "figma-design",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "docs-postmortem",
+          "domain": "docs",
+          "adversarial": true,
+          "picked": "supabase-backend",
+          "top1": false,
+          "top3": true,
+          "rr": 0.5
+        },
+        {
+          "taskId": "code-search-issue",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "github-engineering",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        }
+      ]
+    },
+    {
+      "strategy": "llm",
+      "ran": true,
+      "n": 22,
+      "acc1": 1,
+      "acc3": 1,
+      "mrr": 1,
+      "acc1_adversarial": 1,
+      "acc1_plain": 1,
+      "perDomainAcc1": {
+        "payments": 1,
+        "docs": 1,
+        "code": 1,
+        "issues": 1,
+        "deploy": 1,
+        "backend": 1,
+        "database": 1,
+        "observability": 1,
+        "atlassian": 1,
+        "design": 1
+      },
+      "taskScores": [
+        {
+          "taskId": "pay-connect",
+          "domain": "payments",
+          "adversarial": true,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "pay-subscriptions",
+          "domain": "payments",
+          "adversarial": false,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "pay-checkout-failing",
+          "domain": "payments",
+          "adversarial": true,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "pay-refund",
+          "domain": "payments",
+          "adversarial": false,
+          "picked": "stripe-payments",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "docs-wiki",
+          "domain": "docs",
+          "adversarial": false,
+          "picked": "notion-workspace",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "code-fix-pr",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "github-engineering",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "code-ci-review",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "github-engineering",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "issues-triage",
+          "domain": "issues",
+          "adversarial": false,
+          "picked": "linear-issues",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "issues-roadmap",
+          "domain": "issues",
+          "adversarial": false,
+          "picked": "linear-issues",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "deploy-landing",
+          "domain": "deploy",
+          "adversarial": false,
+          "picked": "vercel-deploy",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "deploy-edge-logs",
+          "domain": "deploy",
+          "adversarial": false,
+          "picked": "vercel-deploy",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "backend-auth-storage",
+          "domain": "backend",
+          "adversarial": false,
+          "picked": "supabase-backend",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "backend-login",
+          "domain": "backend",
+          "adversarial": true,
+          "picked": "supabase-backend",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "db-branch-migrate",
+          "domain": "database",
+          "adversarial": false,
+          "picked": "neon-postgres",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "db-sql-query",
+          "domain": "database",
+          "adversarial": false,
+          "picked": "supabase-backend",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "obs-error-spike",
+          "domain": "observability",
+          "adversarial": false,
+          "picked": "sentry-observability",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "obs-alert-config",
+          "domain": "observability",
+          "adversarial": true,
+          "picked": "sentry-observability",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "atlassian-sprint",
+          "domain": "atlassian",
+          "adversarial": false,
+          "picked": "atlassian-suite",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "design-tokens",
+          "domain": "design",
+          "adversarial": false,
+          "picked": "figma-design",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "design-system",
+          "domain": "design",
+          "adversarial": true,
+          "picked": "figma-design",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "docs-postmortem",
+          "domain": "docs",
+          "adversarial": true,
+          "picked": "notion-workspace",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        },
+        {
+          "taskId": "code-search-issue",
+          "domain": "code",
+          "adversarial": false,
+          "picked": "github-engineering",
+          "top1": true,
+          "top3": true,
+          "rr": 1
+        }
+      ]
+    }
+  ]
+}

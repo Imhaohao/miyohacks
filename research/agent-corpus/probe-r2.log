@@ -1,0 +1,24 @@
+probing 515 unique candidates, concurrency=24, rpc=true
+  25/515 probed
+  50/515 probed
+  75/515 probed
+  100/515 probed
+  125/515 probed
+  150/515 probed
+  175/515 probed
+  200/515 probed
+  225/515 probed
+  250/515 probed
+  275/515 probed
+  300/515 probed
+  325/515 probed
+  350/515 probed
+  375/515 probed
+  400/515 probed
+  425/515 probed
+  450/515 probed
+  475/515 probed
+  500/515 probed
+
+this run: 515 probed | 158 live cards | 135 arbor-compatible | 51 callable
+merged:   481 total | 124 live | 109 compatible | 40 callable

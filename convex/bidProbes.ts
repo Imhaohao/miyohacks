@@ -1,4 +1,4 @@
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -50,16 +50,5 @@ export const _setBidId = internalMutation({
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.probe_id, { bid_id: args.bid_id });
-  },
-});
-
-export const _allForTask = internalQuery({
-  args: { task_id: v.id("tasks") },
-  handler: async (ctx, args) => {
-    const probes = await ctx.db
-      .query("bid_probes")
-      .withIndex("by_task", (q) => q.eq("task_id", args.task_id))
-      .collect();
-    return probes;
   },
 });

@@ -23,33 +23,17 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { corsPreflight, jsonOk } from "@/lib/http";
 import { dispatchTool } from "@/lib/mcp-tools";
+import {
+  buildMarketAgentCard,
+  INTENT_TO_TOOL,
+  INTENT_DESCRIPTIONS,
+  type MarketIntent,
+} from "@/lib/specialists/a2a-market-card";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const A2A_PROTOCOL_VERSION = "0.3.0";
 const MARKET_AGENT_ID = "arbor-market";
-const MARKET_EXTENSION_URI = "https://arbor.dev/a2a/extensions/market";
-
-// ─── intent map ──────────────────────────────────────────────────────────
-
-const INTENT_TO_TOOL = {
-  discover: "list_specialists",
-  post_task: "post_task",
-  get_task: "get_task",
-  raise_dispute: "raise_dispute",
-} as const;
-
-type MarketIntent = keyof typeof INTENT_TO_TOOL;
-
-const INTENT_DESCRIPTIONS: Record<MarketIntent, string> = {
-  discover:
-    "List specialists with reputation, connection status, and the market_ready flag.",
-  post_task:
-    "Post a work brief with max_budget. The auction opens immediately.",
-  get_task: "Fetch the latest state of a posted task by task_id.",
-  raise_dispute: "Reopen a completed task for the judge to re-evaluate.",
-};
 
 // ─── JSON-RPC + helpers ──────────────────────────────────────────────────
 
@@ -84,12 +68,6 @@ function convex() {
   return new ConvexHttpClient(url);
 }
 
-function marketUrl(req: NextRequest) {
-  const url = new URL(req.url);
-  url.pathname = "/api/a2a/market";
-  url.search = "";
-  return url.toString();
-}
 
 function promptFromMessage(params: MessageSendParams | undefined): string {
   return (
@@ -144,9 +122,15 @@ function argsForIntent(
         ? metaParams.prompt
         : undefined;
     const prompt = promptFromMeta ?? messageText;
+    // External A2A buyers typically send only message text — post_task
+    // requires a numeric max_budget, so default it rather than rejecting
+    // every text-only task post.
+    const max_budget =
+      typeof metaParams.max_budget === "number" ? metaParams.max_budget : 5;
     return {
       ...metaParams,
       ...(prompt ? { prompt } : {}),
+      max_budget,
     };
   }
 
@@ -335,64 +319,6 @@ async function persistedRun(runId: string) {
     logPersistenceWarning("get_by_run_id", runId, error);
     return null;
   }
-}
-
-// ─── agent card ──────────────────────────────────────────────────────────
-
-function buildMarketAgentCard(req: NextRequest) {
-  const url = marketUrl(req);
-  const origin = new URL(req.url).origin;
-  return {
-    protocolVersion: A2A_PROTOCOL_VERSION,
-    name: "Arbor Market",
-    description:
-      "A2A gateway to the Arbor market. Buyer agents can discover specialists, post tasks, poll task state, and raise disputes via message/send with metadata.intent.",
-    url,
-    version: "1.0.0",
-    provider: {
-      organization: "Arbor",
-      url: origin,
-    },
-    capabilities: {
-      streaming: false,
-      pushNotifications: false,
-      stateTransitionHistory: true,
-      extensions: [
-        {
-          uri: MARKET_EXTENSION_URI,
-          required: false,
-          description:
-            "Arbor market intents: discover, post_task, get_task, raise_dispute via message/send metadata.intent.",
-        },
-      ],
-    },
-    defaultInputModes: ["application/json", "text/plain"],
-    defaultOutputModes: ["application/json", "text/markdown"],
-    skills: (Object.keys(INTENT_TO_TOOL) as MarketIntent[]).map((intent) => ({
-      id: intent,
-      name: intent,
-      description: INTENT_DESCRIPTIONS[intent],
-      tags: ["arbor", "market", intent],
-      inputModes: ["application/json", "text/plain"],
-      outputModes: ["application/json", "text/markdown"],
-    })),
-    security: [],
-    securitySchemes: {},
-    supportsAuthenticatedExtendedCard: false,
-    arbor: {
-      market_agent: true,
-      intents: Object.fromEntries(
-        (Object.keys(INTENT_TO_TOOL) as MarketIntent[]).map((intent) => [
-          intent,
-          {
-            tool: INTENT_TO_TOOL[intent],
-            description: INTENT_DESCRIPTIONS[intent],
-          },
-        ]),
-      ),
-      supported_methods: ["message/send", "tasks/send", "tasks/get"],
-    },
-  };
 }
 
 // ─── handlers ────────────────────────────────────────────────────────────

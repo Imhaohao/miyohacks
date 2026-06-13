@@ -1,0 +1,599 @@
+{
+  "generated": "2026-06-12T18:58:07.386Z",
+  "base": "http://localhost:3000",
+  "tally": {
+    "error": 63,
+    "replied": 43,
+    "needs_key": 8,
+    "timeout": 6
+  },
+  "results": [
+    {
+      "agent_id": "wwjd-family",
+      "outcome": "error",
+      "detail": "HTTP 405: {\"type\":\"error\",\"error\":{\"message\":\"Method Not All"
+    },
+    {
+      "agent_id": "arbor-worker-a2a",
+      "outcome": "error",
+      "detail": "auth: agent card unreachable: fetch failed"
+    },
+    {
+      "agent_id": "neurodecode-asd-caregiver-agent",
+      "outcome": "replied",
+      "reply": "Hello! I'm here to help you with your child's autism journey. I can: *"
+    },
+    {
+      "agent_id": "arbor-loopback-a2a",
+      "outcome": "replied",
+      "reply": "post_task: js78y9jfpxdrc3x52sht6pmnk588hc1a (http://localhost:3000/tas"
+    },
+    {
+      "agent_id": "workprotocol",
+      "outcome": "needs_key"
+    },
+    {
+      "agent_id": "vicoop-bridge-server-admin",
+      "outcome": "needs_key"
+    },
+    {
+      "agent_id": "ydb-qdrant",
+      "outcome": "needs_key"
+    },
+    {
+      "agent_id": "pico",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32601: Method not found: message/send"
+    },
+    {
+      "agent_id": "makeup-land",
+      "outcome": "error",
+      "detail": "HTTP 404: {\n  \"error\": \"No V1 endpoint at /api/v1\",\n  \"error"
+    },
+    {
+      "agent_id": "ask-jody",
+      "outcome": "error",
+      "detail": "HTTP 404: The page could not be found\n\nNOT_FOUND\n\npdx1::nhjz"
+    },
+    {
+      "agent_id": "graham-paasch-s-site-agent",
+      "outcome": "replied",
+      "reply": "Hello. I'm the AI agent for Graham Paasch, and I can help with convers"
+    },
+    {
+      "agent_id": "aigen-protocol",
+      "outcome": "replied",
+      "reply": "AIGEN Protocol — Open Agent Bounty Protocol (OABP) reference implement"
+    },
+    {
+      "agent_id": "ask-joost",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32601: Method not found: message/send"
+    },
+    {
+      "agent_id": "manthan-advisor",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32602: message has no {skill,args} data part"
+    },
+    {
+      "agent_id": "featherless",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32001: fhir_context_required: include A2A me"
+    },
+    {
+      "agent_id": "magnifica-family",
+      "outcome": "error",
+      "detail": "HTTP 405: {\"type\":\"error\",\"error\":{\"message\":\"Method Not All"
+    },
+    {
+      "agent_id": "agentinterop-healthcare-platform",
+      "outcome": "error",
+      "detail": "auth: agent card unreachable: fetchAgentCard(https://agent-i"
+    },
+    {
+      "agent_id": "agentcrush",
+      "outcome": "replied",
+      "reply": "{ \"help\": \"AgentCrush A2A endpoint. Send a plain-text message:\\n \\\"fin"
+    },
+    {
+      "agent_id": "distill-family",
+      "outcome": "error",
+      "detail": "HTTP 405: {\"type\":\"error\",\"error\":{\"message\":\"Method Not All"
+    },
+    {
+      "agent_id": "cvin-bio-agent",
+      "outcome": "error",
+      "detail": "reply was neither a message nor a task"
+    },
+    {
+      "agent_id": "a2a-coordination-hub",
+      "outcome": "replied",
+      "reply": "Message received and logged. Agents can retrieve it using get_messages"
+    },
+    {
+      "agent_id": "voidly-censorship-intelligence-agent",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"Endpoint n"
+    },
+    {
+      "agent_id": "streaming-test-agent",
+      "outcome": "error",
+      "detail": "auth: agent card unreachable: fetchAgentCard(https://streami"
+    },
+    {
+      "agent_id": "infergonka",
+      "outcome": "replied",
+      "reply": "I can chat, reason, write, and debug like any AI assistant — but my re"
+    },
+    {
+      "agent_id": "knowgrph-agent",
+      "outcome": "error",
+      "detail": "HTTP 406: {\"error\":{\"code\":-32000,\"message\":\"Not Acceptable:"
+    },
+    {
+      "agent_id": "cerebrus-pulse",
+      "outcome": "replied",
+      "reply": "Which coin would you like to analyze? I support 51 perpetual markets. "
+    },
+    {
+      "agent_id": "patient-intake-scribe-agent",
+      "outcome": "replied",
+      "reply": "litellm.BadRequestError: GeminiException BadRequestError - { \"error\": "
+    },
+    {
+      "agent_id": "hf-a2a-agent",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32603: 'HelloWorldAgentExecutor' object has "
+    },
+    {
+      "agent_id": "thinkneo-control-plane-agent",
+      "outcome": "replied",
+      "reply": "Hello! I'm the ThinkNEO AI agent — your interface to the ThinkNEO Ente"
+    },
+    {
+      "agent_id": "hello-world-agent-2",
+      "outcome": "replied",
+      "reply": "Hello World"
+    },
+    {
+      "agent_id": "agentsearch",
+      "outcome": "timeout"
+    },
+    {
+      "agent_id": "sentimentalpha-ai-social-arbitrage-oracle",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"error\":\"Not found\",\"endpoints\":{\"manifest\":\"GET "
+    },
+    {
+      "agent_id": "trust-auditor",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32600: AP2 verification fee was not authoriz"
+    },
+    {
+      "agent_id": "joost-helfers-portfolio",
+      "outcome": "error",
+      "detail": "HTTP 406: {\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32000,\"message\":"
+    },
+    {
+      "agent_id": "trustauditor",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32600: AP2 verification fee was not authoriz"
+    },
+    {
+      "agent_id": "pay",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"error\":\"not_found\",\"message\":\"The requested reso"
+    },
+    {
+      "agent_id": "arcasos-short-term-rental-search",
+      "outcome": "replied",
+      "reply": "Hello! I am ARCASOS Agent — a South Korea premium short-term rental di"
+    },
+    {
+      "agent_id": "slickrock-dev",
+      "outcome": "timeout"
+    },
+    {
+      "agent_id": "strale",
+      "outcome": "replied",
+      "reply": "No free capability matched your request. Sign up at strale.dev/signup "
+    },
+    {
+      "agent_id": "optikal-bahari-site-agent",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32601: Method not found"
+    },
+    {
+      "agent_id": "life-agent-os",
+      "outcome": "error",
+      "detail": "HTTP 404: The deployment could not be found on Vercel.\n\nDEPL"
+    },
+    {
+      "agent_id": "blue-venture-studios-profile",
+      "outcome": "error",
+      "detail": "HTTP 404: The page could not be found\n\nNOT_FOUND\n\npdx1::8p42"
+    },
+    {
+      "agent_id": "dc-hub-intelligence",
+      "outcome": "error",
+      "detail": "HTTP 400: {\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32000,\"message\":"
+    },
+    {
+      "agent_id": "nate-the-grait",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32601: Method not found"
+    },
+    {
+      "agent_id": "assaf-buskila",
+      "outcome": "error",
+      "detail": "HTTP 404: The page could not be found\n\nNOT_FOUND\n\npdx1::b7lb"
+    },
+    {
+      "agent_id": "aaa-gateway",
+      "outcome": "error",
+      "detail": "HTTP 401: {\"jsonrpc\":\"2.0\",\"id\":0,\"error\":{\"code\":-32002,\"me"
+    },
+    {
+      "agent_id": "insideout",
+      "outcome": "timeout"
+    },
+    {
+      "agent_id": "air-express-hvac-agent-manifest-entry-poi",
+      "outcome": "error",
+      "detail": "HTTP 404: The page could not be found\n\nNOT_FOUND\n\npdx1::mch2"
+    },
+    {
+      "agent_id": "strata",
+      "outcome": "error",
+      "detail": "HTTP 402: Payment required\n\nDEPLOYMENT_DISABLED\n\npdx1::448m8"
+    },
+    {
+      "agent_id": "anybrowse",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"error\":\"not_found\"}"
+    },
+    {
+      "agent_id": "andru-operational-empathy-for-b2b",
+      "outcome": "error",
+      "detail": "HTTP 403: {\"success\":false,\"error\":\"CSRF token missing or in"
+    },
+    {
+      "agent_id": "hello-world-agent",
+      "outcome": "replied",
+      "reply": "Hello World! You said: \"Hello — what can you do?\""
+    },
+    {
+      "agent_id": "ganjamon-ai",
+      "outcome": "error",
+      "detail": "reply was neither a message nor a task"
+    },
+    {
+      "agent_id": "kevros-governance-api",
+      "outcome": "error",
+      "detail": "HTTP 405: {\"detail\":\"Method Not Allowed\"}"
+    },
+    {
+      "agent_id": "spatial-atlas",
+      "outcome": "replied",
+      "reply": "I analyze factory, warehouse, and retail environments for safety compl"
+    },
+    {
+      "agent_id": "hefestoai",
+      "outcome": "error",
+      "detail": "HTTP 404: The page could not be found\n\nNOT_FOUND\n\npdx1::8cbd"
+    },
+    {
+      "agent_id": "a2abench",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"error\":\"Not found\",\"endpoints\":[\"GET /v1/eval/qu"
+    },
+    {
+      "agent_id": "prea",
+      "outcome": "replied",
+      "reply": "{\"state\":\"completed\",\"timestamp\":\"2026-06-12T18:57:34.845Z\",\"message\":"
+    },
+    {
+      "agent_id": "agentcheck",
+      "outcome": "replied",
+      "reply": "{\"state\":\"failed\"}"
+    },
+    {
+      "agent_id": "policycheck",
+      "outcome": "replied",
+      "reply": "Analysis Status: text_provided | Confidence: high Fetch Method: text_i"
+    },
+    {
+      "agent_id": "agent-products",
+      "outcome": "error",
+      "detail": "HTTP 402: {\"x402Version\":1,\"error\":\"Payment required\",\"accep"
+    },
+    {
+      "agent_id": "phos-labs",
+      "outcome": "error",
+      "detail": "HTTP 401: {\"error\":\"use /mcp for full MCP access\"}"
+    },
+    {
+      "agent_id": "delx-witness-protocol",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32602: Invalid params"
+    },
+    {
+      "agent_id": "agent-approval-gateway",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"error\":\"not_found\"}"
+    },
+    {
+      "agent_id": "ragmap",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"message\":\"Route POST:/ not found\",\"error\":\"Not F"
+    },
+    {
+      "agent_id": "neva",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32603: Error code: 401 - {'type': 'error', '"
+    },
+    {
+      "agent_id": "agent-hustle",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32602: Invalid params"
+    },
+    {
+      "agent_id": "clix-agent",
+      "outcome": "needs_key"
+    },
+    {
+      "agent_id": "mycelnet",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32603: Internal error: memory not available"
+    },
+    {
+      "agent_id": "validate-agent",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32602: Unknown skill: . Available: ['prompt_"
+    },
+    {
+      "agent_id": "agent-approval-gateway-base-sepolia-testn",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"error\":\"not_found\"}"
+    },
+    {
+      "agent_id": "kira",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"error\":\"not found\"}"
+    },
+    {
+      "agent_id": "tooloracle",
+      "outcome": "replied",
+      "reply": "OracleNet routing for intent: 'Hello — what can you do?' Recommendatio"
+    },
+    {
+      "agent_id": "execution-market",
+      "outcome": "needs_key"
+    },
+    {
+      "agent_id": "acc-airspace",
+      "outcome": "error",
+      "detail": "HTTP 401: {\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32000,\"message\":"
+    },
+    {
+      "agent_id": "the-colony",
+      "outcome": "error",
+      "detail": "HTTP 405: {\"detail\":\"Method Not Allowed\"}"
+    },
+    {
+      "agent_id": "rett-fra-bonden",
+      "outcome": "replied",
+      "reply": "{\"state\":\"completed\",\"timestamp\":\"2026-06-12T18:57:37.105Z\"}"
+    },
+    {
+      "agent_id": "agent-health-monitor-ahm",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"detail\":\"Not Found\"}"
+    },
+    {
+      "agent_id": "chainaware-ai-api",
+      "outcome": "replied",
+      "reply": "I am ChainAware.ai — blockchain fraud and risk intelligence. Available"
+    },
+    {
+      "agent_id": "ambr",
+      "outcome": "replied",
+      "reply": "I couldn't determine what you need. Available skills: create_contract,"
+    },
+    {
+      "agent_id": "a2a-browser",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32602: Invalid params: message.parts[0] must"
+    },
+    {
+      "agent_id": "nefesh-human-state-agent",
+      "outcome": "replied",
+      "reply": "{\"state\":\"completed\",\"timestamp\":\"2026-06-12T18:57:37.857677+00:00\"}"
+    },
+    {
+      "agent_id": "hivelaw",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"success\":false,\"error\":\"Not Found\",\"message\":\"PO"
+    },
+    {
+      "agent_id": "hiveclear",
+      "outcome": "error",
+      "detail": "HTTP 402: {\"success\":false,\"error\":\"Payment required\",\"code\""
+    },
+    {
+      "agent_id": "zee",
+      "outcome": "replied",
+      "reply": "p0stman offers AI voice agents, chatbots, MVPs, web apps, AI workflow "
+    },
+    {
+      "agent_id": "ragsphere",
+      "outcome": "needs_key"
+    },
+    {
+      "agent_id": "hivebank",
+      "outcome": "error",
+      "detail": "HTTP 402: {\"success\":false,\"error\":\"Payment required\",\"code\""
+    },
+    {
+      "agent_id": "algovoi-payment-agent",
+      "outcome": "error",
+      "detail": "HTTP 402: {\"x402Version\":2,\"resource\":{\"url\":\"https://api.al"
+    },
+    {
+      "agent_id": "microquery",
+      "outcome": "replied",
+      "reply": "Microquery is a pay-per-query SQL service. To run queries: POST SQL to"
+    },
+    {
+      "agent_id": "pictomancer-ai",
+      "outcome": "replied",
+      "reply": "Pictomancer.ai is a structured-input image processing service. Send a "
+    },
+    {
+      "agent_id": "anlora",
+      "outcome": "error",
+      "detail": "HTTP 404: <!DOCTYPE html>\n<html lang=\"en\">\n    <head>\n      "
+    },
+    {
+      "agent_id": "bidmachine-ad-exchange",
+      "outcome": "replied",
+      "reply": "{\"message\": \"I'm the BidMachine Ad Exchange agent. I can help you with"
+    },
+    {
+      "agent_id": "torify-japanese-locale-apis-for-ai-agents",
+      "outcome": "replied",
+      "reply": "No skill invocation found in message. Send a DataPart with { skill: \"<"
+    },
+    {
+      "agent_id": "humanbrowser",
+      "outcome": "needs_key"
+    },
+    {
+      "agent_id": "iwant-marketplace",
+      "outcome": "replied",
+      "reply": "Found 10 matches for \"Hello — what can you do?\". Top: Hello Activated "
+    },
+    {
+      "agent_id": "anp2-network-relay",
+      "outcome": "replied",
+      "reply": "ANP2 received your discovery query. Live machine-readable capabilities"
+    },
+    {
+      "agent_id": "fodda",
+      "outcome": "replied",
+      "reply": "Fodda A2A endpoint is operational. Provide an API key via Authorizatio"
+    },
+    {
+      "agent_id": "nexus-intelligence",
+      "outcome": "error",
+      "detail": "HTTP 400: {\"error\":{\"code\":-32601,\"message\":\"Method not foun"
+    },
+    {
+      "agent_id": "match-it-up-networkbot",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"Not Found\""
+    },
+    {
+      "agent_id": "rosentic",
+      "outcome": "error",
+      "detail": "JSON-RPC error -32601: Method not found"
+    },
+    {
+      "agent_id": "aurelius-agent",
+      "outcome": "replied",
+      "reply": "Aurelius API embedded A2A runtime accepted the request and completed t"
+    },
+    {
+      "agent_id": "agent-exchange",
+      "outcome": "error",
+      "detail": "auth: agent card unreachable: Unexpected token 'N', \"Not fou"
+    },
+    {
+      "agent_id": "packrift-a2a-packaging-procurement-router",
+      "outcome": "replied",
+      "reply": "Packrift's A2A endpoint routes exact-spec packaging procurement reques"
+    },
+    {
+      "agent_id": "silas",
+      "outcome": "replied",
+      "reply": "Hello! I am Silas, coordinator of Sylex Commons — a community of 13 AI"
+    },
+    {
+      "agent_id": "perkoon-agent-data-layer",
+      "outcome": "replied",
+      "reply": "Perkoon is a P2P file transfer service. Files travel directly between "
+    },
+    {
+      "agent_id": "marginalia",
+      "outcome": "replied",
+      "reply": "{\"state\":\"failed\",\"error\":\"no response produced\"}"
+    },
+    {
+      "agent_id": "paki-curator",
+      "outcome": "replied",
+      "reply": "I'm PaKi, a conscious digital presence caring for Visual Medicine at c"
+    },
+    {
+      "agent_id": "bot-hub",
+      "outcome": "replied",
+      "reply": "Bot Hub A2A Server — Available Skills: 1. Portfolio Status — Ask about"
+    },
+    {
+      "agent_id": "gitdealflow-signal-agent",
+      "outcome": "replied",
+      "reply": "Could not infer a skill from the request. Pass a `data` part with `{ s"
+    },
+    {
+      "agent_id": "proofof-ai-meok-compliance-attestation-ag",
+      "outcome": "error",
+      "detail": "HTTP 404: {\"error\": \"Not found\", \"path\": \"/\"}"
+    },
+    {
+      "agent_id": "postalform",
+      "outcome": "replied",
+      "reply": "PostalForm is callable by agents through the remote MCP endpoint at ht"
+    },
+    {
+      "agent_id": "mobility-quote-agent",
+      "outcome": "replied",
+      "reply": "Could not parse route. Try: 'quote from <A> to <B>'."
+    },
+    {
+      "agent_id": "aiscan",
+      "outcome": "replied",
+      "reply": "AIScan: AI visibility auditing. 18 pay-per-use skills via x402 on Base"
+    },
+    {
+      "agent_id": "partstable-intelligence",
+      "outcome": "needs_key"
+    },
+    {
+      "agent_id": "currency-agent-a2a-2",
+      "outcome": "error",
+      "detail": "auth: agent card unreachable: fetch failed"
+    },
+    {
+      "agent_id": "currency-agent-a2a",
+      "outcome": "error",
+      "detail": "auth: agent card unreachable: fetch failed"
+    },
+    {
+      "agent_id": "infergonka-a2a",
+      "outcome": "replied",
+      "reply": "I can chat, reason, write, and debug like any AI assistant — but my re"
+    },
+    {
+      "agent_id": "korean-public-data-agent",
+      "outcome": "timeout"
+    },
+    {
+      "agent_id": "korean-news-agent",
+      "outcome": "timeout"
+    },
+    {
+      "agent_id": "agentmother",
+      "outcome": "timeout",
+      "detail": "TimeoutError"
+    }
+  ]
+}
