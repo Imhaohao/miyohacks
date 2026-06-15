@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ReputationChart } from "@/components/agents/ReputationChart";
@@ -16,6 +16,7 @@ import { currentPeriod } from "@/lib/hive/settlement-core";
 import { formatMoney, formatScore } from "@/lib/utils";
 
 interface PayoutRow {
+  owner_id: string;
   agent_id: string;
   tasks_won: number;
   tasks_lost: number;
@@ -52,10 +53,28 @@ function formatDate(ms: number) {
   }).format(new Date(ms));
 }
 
-export function HivePayouts({ ownerId }: { ownerId: string }) {
+export function HivePayouts({ ownerId }: { ownerId?: string }) {
   const period = useMemo(() => currentPeriod(Date.now()), []);
+  // No auth system in this app (no Clerk/session), so payouts are scoped by
+  // owner_id selection rather than a signed-in user. Owners are derived from
+  // the period's accrual; the default is the highest-volume owner.
+  const summary = useQuery(api.settlement.payoutSummary, { period }) as
+    | PayoutRow[]
+    | undefined;
+  const owners = useMemo(() => {
+    if (!summary) return [] as string[];
+    const gross = new Map<string, number>();
+    for (const row of summary) {
+      gross.set(row.owner_id, (gross.get(row.owner_id) ?? 0) + row.gross_volume);
+    }
+    return [...gross.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([id]) => id);
+  }, [summary]);
+  const [picked, setPicked] = useState<string | null>(null);
+  const owner = picked ?? ownerId ?? owners[0] ?? "agent:mcp";
   const payouts = useQuery(api.settlement.payoutsForOwner, {
-    owner_id: ownerId,
+    owner_id: owner,
     period,
   }) as PayoutRow[] | undefined;
   const escalations = useQuery(api.escalations.listOpen, {
@@ -78,9 +97,27 @@ export function HivePayouts({ ownerId }: { ownerId: string }) {
             {period} payout accrual and human review queue.
           </p>
         </div>
-        <Badge variant="outline" className="font-mono">
-          {ownerId}
-        </Badge>
+        {owners.length > 0 ? (
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {owners.map((o) => (
+              <button
+                key={o}
+                onClick={() => setPicked(o)}
+                className={
+                  o === owner
+                    ? "rounded-full bg-brand-700 px-2.5 py-1 font-mono text-[11px] font-medium text-white"
+                    : "rounded-full border border-line px-2.5 py-1 font-mono text-[11px] text-ink-muted transition hover:text-ink"
+                }
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Badge variant="outline" className="font-mono">
+            {owner}
+          </Badge>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">

@@ -45,7 +45,14 @@ const CLASSIFY_SYSTEM_PROMPT =
  * returns immediately without minting a duplicate child task.
  */
 export const routeNode = internalAction({
-  args: { dag_id: v.id("hive_dags"), node_id: v.string() },
+  args: {
+    dag_id: v.id("hive_dags"),
+    node_id: v.string(),
+    // Set by the orchestrator's bounded open-retry: skip the registry shortlist
+    // and run a full open auction (every roster agent may bid). This is the
+    // safety valve when a node's shortlisted auction produced no plausible bid.
+    force_open: v.optional(v.boolean()),
+  },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
     const dag = await ctx.runQuery(internal.hiveData._getDag, {
@@ -196,15 +203,21 @@ export const routeNode = internalAction({
       { description: node.description, success_criteria: node.success_criteria },
       hints,
     );
-    const candidates = await ctx.runAction(api.hiveRegistry.searchAgents, {
-      query,
-      top_k: 6,
-      min_reputation: 0.3,
-      max_cost: budget,
-    });
-    const invited = shouldFallbackOpen(candidates)
-      ? undefined
-      : candidates.map((c) => c.agent_id);
+    // On a force_open retry, skip the semantic shortlist entirely and run an
+    // open auction (invited = undefined). Otherwise shortlist, falling back to
+    // open when the candidate set is too thin (shouldFallbackOpen).
+    const candidates = args.force_open
+      ? []
+      : await ctx.runAction(api.hiveRegistry.searchAgents, {
+          query,
+          top_k: 6,
+          min_reputation: 0.3,
+          max_cost: budget,
+        });
+    const invited =
+      args.force_open || shouldFallbackOpen(candidates)
+        ? undefined
+        : candidates.map((c) => c.agent_id);
 
     // 4. Stable per-node step index: position of this node_id in the
     //    ascending-sorted list of all node_ids in the DAG.
@@ -266,6 +279,7 @@ export const routeNode = internalAction({
         candidate_count: candidates.length,
         task_class: taskClass,
         budget,
+        force_open: Boolean(args.force_open),
       },
     });
 

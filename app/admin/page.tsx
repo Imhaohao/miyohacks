@@ -3,8 +3,8 @@
 /**
  * Admin console: direct A2A chat with any registered specialist.
  *
- * Pick a specialist with an a2a_endpoint, send messages over the A2A
- * protocol (message/send via /api/admin/a2a-chat), and read replies.
+ * Pick any listed specialist, then send messages to specialists with an
+ * a2a_endpoint over the A2A protocol (message/send via /api/admin/a2a-chat).
  * contextId is threaded so multi-turn conversations stay coherent on
  * agents that support it.
  */
@@ -19,7 +19,10 @@ interface A2ASpecialist {
   display_name: string;
   sponsor: string;
   one_liner: string;
-  a2a_endpoint: string;
+  tier?: string;
+  a2a_endpoint?: string;
+  chat_ready: boolean;
+  chat_unavailable_reason?: string;
   discovered: boolean;
 }
 
@@ -38,6 +41,7 @@ export default function AdminPage() {
   const [contextByAgent, setContextByAgent] = useState<Record<string, string>>({});
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [rawOpen, setRawOpen] = useState<number | null>(null);
   // Agents that declined for a missing API key — shows the paste-key form.
   const [keyPromptByAgent, setKeyPromptByAgent] = useState<Record<string, boolean>>({});
@@ -47,16 +51,36 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetch("/api/admin/a2a-chat")
-      .then((r) => r.json())
-      .then((d) => {
-        setSpecialists(d.specialists ?? []);
-        if (d.specialists?.length) setSelected(d.specialists[0].agent_id);
+      .then(async (r) => {
+        if (!r.ok) {
+          throw new Error(`admin specialist load failed (${r.status})`);
+        }
+        return r.json();
       })
-      .catch(() => setSpecialists([]));
+      .then((d) => {
+        const next = (d.specialists ?? []) as A2ASpecialist[];
+        setLoadError(null);
+        setSpecialists(next);
+        if (next.length) {
+          setSelected(
+            (prev) =>
+              prev ||
+              next.find((s) => s.chat_ready)?.agent_id ||
+              next[0].agent_id,
+          );
+        }
+      })
+      .catch((err) => {
+        setLoadError(
+          err instanceof Error ? err.message : "admin specialist load failed",
+        );
+        setSpecialists([]);
+      });
   }, []);
 
   const turns = turnsByAgent[selected] ?? [];
   const spec = specialists.find((s) => s.agent_id === selected);
+  const canChat = Boolean(spec?.chat_ready && spec.a2a_endpoint);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -71,7 +95,7 @@ export default function AdminPage() {
 
   async function send() {
     const text = input.trim();
-    if (!text || !selected || sending) return;
+    if (!text || !selected || !canChat || sending) return;
     const agentId = selected;
     setInput("");
     setSending(true);
@@ -203,9 +227,9 @@ export default function AdminPage() {
       <div className="grid gap-6 md:grid-cols-[260px_1fr]">
         <aside>
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            A2A specialists
+            Specialists
           </h2>
-          <ul className="space-y-1">
+          <ul className="max-h-[70vh] space-y-1 overflow-y-auto pr-1">
             {specialists.map((s) => (
               <li key={s.agent_id}>
                 <button
@@ -216,7 +240,24 @@ export default function AdminPage() {
                       : "text-ink hover:bg-black/5"
                   }`}
                 >
-                  <span className="block font-medium">{s.display_name}</span>
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate font-medium">
+                      {s.display_name}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                        s.agent_id === selected
+                          ? s.chat_ready
+                            ? "bg-white/20 text-white"
+                            : "bg-white/15 text-white/80"
+                          : s.chat_ready
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-black/5 text-ink-muted"
+                      }`}
+                    >
+                      {s.chat_ready ? "A2A" : "listed"}
+                    </span>
+                  </span>
                   <span
                     className={`block truncate text-xs ${
                       s.agent_id === selected ? "text-white/70" : "text-ink-muted"
@@ -230,7 +271,7 @@ export default function AdminPage() {
             ))}
             {specialists.length === 0 && (
               <li className="px-3 py-2 text-sm text-ink-muted">
-                No A2A specialists registered.
+                {loadError ?? "No specialists loaded."}
               </li>
             )}
           </ul>
@@ -242,8 +283,13 @@ export default function AdminPage() {
               {spec?.display_name ?? "Select a specialist"}
             </p>
             {spec && (
-              <p className="truncate text-xs text-ink-muted" title={spec.a2a_endpoint}>
-                {spec.a2a_endpoint}
+              <p
+                className="truncate text-xs text-ink-muted"
+                title={spec.a2a_endpoint ?? spec.chat_unavailable_reason}
+              >
+                {spec.a2a_endpoint ??
+                  spec.chat_unavailable_reason ??
+                  "No endpoint configured"}
               </p>
             )}
           </div>
@@ -252,7 +298,9 @@ export default function AdminPage() {
             {turns.length === 0 && (
               <p className="text-sm text-ink-muted">
                 {spec
-                  ? `Send a message to ${spec.display_name}. ${spec.one_liner}`
+                  ? canChat
+                    ? `Send a message to ${spec.display_name}. ${spec.one_liner}`
+                    : `${spec.display_name} is on the market listing, but is not directly reachable from this A2A console. ${spec.chat_unavailable_reason ?? ""}`
                   : "Pick a specialist on the left."}
               </p>
             )}
@@ -339,12 +387,12 @@ export default function AdminPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={spec ? `Message ${spec.display_name}` : "Select a specialist first"}
-              disabled={!spec || sending}
+              disabled={!canChat || sending}
               className="flex-1 rounded-lg border border-black/10 px-3 py-2 text-sm text-ink outline-none focus:border-brand-700 disabled:opacity-50"
             />
             <button
               type="submit"
-              disabled={!spec || sending || !input.trim()}
+              disabled={!canChat || sending || !input.trim()}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-3.5 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-40"
             >
               <PaperPlaneTilt size={14} weight="bold" />

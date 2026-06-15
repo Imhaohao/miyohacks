@@ -221,6 +221,53 @@ export const onNodeSettled = internalAction({
       nodeStatus = "failed";
     }
 
+    // 6b. Bounded open-retry. A node whose SHORTLISTED auction failed (no
+    //     plausible bid from the invited set) gets ONE re-route on the open
+    //     roster before being declared failed. The retry is bounded because the
+    //     open re-route carries no invited_agent_ids: if it too fails, this
+    //     branch is skipped (wasShortlisted=false) and the node truly fails.
+    if (nodeStatus === "failed") {
+      const wasShortlisted =
+        Array.isArray(task.invited_agent_ids) &&
+        task.invited_agent_ids.length > 0;
+      if (wasShortlisted) {
+        // Atomic claim: only one onNodeSettled delivery for this failed child
+        // wins, so the open re-route is scheduled at most once.
+        const claimed = await ctx.runMutation(
+          internal.hiveData._claimNodeRetryOpen,
+          {
+            dag_id: node.dag_id,
+            node_id: node.node_id,
+            failed_task_id: args.task_id,
+          },
+        );
+        if (claimed) {
+          const retryDag = await ctx.runQuery(internal.hiveData._getDag, {
+            dag_id: node.dag_id,
+          });
+          if (retryDag !== null) {
+            await ctx.runMutation(internal.lifecycle.log, {
+              task_id: retryDag.root_task_id,
+              event_type: "hive_node_retry_open",
+              payload: {
+                node_id: node.node_id,
+                failed_task_id: args.task_id,
+                invited_count: task.invited_agent_ids?.length ?? 0,
+              },
+            });
+          }
+          await ctx.scheduler.runAfter(0, internal.hiveRouter.routeNode, {
+            dag_id: node.dag_id,
+            node_id: node.node_id,
+            force_open: true,
+          });
+        }
+        // Do not fall through to mark the node failed — the winning retry owns
+        // the node now (and a losing duplicate delivery must also no-op).
+        return null;
+      }
+    }
+
     const truncatedOutput = resultText.slice(0, MAX_OUTPUT_CHARS);
 
     await ctx.runMutation(internal.hiveData._patchNode, {

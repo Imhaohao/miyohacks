@@ -23,6 +23,18 @@ or in the Convex dashboard.
 | `HIVE_EMBEDDINGS_FORCE_LOCAL` | Both | Optional | Set `true` to force deterministic local-hash embeddings for dev/CI. |
 | `ARBOR_HIVE_DEFAULT` | Both | Optional | Set `true` to route new tasks through the hive DAG planner by default. Use `workflow_mode: "legacy"` to opt out per task. |
 
+> Operational note (2026-06-13): `ANTHROPIC_API_KEY` is documented as required
+> above but is NOT currently set on the Convex deployment (`npx convex env list`
+> shows only `OPENAI_API_KEY`). The hive planner and evaluator run inside Convex
+> actions, so a value in `.env.local` alone has no effect — set it deployment-side
+> with `npx convex env set ANTHROPIC_API_KEY '<value>'`. Until then the planner
+> silently falls back to single-node DAGs and the evaluator to plain
+> concatenation: hive runs still complete, just at reduced quality (no model
+> error is raised). This is the gate on a full-quality `npm run hive:e2e`.
+> Independent of keys, the router does a bounded open-retry — a node whose
+> shortlisted auction draws no plausible bid is re-routed once on the open
+> roster before failing (lifecycle event `hive_node_retry_open`).
+
 ## Convex And App Runtime
 
 | Var | Where (Next / Convex / both) | Required? | Purpose |

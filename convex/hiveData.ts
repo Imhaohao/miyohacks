@@ -128,6 +128,41 @@ export const _setNodeStatus = internalMutation({
   },
 });
 
+// 4b. Atomically claim a node's open-retry. Used by the orchestrator when a
+// node's SHORTLISTED auction fails: re-claim the node (executing -> auctioned)
+// so the router can re-route it open. Returns true to exactly ONE caller — the
+// status+task_id guard means a duplicate onNodeSettled delivery for the same
+// failed child reads a node that is no longer "executing"/linked and gets false,
+// so the open re-route is scheduled at most once.
+export const _claimNodeRetryOpen = internalMutation({
+  args: {
+    dag_id: v.id("hive_dags"),
+    node_id: v.string(),
+    failed_task_id: v.id("tasks"),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args): Promise<boolean> => {
+    const node = await ctx.db
+      .query("hive_nodes")
+      .withIndex("by_dag_and_node_id", (q) =>
+        q.eq("dag_id", args.dag_id).eq("node_id", args.node_id),
+      )
+      .first();
+    if (
+      !node ||
+      node.status !== "executing" ||
+      node.task_id !== args.failed_task_id
+    ) {
+      return false;
+    }
+    await ctx.db.patch(node._id, {
+      status: "auctioned",
+      updated_at: Date.now(),
+    });
+    return true;
+  },
+});
+
 // 5. Get a DAG by id (or null).
 export const _getDag = internalQuery({
   args: { dag_id: v.id("hive_dags") },

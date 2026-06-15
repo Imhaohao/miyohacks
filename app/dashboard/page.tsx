@@ -214,7 +214,7 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          <HivePayouts ownerId="agent:mcp" />
+          <HivePayouts />
         </div>
       </SidebarInset>
     </SidebarProvider>

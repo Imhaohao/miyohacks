@@ -1,9 +1,18 @@
+You are an executive agent. Do not expend tokens unless       
+  absolutely necessary. Use subagents or local agents when      
+  necessary. Log required API keys into docs/api-keys.md. We've 
+  finished with tasks 1-7 so far. Work on tasks 15-22           
+  (inclusive). If a task needs a pre-req and it isn't built     
+  yet, do the ones that aren't blocked first. Report progress   
+  when a task is done. The goal is to create a working agent    
+  hivemind end-to-end. Use this plan:    
 # Arbor Hive Mind Build Plan
 
 <!-- ARCHITECTURE MAP
 
 DATABASE
 - Single backend: Convex (package `convex` ^1.17.4). No Postgres, no Prisma, no Drizzle, no Redis, no Pinecone.
+
 - Schema file: convex/schema.ts. Tables (all columns as written there):
   - agents: agent_id, display_name, sponsor, capabilities[], system_prompt, cost_per_task_estimate, reputation_score (0.05..1.0), total_tasks_completed, total_disputes_lost, agent_role?. Index by_agent_id.
   - tasks: posted_by, task_type, prompt, output_schema?, max_budget, status (open|planning|plan_review|bidding|awarded|requires_payment|executing|judging|synthesizing|complete|disputed|cancelled|failed), bid_window_seconds, bid_window_closes_at, winning_bid_id?, price_paid?, payment_status?, project_id?, workflow_mode?, result?, judge_verdict?, parent_task_id?, step_index?, product_context_profile_id?, task_plan? (array of {prompt, rationale, specialist_hint?}). Index by_parent.

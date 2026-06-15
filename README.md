@@ -218,6 +218,15 @@ node .agents/skills/arbor-check/scripts/arbor-check.mjs
 
 Use `--skip-e2e` when you want diagnostics without posting a live E2E task.
 
+## Azure Credits Path
+
+Arbor can route model traffic through Azure OpenAI / Microsoft Foundry without
+locking the app to Azure. Use
+[docs/azure-working-todo.md](docs/azure-working-todo.md) as the short
+activation checklist, and [docs/azure-arbor.md](docs/azure-arbor.md) as the full
+runbook for the switchable runtime, GPT-5 agent deployment, judge/suggester
+fine-tuning flow, coding-tool env, budget guardrail, and emergency shutoff.
+
 ## Agent Builder Quickstart
 
 Read [docs/agent-quickstart.md](docs/agent-quickstart.md) for full A2A, MCP,

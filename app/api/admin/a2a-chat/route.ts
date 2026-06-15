@@ -1,8 +1,8 @@
 /**
  * Admin console A2A chat.
  *
- * GET  -> list every specialist with an a2a_endpoint (static registry merged
- *         with Convex-discovered rows) for the admin chat picker.
+ * GET  -> list every specialist shown in the market/admin listing, with
+ *         A2A-ready entries marked for direct chat.
  * POST -> { agent_id, text, context_id? }: send one user message to that
  *         specialist over A2A JSON-RPC message/send, poll tasks/get to a
  *         terminal state when the reply is a task, and return the agent's
@@ -46,15 +46,17 @@ interface DiscoveredRow {
   cost_baseline: number;
   starting_reputation: number;
   one_liner: string;
+  mcp_endpoint?: string;
   a2a_endpoint?: string;
   a2a_agent_card_url?: string;
   a2a_api_key_env?: string;
   a2a_auth_mode?: "none" | "card";
+  discovery_source?: "catalog" | "registry" | "a2a" | "synthesized";
 }
 
-/** Static registry + Convex-discovered rows, filtered to A2A-capable. */
-async function a2aSpecialists(): Promise<SpecialistConfig[]> {
-  const fromRegistry = SPECIALISTS.filter((s) => s.a2a_endpoint);
+/** Static registry + Convex-discovered rows. */
+async function listedSpecialists(): Promise<SpecialistConfig[]> {
+  const fromRegistry = SPECIALISTS;
   let discovered: SpecialistConfig[] = [];
   try {
     const rows = (await convex().query(
@@ -62,7 +64,6 @@ async function a2aSpecialists(): Promise<SpecialistConfig[]> {
       {},
     )) as DiscoveredRow[];
     discovered = rows
-      .filter((r) => r.a2a_endpoint)
       .map((r) => ({
         agent_id: r.agent_id,
         display_name: r.display_name,
@@ -72,12 +73,18 @@ async function a2aSpecialists(): Promise<SpecialistConfig[]> {
         cost_baseline: r.cost_baseline,
         starting_reputation: r.starting_reputation,
         one_liner: r.one_liner,
-        tier: "a2a" as const,
+        tier: r.a2a_endpoint
+          ? ("a2a" as const)
+          : r.mcp_endpoint
+            ? ("mcp-forwarding" as const)
+            : ("mock" as const),
+        mcp_endpoint: r.mcp_endpoint,
         a2a_endpoint: r.a2a_endpoint,
         a2a_agent_card_url: r.a2a_agent_card_url,
         a2a_api_key_env: r.a2a_api_key_env,
         a2a_auth_mode: r.a2a_auth_mode,
         discovered: true,
+        discovery_source: r.discovery_source,
       }));
   } catch {
     // Convex unreachable -> registry-only list rather than a hard failure.
@@ -86,15 +93,38 @@ async function a2aSpecialists(): Promise<SpecialistConfig[]> {
   return [...fromRegistry, ...discovered.filter((s) => !seen.has(s.agent_id))];
 }
 
+/** Static registry + Convex-discovered rows, filtered to A2A-capable. */
+async function a2aSpecialists(): Promise<SpecialistConfig[]> {
+  return (await listedSpecialists()).filter((s) => s.a2a_endpoint);
+}
+
+function chatUnavailableReason(s: SpecialistConfig): string | undefined {
+  if (s.a2a_endpoint) return undefined;
+  if (s.mcp_endpoint) return "MCP specialist; not directly reachable over A2A.";
+  if (s.tier === "a2a-bridge") {
+    return "A2A bridge specialist; use auction flow rather than direct message/send.";
+  }
+  if (s.tier === "mock") {
+    return "Mock/persona specialist; no direct A2A endpoint configured.";
+  }
+  if (s.tier === "real") {
+    return "Native API specialist; no direct A2A endpoint configured.";
+  }
+  return "No A2A endpoint configured.";
+}
+
 export async function GET() {
-  const specs = await a2aSpecialists();
+  const specs = await listedSpecialists();
   return jsonOk({
     specialists: specs.map((s) => ({
       agent_id: s.agent_id,
       display_name: s.display_name,
       sponsor: s.sponsor,
       one_liner: s.one_liner,
+      tier: s.tier,
       a2a_endpoint: s.a2a_endpoint,
+      chat_ready: Boolean(s.a2a_endpoint),
+      chat_unavailable_reason: chatUnavailableReason(s),
       discovered: s.discovered === true,
     })),
   });
